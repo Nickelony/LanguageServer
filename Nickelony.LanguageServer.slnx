@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Nickelony.LanguageServer.Abstractions/Nickelony.LanguageServer.Abstractions.csproj" />
+    <Project Path="Nickelony.LanguageServer.Client/Nickelony.LanguageServer.Client.csproj" />
+    <Project Path="Nickelony.LanguageServer.Lua/Nickelony.LanguageServer.Lua.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="Tests/Nickelony.LanguageServer.Client.Tests/Nickelony.LanguageServer.Client.Tests.csproj" />
+    <Project Path="Tests/Nickelony.LanguageServer.Lua.Tests/Nickelony.LanguageServer.Lua.Tests.csproj" />
+  </Folder>
+</Solution>
