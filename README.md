@@ -1,4 +1,4 @@
-# <img width="32" height="32" alt="LanguageServer" src="https://github.com/user-attachments/assets/3b8c6718-3f76-4780-9872-168eee8fab74" /> LanguageServer
+# <img width="32" height="32" alt="LanguageServerProtocol" src="https://github.com/user-attachments/assets/3b8c6718-3f76-4780-9872-168eee8fab74" /> Language Server Protocol .NET library family
 
 A lightweight .NET library family for building language-server-powered editors: a StreamJsonRpc LSP client, generic editor IntelliSense contracts, and a Lua provider backed by [LuaLS](https://github.com/LuaLS/lua-language-server).
 
