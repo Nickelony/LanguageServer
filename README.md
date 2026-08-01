@@ -1,6 +1,6 @@
 # LanguageServer
 
-A .NET library family for building language-server-powered editors: a StreamJsonRpc LSP client, generic editor IntelliSense contracts, and a Lua provider backed by [LuaLS](https://github.com/LuaLS/lua-language-server).
+A lightweight .NET library family for building language-server-powered editors: a StreamJsonRpc LSP client, generic editor IntelliSense contracts, and a Lua provider backed by [LuaLS](https://github.com/LuaLS/lua-language-server).
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
