@@ -8,6 +8,7 @@ namespace Nickelony.LanguageServer.Client;
 /// </summary>
 public sealed class SupportedCapabilityJsonConverter : JsonConverter<SupportedCapability>
 {
+	/// <inheritdoc/>
 	public override SupportedCapability Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		return reader.TokenType switch
@@ -20,6 +21,7 @@ public sealed class SupportedCapabilityJsonConverter : JsonConverter<SupportedCa
 		};
 	}
 
+	/// <inheritdoc/>
 	public override void Write(Utf8JsonWriter writer, SupportedCapability value, JsonSerializerOptions options)
 		=> throw new NotSupportedException();
 
@@ -44,6 +46,7 @@ public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<Text
 	private readonly record struct TextDocumentSyncCapabilityObject(
 		[property: JsonPropertyName("change")] JsonElement Change);
 
+	/// <inheritdoc/>
 	public override TextDocumentSyncCapability Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		switch (reader.TokenType)
@@ -67,6 +70,7 @@ public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<Text
 		}
 	}
 
+	/// <inheritdoc/>
 	public override void Write(Utf8JsonWriter writer, TextDocumentSyncCapability value, JsonSerializerOptions options)
 		=> throw new NotSupportedException();
 
@@ -100,6 +104,7 @@ public sealed class SemanticTokensFullCapabilityJsonConverter : JsonConverter<Se
 	private readonly record struct SemanticTokensFullCapabilityObject(
 		[property: JsonPropertyName("delta")] JsonElement Delta);
 
+	/// <inheritdoc/>
 	public override SemanticTokensFullCapability Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		return reader.TokenType switch
@@ -112,6 +117,7 @@ public sealed class SemanticTokensFullCapabilityJsonConverter : JsonConverter<Se
 		};
 	}
 
+	/// <inheritdoc/>
 	public override void Write(Utf8JsonWriter writer, SemanticTokensFullCapability value, JsonSerializerOptions options)
 		=> throw new NotSupportedException();
 

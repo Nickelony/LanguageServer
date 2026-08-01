@@ -51,6 +51,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 	private int _disposeStarted;
 	private volatile bool _isDisposed;
 
+	/// <inheritdoc/>
 	public bool IsAvailable
 	{
 		get
@@ -63,11 +64,19 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 		}
 	}
 
+	/// <inheritdoc/>
 	public bool SupportsReferences => !_isDisposed && _client is not null && _client.SupportsReferences;
+
+	/// <inheritdoc/>
 	public bool SupportsRename => !_isDisposed && _client is not null && _client.SupportsRename;
+
+	/// <inheritdoc/>
 	public bool SupportsFormatting => !_isDisposed && _client is not null && _client.SupportsFormatting;
 
+	/// <inheritdoc/>
 	public event Action<string, IReadOnlyList<TextEditorDiagnostic>>? DiagnosticsUpdated;
+
+	/// <inheritdoc/>
 	public event Action<string, IReadOnlyList<LuaSemanticToken>>? SemanticTokensUpdated;
 
 	/// <summary>
@@ -165,6 +174,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 		return new(workspaceRootDirectoryPath, dispatchAsync, WorkspaceWatchSpecifications, watcherFailed);
 	}
 
+	/// <inheritdoc/>
 	public IReadOnlyList<TextEditorDiagnostic> GetDiagnostics(string filePath)
 	{
 		if (_isDisposed)
@@ -176,6 +186,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 		return _documents.GetDiagnostics(normalizedFilePath);
 	}
 
+	/// <inheritdoc/>
 	public IReadOnlyList<LuaSemanticToken> GetSemanticTokens(string filePath)
 	{
 		if (_isDisposed)
@@ -187,6 +198,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 		return _documents.GetSemanticTokens(normalizedFilePath);
 	}
 
+	/// <inheritdoc/>
 	public void OpenDocument(string filePath, string content)
 	{
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
@@ -201,6 +213,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 			CancellationToken.None), "Document open");
 	}
 
+	/// <inheritdoc/>
 	public void UpdateDocument(string filePath, string content)
 	{
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
@@ -209,6 +222,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider : ILuaIntellis
 		ObserveBackgroundTask(QueueLatestDocumentUpdateAsync(normalizedFilePath, content), "Document change");
 	}
 
+	/// <inheritdoc/>
 	public void CloseDocument(string filePath)
 	{
 		if (_isDisposed || _client is null || !LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))

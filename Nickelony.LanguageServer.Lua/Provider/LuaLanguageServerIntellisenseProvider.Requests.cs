@@ -7,6 +7,7 @@ namespace Nickelony.LanguageServer.Lua;
 
 public sealed partial class LuaLanguageServerIntellisenseProvider
 {
+	/// <inheritdoc/>
 	public async Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(TextReferenceRequest request, CancellationToken cancellationToken = default)
 	{
 		return await GetReferencesAsync(
@@ -17,6 +18,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			cancellationToken).ConfigureAwait(false);
 	}
 
+	/// <inheritdoc/>
 	public Task<TextHoverInfo?> GetHoverAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
@@ -29,6 +31,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			cancellationToken);
 	}
 
+	/// <inheritdoc/>
 	public Task<TextDefinitionLocation?> GetDefinitionAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
@@ -88,6 +91,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		}
 	}
 
+	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> RenameSymbolAsync(TextRenameRequest request, CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrWhiteSpace(request.NewName))
@@ -128,6 +132,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		}
 	}
 
+	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> FormatDocumentAsync(TextFormatRequest request, CancellationToken cancellationToken = default)
 	{
 		ILanguageServerClient? client = _client;
@@ -170,6 +175,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		}
 	}
 
+	/// <inheritdoc/>
 	public Task<TextSignatureHelpInfo?> GetSignatureHelpAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{

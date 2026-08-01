@@ -18,6 +18,7 @@ public sealed class CompletionResponseJsonConverter : JsonConverter<CompletionRe
 	internal static void InitializeLogger(ILogger logger)
 		=> _logger = logger ?? NullLogger.Instance;
 
+	/// <inheritdoc/>
 	public override CompletionResponse? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		if (reader.TokenType == JsonTokenType.Null)
@@ -205,6 +206,7 @@ public sealed class CompletionResponseJsonConverter : JsonConverter<CompletionRe
 		return false;
 	}
 
+	/// <inheritdoc/>
 	public override void Write(Utf8JsonWriter writer, CompletionResponse value, JsonSerializerOptions options)
 	{
 		writer.WriteStartObject();

@@ -61,6 +61,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		CancelSemanticTokenRequest(filePath);
 	}
 
+	/// <inheritdoc/>
 	public void RenameDocument(string oldFilePath, string newFilePath, string content)
 	{
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(oldFilePath, out string normalizedOldFilePath)

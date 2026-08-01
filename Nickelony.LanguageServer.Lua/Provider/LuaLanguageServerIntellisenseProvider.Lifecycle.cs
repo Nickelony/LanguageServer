@@ -134,7 +134,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		RaiseStartupFailed(failure);
 	}
 
-	/// <inheritdoc />
+	/// <inheritdoc/>
 	/// <remarks>
 	/// Disposal stops the workspace watcher, cancels queued document and semantic token work, and releases the active
 	/// Lua language-server client.

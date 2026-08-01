@@ -7,6 +7,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	private const int CompletionTriggerKindInvoked = 1;
 	private const int CompletionTriggerKindTriggerCharacter = 2;
 
+	/// <inheritdoc/>
 	public async Task<IReadOnlyList<TextCompletionItem>> GetCompletionItemsAsync(string filePath, string content,
 		int line, int column, char? triggerCharacter = null, CancellationToken cancellationToken = default)
 	{
