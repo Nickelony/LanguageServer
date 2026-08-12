@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Nickelony.LanguageServer.Abstractions.Completion;
@@ -191,10 +190,10 @@ public sealed class TextCompletionItemKind : IEquatable<TextCompletionItemKind>
 
 	private static string NormalizeAndValidate(string identifier)
 	{
-		string normalizedIdentifier = identifier.Trim();
-
-		if (normalizedIdentifier.Length == 0)
+		if (string.IsNullOrWhiteSpace(identifier))
 			throw new ArgumentException("A completion-kind identifier cannot be empty.", nameof(identifier));
+
+		string normalizedIdentifier = identifier.Trim();
 
 		if (normalizedIdentifier.Length > MaximumIdentifierLength)
 			throw new ArgumentException($"A completion-kind identifier cannot exceed {MaximumIdentifierLength} characters.", nameof(identifier));
@@ -216,30 +215,4 @@ public sealed class TextCompletionItemKind : IEquatable<TextCompletionItemKind>
 
 	private static bool IsIdentifierPart(char value)
 		=> IsIdentifierStart(value) || value is >= '0' and <= '9' or '.' or '-' or ':';
-}
-
-/// <summary>
-/// Serializes completion-kind identifiers as strings and recreates unknown values as custom categories.
-/// </summary>
-public sealed class TextCompletionItemKindJsonConverter : JsonConverter<TextCompletionItemKind>
-{
-	/// <inheritdoc/>
-	public override TextCompletionItemKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-	{
-		if (reader.TokenType != JsonTokenType.String)
-			throw new JsonException("A completion-kind value must be a string identifier.");
-
-		try
-		{
-			return TextCompletionItemKind.FromIdentifier(reader.GetString() ?? string.Empty);
-		}
-		catch (ArgumentException exception)
-		{
-			throw new JsonException("The completion-kind identifier is invalid.", exception);
-		}
-	}
-
-	/// <inheritdoc/>
-	public override void Write(Utf8JsonWriter writer, TextCompletionItemKind value, JsonSerializerOptions options)
-		=> writer.WriteStringValue(value.Identifier);
 }

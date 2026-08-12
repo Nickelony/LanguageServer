@@ -90,7 +90,7 @@ var options = new LanguageServerClientOptions(settingsProvider: () => new { maxP
 ## Dependencies
 
 - `Nickelony.LanguageServer.Abstractions`
-- `StreamJsonRpc` 2.25.x
+- `StreamJsonRpc` 2.25.29
 - `Microsoft.Extensions.Logging.Abstractions` 8.0.3
 
 ## License

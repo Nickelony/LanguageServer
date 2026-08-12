@@ -58,7 +58,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 
 			if (GetStartupSucceeded() && _client.IsReady)
 			{
-				SetProviderState(LanguageServerProviderState.Ready);
+				SetProviderState(LanguageServerProviderState.Ready, notifyCapabilitiesChanged: true);
 
 				_workspaceChanges.EnsureWorkspaceFileWatcherStarted();
 				await _workspaceChanges.ReplayDeferredWorkspaceFileChangesAsync(effectiveStartupCancellationToken).ConfigureAwait(false);

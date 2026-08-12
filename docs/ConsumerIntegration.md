@@ -21,6 +21,7 @@ try
     provider.SemanticTokensUpdated += OnSemanticTokensUpdated;
 
     provider.OpenDocument(filePath, initialText);
+
     IReadOnlyList<TextCompletionItem> items =
         await provider.GetCompletionItemsAsync(filePath, initialText, line, column, cancellationToken: token);
 
@@ -81,11 +82,3 @@ catch (OperationCanceledException) when (requestCancellation.IsCancellationReque
 Caller cancellation propagates as `OperationCanceledException`. Provider disposal,
 provider-enforced timeouts, internal transport failure, and unsupported capabilities use
 the documented fallback result instead; they are not reported as caller cancellation.
-
-## Package-only concrete provider sample
-
-The [sample host](../Samples/Nickelony.LanguageServer.SampleHost/) restores the produced Lua
-package without repository project references and constructs the concrete
-`LuaLanguageServerIntelliSenseProvider`. It deliberately supplies no LuaLS executable, so it
-deterministically verifies startup fallback, event routing, the documented references, rename,
-and formatting request shapes, and idempotent disposal without launching an external process.

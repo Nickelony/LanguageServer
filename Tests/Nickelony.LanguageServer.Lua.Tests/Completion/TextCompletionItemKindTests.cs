@@ -49,6 +49,15 @@ public sealed class TextCompletionItemKindTests
 	}
 
 	[TestMethod]
+	public void InvalidIdentifiersRejectNullAndWhitespace()
+	{
+		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.CreateCustom(null!));
+		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.FromIdentifier(null!));
+		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.CreateCustom(" \t\r\n "));
+		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.FromIdentifier(" \t\r\n "));
+	}
+
+	[TestMethod]
 	public void CustomKindsSurviveStringJsonRoundTrip()
 	{
 		TextCompletionItemKind originalKind = TextCompletionItemKind.CreateCustom("editor.lua.special");
