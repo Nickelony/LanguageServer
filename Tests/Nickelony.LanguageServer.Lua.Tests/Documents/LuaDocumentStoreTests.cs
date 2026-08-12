@@ -14,12 +14,11 @@ public class LuaDocumentStoreTests
 		manager.Synchronize(filePath, "return 1", acquireOpenReference: true);
 
 		DocumentSnapshot? trackedDocument = manager.GetDocumentSnapshot(filePath);
+		Assert.IsNotNull(trackedDocument);
 
 		var originalDiagnostic = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Warning, "Original", 0, 1);
 		var replacementDiagnostic = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Warning, "Replacement", 1, 2);
 		TextEditorDiagnostic[] sourceDiagnostics = [originalDiagnostic];
-
-		Assert.IsNotNull(trackedDocument);
 
 		Assert.IsTrue(manager.TryStoreDiagnostics(
 			new LuaPublishedDiagnostics(filePath, sourceDiagnostics, version: trackedDocument.Version),

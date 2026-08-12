@@ -30,13 +30,13 @@ public class WorkspaceFileChangeForwarderTests
 			},
 			CancellationToken.None).ConfigureAwait(false);
 
+		await forwarder.ReplayDeferredAsync((_, _) => throw new AssertFailedException("No deferred changes should remain."), CancellationToken.None)
+			.ConfigureAwait(false);
+
 		Assert.IsTrue(ensureStartedCalled);
 		Assert.IsNotNull(forwardedChanges);
 		Assert.AreEqual(1, forwardedChanges.Count);
 		Assert.AreEqual(0, markTransportUnavailableCallCount);
-
-		await forwarder.ReplayDeferredAsync((_, _) => throw new AssertFailedException("No deferred changes should remain."), CancellationToken.None)
-			.ConfigureAwait(false);
 	}
 
 	[TestMethod]

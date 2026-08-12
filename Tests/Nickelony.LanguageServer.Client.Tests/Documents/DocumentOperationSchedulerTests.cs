@@ -122,6 +122,7 @@ public class DocumentOperationSchedulerTests
 		string aliasedFilePath = Path.Combine(Path.GetDirectoryName(canonicalFilePath)!, ".", Path.GetFileName(canonicalFilePath));
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
 		int secondOperationCallCount = 0;
 
 		Task<bool> firstTask = scheduler.EnqueuePerDocumentAsync(canonicalFilePath, async _ =>
@@ -200,6 +201,7 @@ public class DocumentOperationSchedulerTests
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondQueued = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
 		int thirdStarted = 0;
 
 		Task firstTask = scheduler.QueueLatestUpdateAsync("test.lua", async token =>
@@ -240,6 +242,7 @@ public class DocumentOperationSchedulerTests
 		var scheduler = new DocumentOperationScheduler();
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
 		int secondStarted = 0;
 
 		Task firstTask = scheduler.QueueLatestUpdateAsync("test.lua", async _ =>
@@ -275,6 +278,7 @@ public class DocumentOperationSchedulerTests
 		var scheduler = new DocumentOperationScheduler();
 		var exclusiveStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowExclusiveToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
 		int laterOperationCallCount = 0;
 
 		Task<bool> exclusiveTask = scheduler.EnqueueExclusivePerDocumentAsync(
