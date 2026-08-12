@@ -1,14 +1,35 @@
+using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
+
 namespace Nickelony.LanguageServer.Lua;
 
-public sealed partial class LuaLanguageServerIntellisenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider
 {
 	/// <summary>
 	/// Ensures the language-server transport is running and that tracked documents and workspace watching are restored after reconnects.
 	/// </summary>
 	private async Task<bool> EnsureStartedAsync(CancellationToken cancellationToken)
 	{
-		if (_isDisposed || _client is null || GetConsecutiveStartupFailures() >= HardStartupFailureThreshold)
+		if (_isDisposed || _client is null)
 			return false;
+
+		if (GetConsecutiveStartupFailures() >= HardStartupFailureThreshold)
+		{
+			SetProviderState(LanguageServerProviderState.Failed);
+			return false;
+		}
+
+		using var fastPathDisposeAwareCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
+
+		// Fast path: once the client is healthy, keep the workspace watcher alive and avoid taking the startup lock.
+		if (GetStartupSucceeded() && _client.IsReady)
+		{
+			_workspaceChanges.EnsureWorkspaceFileWatcherStarted();
+			await _workspaceChanges.ReplayDeferredWorkspaceFileChangesAsync(fastPathDisposeAwareCts.Token).ConfigureAwait(false);
+
+			return true;
+		}
+
+		SetProviderState(LanguageServerProviderState.Starting);
 
 		bool shieldCancellationForRestart = GetStartupSucceeded() && !_client.IsReady;
 
@@ -20,14 +41,6 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		CancellationToken effectiveStartupCancellationToken = disposeAwareStartupCts.Token;
 		bool startLockHeld = false;
 
-		// Fast path: once the client is healthy, keep the workspace watcher alive and avoid taking the startup lock.
-		if (GetStartupSucceeded() && _client.IsReady)
-		{
-			_workspaceChanges.EnsureWorkspaceFileWatcherStarted();
-			await _workspaceChanges.ReplayDeferredWorkspaceFileChangesAsync(effectiveStartupCancellationToken).ConfigureAwait(false);
-			return true;
-		}
-
 		try
 		{
 			// Serialize startup and restart work so concurrent callers share one recovery flow.
@@ -38,12 +51,18 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 
 			// Re-check state after taking the lock so concurrent callers share the same restart/startup work.
 			if (GetConsecutiveStartupFailures() >= HardStartupFailureThreshold)
+			{
+				SetProviderState(LanguageServerProviderState.Failed);
 				return false;
+			}
 
 			if (GetStartupSucceeded() && _client.IsReady)
 			{
+				SetProviderState(LanguageServerProviderState.Ready);
+
 				_workspaceChanges.EnsureWorkspaceFileWatcherStarted();
 				await _workspaceChanges.ReplayDeferredWorkspaceFileChangesAsync(effectiveStartupCancellationToken).ConfigureAwait(false);
+
 				return true;
 			}
 
@@ -61,6 +80,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 
 			// Start the transport, then replay tracked documents when this is a restart rather than a cold start.
 			bool startupSucceeded = await _client.StartAsync(effectiveStartupCancellationToken).ConfigureAwait(false);
+			long startedTransportGeneration = startupSucceeded ? _client.TransportGeneration : 0;
 
 			if (startupSucceeded && documentsToReopen.Count > 0)
 			{
@@ -74,23 +94,26 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 				}
 			}
 
-			// Update startup bookkeeping before resuming watcher and timeout management.
-			SetStartupSucceeded(startupSucceeded);
+			if (startupSucceeded)
+				startupSucceeded = TryCompleteSuccessfulStart(startedTransportGeneration);
 
 			if (startupSucceeded)
 			{
-				ResetStartupStateAfterSuccessfulStart();
-				ResetRequestTimeoutTracking(_client.TransportGeneration);
+				ResetRequestTimeoutTracking(startedTransportGeneration);
 
 				_workspaceChanges.EnsureWorkspaceFileWatcherStarted();
 				await _workspaceChanges.ReplayDeferredWorkspaceFileChangesAsync(effectiveStartupCancellationToken).ConfigureAwait(false);
 			}
 			else
 			{
-				// Record repeated failures so IntelliSense eventually stops advertising availability until restart.
 				int consecutiveStartupFailures = RegisterStartupFailure();
 				bool isPermanentFailure = consecutiveStartupFailures >= HardStartupFailureThreshold;
 
+				SetProviderState(
+					isPermanentFailure ? LanguageServerProviderState.Failed : LanguageServerProviderState.Unavailable,
+					notifyCapabilitiesChanged: true);
+
+				// Record repeated failures so IntelliSense eventually stops advertising availability until restart.
 				if (isPermanentFailure)
 				{
 					_logger.LogError("Lua language server failed to start {Count} times consecutively for workspace '{Workspace}'; IntelliSense is now disabled until the editor is restarted.",
@@ -111,6 +134,16 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		{
 			return false;
 		}
+		catch (OperationCanceledException)
+		{
+			SetProviderState(LanguageServerProviderState.Unavailable, notifyCapabilitiesChanged: true);
+			throw;
+		}
+		catch
+		{
+			SetProviderState(LanguageServerProviderState.Unavailable, notifyCapabilitiesChanged: true);
+			throw;
+		}
 		finally
 		{
 			if (startLockHeld)
@@ -125,31 +158,52 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 
 		LanguageServerStartupFailure failure = isPermanentFailure
 			? new LanguageServerStartupFailure(
-				"The bundled Lua language server failed to start repeatedly and Lua IntelliSense is now disabled until the application is restarted. See the log for technical details.",
+				"The configured Lua language server failed to start repeatedly and Lua IntelliSense is now disabled until the application is restarted. See the log for technical details.",
 				true)
 			: new LanguageServerStartupFailure(
-				"The bundled Lua language server failed to start. Lua IntelliSense will remain unavailable until the application can start the server successfully. The application will retry automatically when Lua IntelliSense is requested again.",
+				"The configured Lua language server failed to start. Lua IntelliSense will remain unavailable until the application can start the server successfully. The application will retry automatically when Lua IntelliSense is requested again.",
 				false);
 
 		RaiseStartupFailed(failure);
 	}
 
+	private void ReportMissingClientFailure()
+	{
+		if (_isDisposed || _client is not null)
+			return;
+
+		SetProviderState(LanguageServerProviderState.Failed, notifyCapabilitiesChanged: true);
+
+		if (!TryMarkStartupFailureReported(isPermanentFailure: true))
+			return;
+
+		s_logMissingExecutable(_logger, _workspaceRootDirectoryPath, null);
+
+		RaiseStartupFailed(new LanguageServerStartupFailure(
+			"The Lua language server executable is unavailable, so Lua IntelliSense is disabled until the application provides a valid server installation.",
+			IsPersistent: true));
+	}
+
 	/// <inheritdoc/>
 	/// <remarks>
-	/// Disposal stops the workspace watcher, cancels queued document and semantic token work, and releases the active
-	/// Lua language-server client.
+	/// Disposal is idempotent. It first closes callback admission and detaches provider subscribers, then cancels
+	/// provider-owned work, disposes the workspace watcher/coordinator, and finally disposes the Lua language-server
+	/// client owned by this provider. A callback already admitted before disposal began may finish; no later callback
+	/// starts. The provider must not be used after disposal.
 	/// </remarks>
 	public void Dispose()
 	{
 		if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
 			return;
 
-		_isDisposed = true;
+		CloseCallbackAdmission();
+		SetProviderState(LanguageServerProviderState.Disposed);
 
 		if (_client is not null)
 		{
 			_client.DiagnosticsPublished -= HandleDiagnosticsPublished;
 			_client.SemanticTokensRefreshRequested -= HandleSemanticTokensRefreshRequested;
+			_client.TransportUnavailable -= HandleTransportUnavailable;
 		}
 
 		try
@@ -171,6 +225,21 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		finally
 		{
 			_disposeCts.Dispose();
+		}
+	}
+
+	private void CloseCallbackAdmission()
+	{
+		lock (_callbackAdmissionSyncRoot)
+		{
+			_callbackAdmissionClosed = true;
+			_isDisposed = true;
+
+			_diagnosticsUpdated = null;
+			_semanticTokensUpdated = null;
+			_capabilitiesChanged = null;
+			_startupFailed = null;
+			_workspaceWatcherFailed = null;
 		}
 	}
 }

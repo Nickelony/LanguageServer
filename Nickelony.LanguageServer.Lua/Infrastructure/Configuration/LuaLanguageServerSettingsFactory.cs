@@ -1,13 +1,13 @@
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Builds the workspace-scoped configuration payload sent to the bundled Lua language server.
+/// Builds the workspace-scoped configuration payload sent to the external Lua language server.
 /// </summary>
 internal static class LuaLanguageServerSettingsFactory
 {
 	private const string LuaRuntimeVersion = "Lua 5.4";
 	private const string DisabledSettingValue = "Disable";
-	private static readonly string[] DisabledDiagnostics = ["duplicate-set-field"];
+	private static readonly string[] s_disabledDiagnostics = ["duplicate-set-field"];
 
 	/// <summary>
 	/// Builds the Lua language server settings payload for the active script workspace.
@@ -45,7 +45,7 @@ internal static class LuaLanguageServerSettingsFactory
 				},
 				diagnostics = new
 				{
-					disable = DisabledDiagnostics
+					disable = s_disabledDiagnostics
 				}
 			}
 		};

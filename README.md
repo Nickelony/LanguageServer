@@ -36,16 +36,16 @@ It powers Lua IntelliSense in **Tomb Editor** (`TombIDE.ScriptingStudio`).
 ## Quick start
 
 The fastest way to get going is to reference the **Lua** package and host
-`LuaLanguageServerIntellisenseProvider` in your editor:
+`LuaLanguageServerIntelliSenseProvider` in your editor:
 
 ```xml
-<PackageReference Include="Nickelony.LanguageServer.Lua" Version="0.1.0-preview" />
+<PackageReference Include="Nickelony.LanguageServer.Lua" Version="1.0.0-preview.1" />
 ```
 
 ```csharp
 using Nickelony.LanguageServer.Lua;
 
-var provider = new LuaLanguageServerIntellisenseProvider(
+var provider = new LuaLanguageServerIntelliSenseProvider(
     workspaceRootDirectoryPath: @"C:\my\workspace",
     serverExecutablePath: @"C:\tools\lua-language-server\lua-language-server.exe");
 
@@ -64,6 +64,8 @@ var completions = await provider.GetCompletionItemsAsync(
 See the [Lua package README](Nickelony.LanguageServer.Lua/README.md) for the full example, or the
 [Client](Nickelony.LanguageServer.Client/README.md) and
 [Abstractions](Nickelony.LanguageServer.Abstractions/README.md) READMEs for the lower layers.
+The [consumer integration guide](docs/ConsumerIntegration.md) documents construction,
+disposal, event marshaling, document references, and cancellation behavior.
 
 ## Architecture
 
@@ -73,7 +75,7 @@ See the [Lua package README](Nickelony.LanguageServer.Lua/README.md) for the ful
 └───────────────┬───────────────┘
                 │ uses
 ┌───────────────▼───────────────┐
-│   Nickelony.LanguageServer    │  Lua provider (ILuaIntellisenseProvider)
+│   Nickelony.LanguageServer    │  Lua provider (ILuaIntelliSenseProvider)
 │   .Lua                        │
 └───────┬───────────────┬───────┘
         │               │
@@ -106,8 +108,8 @@ dotnet build Nickelony.LanguageServer.slnx
 dotnet test  Nickelony.LanguageServer.slnx
 ```
 
-The test suite covers the client (194 tests) and the Lua provider (136 tests + 4 integration
-tests that require a local LuaLS bundle).
+The test suite covers the client and Lua provider, plus four opt-in integration tests that
+require a local LuaLS bundle. Run `dotnet test` for the current counts.
 
 ## Repository layout
 

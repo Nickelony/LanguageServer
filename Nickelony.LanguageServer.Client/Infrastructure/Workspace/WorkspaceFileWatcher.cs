@@ -11,8 +11,8 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 
 	private readonly ILogger _logger;
 
-	private static readonly TimeSpan DispatchDebounce = TimeSpan.FromMilliseconds(250);
-	private static readonly TimeSpan MaxDispatchRetryDelay = TimeSpan.FromSeconds(5.0f);
+	private static readonly TimeSpan s_dispatchDebounce = TimeSpan.FromMilliseconds(250);
+	private static readonly TimeSpan s_maxDispatchRetryDelay = TimeSpan.FromSeconds(5.0f);
 
 	// Watcher registration state.
 	private readonly string _workspaceRootDirectoryPath;
@@ -99,6 +99,6 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 		_watcherFailed = watcherFailed;
 		_fileSystemWatcherFactory = fileSystemWatcherFactory ?? CreateFileSystemWatcher;
 
-		_pendingChanges = new WorkspaceChangeDebouncer(DispatchDebounce, () => _ = DispatchPendingChangesAsync());
+		_pendingChanges = new WorkspaceChangeDebouncer(s_dispatchDebounce, () => _ = DispatchPendingChangesAsync());
 	}
 }

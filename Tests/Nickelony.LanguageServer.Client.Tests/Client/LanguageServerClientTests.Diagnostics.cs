@@ -7,12 +7,13 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleDiagnosticsPublished_WhenTransportIsAttachedButNotReady_QueuesDiagnostics()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);
 		var publishedMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		SetActiveSession(client, session);
 		InvokePrivateMethod(client, "EnsureTransportBackgroundLoopsRunning", true);
+
 		client.DiagnosticsPublished += parameters => publishedMessage.TrySetResult(parameters.Diagnostics?[0].Message);
 
 		object rpcTarget = CreateRpcTarget(client, GetTransportGeneration(session));
@@ -27,12 +28,13 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleDiagnosticsPublished_IgnoresUnhealthyTransportGeneration()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);
 		var publishedMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		SetActiveSession(client, session);
 		SetReadyState(client, true);
+
 		client.DiagnosticsPublished += parameters => publishedMessage.TrySetResult(parameters.Diagnostics?[0].Message);
 
 		client.MarkTransportUnhealthy();
@@ -51,7 +53,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_CoalescesQueuedDiagnosticsByFile()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		int publishedCount = 0;
 		string? lastMessage = null;
 
@@ -74,7 +76,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_CoalescesWindowsFileUrisThatDifferOnlyByCase()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		int publishedCount = 0;
 		string? lastMessage = null;
 
@@ -97,7 +99,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_DropsQueuedDiagnosticsFromInactiveTransportGeneration()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 		int publishedCount = 0;
@@ -127,7 +129,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_SameUriStaleGenerationDoesNotOverwriteCurrentGenerationPayload()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 		int publishedCount = 0;
@@ -158,7 +160,7 @@ public partial class LanguageServerClientTests
 	public async Task PumpDiagnosticsAsync_WhenHandlerThrows_LogsWarningAndContinuesProcessing()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		int publishedCount = 0;
 		var publishedMessages = new List<string>();
 
@@ -191,7 +193,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_SlowSubscriberDoesNotBlockLaterSubscriber()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstSubscriberEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var firstSubscriberCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondSubscriberObserved = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -229,16 +231,14 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_SubscribersReceiveIndependentDiagnosticsSnapshots()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstSubscriberMutated = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondSubscriberObserved = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		client.DiagnosticsPublished += parameters =>
 		{
 			if (parameters.Diagnostics is { Length: > 0 } diagnostics)
-			{
 				diagnostics[0] = diagnostics[0] with { Message = "Mutated warning." };
-			}
 
 			firstSubscriberMutated.TrySetResult(true);
 		};
@@ -264,8 +264,9 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task InvokeDiagnosticsPublished_WhenSubscriberIsBusy_CoalescesPendingPayloadsPerDocument()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
 		const string uri = "file:///C:/Workspace/test.lua";
+
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstInvocationEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstInvocationToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondInvocationMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -312,8 +313,9 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task PumpDiagnosticsAsync_CoalescesRepeatedUpdatesWhileCallbackPumpIsBusy()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
 		const string uri = "file:///C:/Workspace/test.lua";
+
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstHandlerEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstHandlerToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondHandlerMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -365,8 +367,9 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task InvokeDiagnosticsPublished_AfterUnsubscribe_DoesNotDeliverQueuedCallbacks()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
 		const string uri = "file:///C:/Workspace/test.lua";
+
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstInvocationEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstInvocationToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var unexpectedSecondInvocation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

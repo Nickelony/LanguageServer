@@ -10,7 +10,7 @@ public partial class LanguageServerClientTests
 	public async Task WaitForBackgroundLoopsAsync_WhenLoopFaults_LogsSpecificWarningWithoutFallback()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 
 		await InvokePrivateTaskAsync(client, "WaitForBackgroundLoopsAsync",
 			Task.FromException(new IOException("Simulated loop failure.")),
@@ -28,7 +28,7 @@ public partial class LanguageServerClientTests
 	public async Task ObserveBackgroundLoop_WhenLoopFaultsBeforeDisposal_LogsImmediateWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Warning);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 
 		InvokePrivateMethod(client,
 			"ObserveBackgroundLoop",
@@ -49,7 +49,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task ObserveBackgroundLoop_WhenTrackedPumpFaults_MarksReadyClientUnhealthy()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 4, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -65,7 +65,7 @@ public partial class LanguageServerClientTests
 
 		Assert.IsFalse(client.IsReady);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendRequestAsync<JsonElement>(
 				"workspace/configuration",
 				new WorkspaceConfigurationParams([]),
@@ -75,11 +75,10 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void EnsureTransportBackgroundLoopsRunning_WhenCallbackPumpFaulted_ReplacesTrackedCallbackPumpTask()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		Task faultedCallbackPump = Task.FromException(new IOException("Simulated callback pump failure."));
 
 		SetPrivateField(client, "_callbackPumpTask", faultedCallbackPump);
-
 		InvokePrivateMethod(client, "EnsureTransportBackgroundLoopsRunning", false);
 
 		Task replacementTask = (Task)GetPrivateField(client, "_callbackPumpTask");
@@ -91,10 +90,11 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task EnsureTransportBackgroundLoopsRunning_WhenFaultedPumpIsReplaced_ForgetsObservedTermination()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		Task faultedCallbackPump = Task.FromException(new IOException("Simulated callback pump failure."));
 
 		SetPrivateField(client, "_callbackPumpTask", faultedCallbackPump);
+
 		InvokePrivateMethod(client,
 			"ObserveBackgroundLoop",
 			faultedCallbackPump,
@@ -113,7 +113,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task EnsureTransportBackgroundLoopsRunning_WhenDiagnosticsPumpFaulted_RestartRecoveryStillPublishesDiagnostics()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object originalSession = CreateTransportSession(client, 4, process: null, Stream.Null, Stream.Null);
 		var publishedMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 		Task faultedDiagnosticsPump = Task.FromException(new IOException("Simulated diagnostics pump failure."));
@@ -154,7 +154,7 @@ public partial class LanguageServerClientTests
 	public async Task WaitWithDisposeBudgetAsync_WhenLoopAlreadyLogged_DoesNotLogDuplicateDisposalWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Warning);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		Task faultedLoopTask = Task.FromException(new IOException("Simulated callback pump failure."));
 
 		InvokePrivateMethod(client, "ObserveBackgroundLoop", faultedLoopTask, "callback dispatcher", true);
@@ -181,7 +181,7 @@ public partial class LanguageServerClientTests
 	public async Task WaitForBackgroundLoopsAsync_WhenLoopIsCanceled_LogsDebugWithoutWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 
 		await InvokePrivateTaskAsync(client, "WaitForBackgroundLoopsAsync",
 			Task.FromCanceled(new CancellationToken(canceled: true)),

@@ -5,12 +5,12 @@ namespace Nickelony.LanguageServer.Lua;
 /// </summary>
 internal sealed class LuaSemanticTokensCache
 {
-	private static readonly IReadOnlyList<LuaSemanticToken> EmptyTokens = Array.AsReadOnly(Array.Empty<LuaSemanticToken>());
+	private static readonly IReadOnlyList<LuaSemanticToken> s_emptyTokens = Array.AsReadOnly(Array.Empty<LuaSemanticToken>());
 
 	/// <summary>
 	/// Gets the latest decoded semantic tokens.
 	/// </summary>
-	internal IReadOnlyList<LuaSemanticToken> Tokens { get; private set; } = EmptyTokens;
+	internal IReadOnlyList<LuaSemanticToken> Tokens { get; private set; } = s_emptyTokens;
 
 	/// <summary>
 	/// Gets the synchronized document version associated with the cached semantic tokens.
@@ -32,7 +32,7 @@ internal sealed class LuaSemanticTokensCache
 	/// </summary>
 	internal void Clear()
 	{
-		Tokens = EmptyTokens;
+		Tokens = s_emptyTokens;
 		Version = 0;
 		PreviousData = null;
 		PreviousResultId = null;
@@ -89,7 +89,7 @@ internal sealed class LuaSemanticTokensCache
 	private static IReadOnlyList<LuaSemanticToken> CreateReadOnlyTokens(IReadOnlyList<LuaSemanticToken>? semanticTokens)
 	{
 		return semanticTokens is null || semanticTokens.Count == 0
-			? EmptyTokens
+			? s_emptyTokens
 			: Array.AsReadOnly([.. semanticTokens]);
 	}
 }

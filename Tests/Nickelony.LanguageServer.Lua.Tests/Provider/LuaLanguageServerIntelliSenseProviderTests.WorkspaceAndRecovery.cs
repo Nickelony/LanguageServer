@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntellisenseProviderTests
+public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task DispatchWorkspaceFileChangesAsync_RefreshesConfigurationWhenApiLibraryChanges()
@@ -20,7 +20,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			File.WriteAllText(apiFilePath, "return {}");
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -75,7 +75,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -133,7 +133,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -192,7 +192,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -206,10 +206,10 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			using var cancellationTokenSource = new CancellationTokenSource();
 			cancellationTokenSource.Cancel();
 
-			TextHoverInfo? canceledHover = await provider.GetHoverAsync(scriptFilePath, "local value = 1", 0, 0, cancellationTokenSource.Token);
+			Task<TextHoverInfo?> canceledHoverTask = provider.GetHoverAsync(scriptFilePath, "local value = 1", 0, 0, cancellationTokenSource.Token);
 			TextHoverInfo? recoveredHover = await provider.GetHoverAsync(scriptFilePath, "local value = 1", 0, 0);
 
-			Assert.IsNull(canceledHover);
+			await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => canceledHoverTask);
 			Assert.IsNotNull(recoveredHover);
 
 			CollectionAssert.AreEqual(
@@ -252,7 +252,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -306,7 +306,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			client.BlockNextWatchedFilesNotification();
 			client.ThrowIOExceptionAfterWatchedFilesNotificationGateRelease = true;
@@ -371,7 +371,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			for (int i = 1; i <= 3; i++)
 			{
@@ -418,7 +418,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			StartResult = false
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var failures = new List<LanguageServerStartupFailure>();
 
 		provider.StartupFailed += failures.Add;
@@ -453,7 +453,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		TextHoverInfo? hover = await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -486,7 +486,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		TextDefinitionLocation? definition = await provider.GetDefinitionAsync(filePath, "value", 0, 0);
 
@@ -532,7 +532,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		IReadOnlyList<TextReferenceLocation> references = await provider.GetReferencesAsync(filePath, "value", 0, 0);
 
@@ -586,7 +586,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		TextSignatureHelpInfo? signature = await provider.GetSignatureHelpAsync(filePath, "spawn(", 0, 6);
 

@@ -4,21 +4,10 @@
     <RootNamespace>Nickelony.LanguageServer.Abstractions</RootNamespace>
     <AssemblyName>Nickelony.LanguageServer.Abstractions</AssemblyName>
     <PackageId>Nickelony.LanguageServer.Abstractions</PackageId>
-    <Authors>Kewin Kupilas</Authors>
     <Description>Lightweight, dependency-free editor IntelliSense contracts shared by the Nickelony Language Server family.</Description>
     <PackageTags>language-server;lsp;editor;intellisense;nickelony</PackageTags>
-    <RepositoryUrl>https://github.com/Nickelony/LanguageServer</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <Version>0.1.0-preview</Version>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageIcon>LanguageServer.png</PackageIcon>
-    <Copyright>Copyright (c) 2026 Kewin Kupilas</Copyright>
-    <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>12</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

@@ -64,8 +64,5 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	protected virtual void OnTrackedDocumentRenamed(TTrackedDocumentState state, bool contentChanged)
 	{ }
 
-	private static string NormalizeTrackedFilePath(string filePath)
-		=> LanguageServerPathHelper.NormalizeLocalPath(filePath);
-
 	private long GetNextAccessStamp() => ++_nextAccessStamp;
 }

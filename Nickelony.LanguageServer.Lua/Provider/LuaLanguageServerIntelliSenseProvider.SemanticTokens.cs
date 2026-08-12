@@ -1,6 +1,6 @@
 namespace Nickelony.LanguageServer.Lua;
 
-public sealed partial class LuaLanguageServerIntellisenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider
 {
 	private void HandleSemanticTokensRefreshRequested()
 		=> ObserveBackgroundTask(RefreshTrackedSemanticTokensAsync(CancellationToken.None), "Semantic tokens refresh");
@@ -146,7 +146,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		SemanticTokensWireResponse? response, DocumentSnapshot document, int[]? previousData, bool deltaWasRequested)
 	{
 		if (_client is null || response is null)
-			return new LuaSemanticTokensDecodeResult([], null, null, false);
+			return new([], null, null, false);
 
 		if (deltaWasRequested)
 		{
@@ -161,11 +161,11 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 					IReadOnlyList<LuaSemanticToken> tokens = LuaLanguageServerSemanticTokensDecoder.Decode(
 						patchedData, document, _client.SemanticTokenTypes, _client.SemanticTokenModifiers);
 
-					return new LuaSemanticTokensDecodeResult(tokens, patchedData, delta.ResultId, false);
+					return new(tokens, patchedData, delta.ResultId, false);
 				}
 
 				_logger.LogDebug("Lua semantic tokens delta edits could not be applied for '{FilePath}'; falling back to a full reparse.", document.FilePath);
-				return new LuaSemanticTokensDecodeResult([], null, null, true);
+				return new([], null, null, true);
 			}
 
 			if (delta.Data is { } fullData)
@@ -173,11 +173,11 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 				IReadOnlyList<LuaSemanticToken> tokens = LuaLanguageServerSemanticTokensDecoder.Decode(
 					fullData, document, _client.SemanticTokenTypes, _client.SemanticTokenModifiers);
 
-				return new LuaSemanticTokensDecodeResult(tokens, fullData, delta.ResultId, false);
+				return new(tokens, fullData, delta.ResultId, false);
 			}
 
 			_logger.LogDebug("Lua semantic tokens delta response for '{FilePath}' did not contain usable data; requesting a full refresh.", document.FilePath);
-			return new LuaSemanticTokensDecodeResult([], null, null, true);
+			return new([], null, null, true);
 		}
 
 		SemanticTokensDeltaResponse fullResponse = SemanticTokensDeltaParser.Parse(response);
@@ -187,10 +187,10 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			IReadOnlyList<LuaSemanticToken> tokens = LuaLanguageServerSemanticTokensDecoder.Decode(
 				data, document, _client.SemanticTokenTypes, _client.SemanticTokenModifiers);
 
-			return new LuaSemanticTokensDecodeResult(tokens, data, fullResponse.ResultId, false);
+			return new(tokens, data, fullResponse.ResultId, false);
 		}
 
-		return new LuaSemanticTokensDecodeResult([], null, fullResponse.ResultId, false);
+		return new([], null, fullResponse.ResultId, false);
 	}
 
 	private CancellationToken ReplaceSemanticTokenRequest(string filePath, CancellationToken cancellationToken, out CancellationTokenSource? linkedSource)

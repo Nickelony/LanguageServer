@@ -6,7 +6,7 @@ namespace Nickelony.LanguageServer.Client;
 
 public sealed partial class LanguageServerClient
 {
-	private static readonly string[] TextDocumentDynamicRegistrationCapabilityNames =
+	private static readonly string[] s_textDocumentDynamicRegistrationCapabilityNames =
 	[
 		"completion",
 		"hover",
@@ -62,8 +62,8 @@ public sealed partial class LanguageServerClient
 
 		EnforceDynamicRegistrationFalse(capabilitiesObject, "workspace", "didChangeWatchedFiles");
 
-		for (int i = 0; i < TextDocumentDynamicRegistrationCapabilityNames.Length; i++)
-			EnforceDynamicRegistrationFalse(capabilitiesObject, "textDocument", TextDocumentDynamicRegistrationCapabilityNames[i]);
+		for (int i = 0; i < s_textDocumentDynamicRegistrationCapabilityNames.Length; i++)
+			EnforceDynamicRegistrationFalse(capabilitiesObject, "textDocument", s_textDocumentDynamicRegistrationCapabilityNames[i]);
 
 		return capabilitiesObject;
 	}
@@ -142,8 +142,8 @@ public sealed partial class LanguageServerClient
 		bool supportsSemanticTokensFull = false;
 		bool supportsSemanticTokensDelta = false;
 
-		IReadOnlyList<string> semanticTokenTypes = EmptyCapabilityList;
-		IReadOnlyList<string> semanticTokenModifiers = EmptyCapabilityList;
+		IReadOnlyList<string> semanticTokenTypes = s_emptyCapabilityList;
+		IReadOnlyList<string> semanticTokenModifiers = s_emptyCapabilityList;
 
 		if (capabilities.SemanticTokensProvider is { } semanticTokensProvider)
 		{
@@ -180,8 +180,8 @@ public sealed partial class LanguageServerClient
 		IsReady: false,
 		AcceptsServerCallbacks: transportGeneration != 0,
 		TextDocumentSyncKind: TextDocumentSyncKind.None,
-		SemanticTokenTypes: EmptyCapabilityList,
-		SemanticTokenModifiers: EmptyCapabilityList,
+		SemanticTokenTypes: s_emptyCapabilityList,
+		SemanticTokenModifiers: s_emptyCapabilityList,
 		SupportsCompletionResolve: false,
 		SupportsReferences: null,
 		SupportsRename: null,
@@ -201,8 +201,8 @@ public sealed partial class LanguageServerClient
 		isReady,
 		AcceptsServerCallbacks: transportGeneration != 0 && isReady,
 		TextDocumentSyncKind: TextDocumentSyncKind.None,
-		SemanticTokenTypes: EmptyCapabilityList,
-		SemanticTokenModifiers: EmptyCapabilityList,
+		SemanticTokenTypes: s_emptyCapabilityList,
+		SemanticTokenModifiers: s_emptyCapabilityList,
 		SupportsCompletionResolve: false,
 		SupportsReferences: null,
 		SupportsRename: null,
@@ -279,8 +279,8 @@ public sealed partial class LanguageServerClient
 				IsReady: false,
 				AcceptsServerCallbacks: false,
 				TextDocumentSyncKind: TextDocumentSyncKind.None,
-				SemanticTokenTypes: EmptyCapabilityList,
-				SemanticTokenModifiers: EmptyCapabilityList,
+				SemanticTokenTypes: s_emptyCapabilityList,
+				SemanticTokenModifiers: s_emptyCapabilityList,
 				SupportsCompletionResolve: false,
 				SupportsReferences: null,
 				SupportsRename: null,
@@ -290,7 +290,10 @@ public sealed partial class LanguageServerClient
 		}
 
 		if (snapshot.IsReady && transportGeneration != 0)
+		{
 			_logger.LogWarning("Marked language server transport generation {Generation} unhealthy; the host will restart it before the next public request.", transportGeneration);
+			RaiseTransportUnavailable(transportGeneration);
+		}
 
 		return true;
 	}

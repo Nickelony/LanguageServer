@@ -11,7 +11,7 @@ public sealed class DefinitionResponseJsonConverter : JsonConverter<DefinitionRe
 	/// <summary>
 	/// Lists the candidate property names that may carry the target range in LSP definition payloads.
 	/// </summary>
-	private static readonly string[] RangeProperties =
+	private static readonly string[] s_rangeProperties =
 	[
 		"targetSelectionRange",
 		"targetRange",
@@ -22,7 +22,7 @@ public sealed class DefinitionResponseJsonConverter : JsonConverter<DefinitionRe
 	public override DefinitionResponse Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		if (reader.TokenType == JsonTokenType.Null)
-			return new DefinitionResponse([]);
+			return new([]);
 
 		using JsonDocument document = JsonDocument.ParseValue(ref reader);
 		JsonElement root = document.RootElement;
@@ -37,7 +37,7 @@ public sealed class DefinitionResponseJsonConverter : JsonConverter<DefinitionRe
 					targets.Add(target);
 			}
 
-			return new DefinitionResponse([.. targets]);
+			return new([.. targets]);
 		}
 
 		return TryParseDefinitionTarget(root, out DefinitionTargetResponse targetResponse)
@@ -125,9 +125,9 @@ public sealed class DefinitionResponseJsonConverter : JsonConverter<DefinitionRe
 		lineNumber = 1;
 		columnNumber = 1;
 
-		for (int i = 0; i < RangeProperties.Length; i++)
+		for (int i = 0; i < s_rangeProperties.Length; i++)
 		{
-			string rangeProperty = RangeProperties[i];
+			string rangeProperty = s_rangeProperties[i];
 
 			if (definitionElement.TryGetProperty(rangeProperty, out JsonElement rangeElement)
 				&& rangeElement.TryGetProperty("start", out JsonElement startElement)

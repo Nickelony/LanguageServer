@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Builds the initialization-options payload sent to the bundled Lua language server.
+/// Builds the initialization-options payload sent to the external Lua language server.
 /// </summary>
 internal static class LuaLanguageServerInitializationOptionsFactory
 {

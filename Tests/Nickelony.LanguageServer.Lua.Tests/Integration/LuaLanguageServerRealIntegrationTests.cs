@@ -10,17 +10,17 @@ using System.Reflection;
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 /// <summary>
-/// Live integration coverage for the bundled Lua language server.
-/// These tests require TombIDE/TombIDE.Shared/TIDE/LuaLS.zip to be present in the repository layout
-/// reachable from the test output directory, and they typically take several seconds each because they
-/// launch a real language-server process, wait for diagnostics and semantic token round-trips, and
-/// exercise restart or shutdown behavior.
+/// Live integration coverage for a configured Lua language server.
+/// These tests require an archive configured by NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE or the neutral
+/// Tests/TestAssets/LuaLS.zip fallback, and they typically take several seconds each because they launch
+/// a real language-server process, wait for diagnostics and semantic token round-trips, and exercise
+/// restart or shutdown behavior.
 /// </summary>
 [TestClass]
 public class LuaLanguageServerRealIntegrationTests
 {
-	private static readonly TimeSpan IntegrationTimeout = TimeSpan.FromSeconds(20);
-	private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(150);
+	private static readonly TimeSpan s_integrationTimeout = TimeSpan.FromSeconds(20);
+	private static readonly TimeSpan s_pollInterval = TimeSpan.FromMilliseconds(150);
 
 	[TestMethod]
 	[TestCategory("Integration")]
@@ -39,33 +39,33 @@ public class LuaLanguageServerRealIntegrationTests
 		Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? session.WorkspaceRoot);
 		File.WriteAllText(filePath, initialContent);
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(session.WorkspaceRoot, session.ExecutablePath);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(session.WorkspaceRoot, session.ExecutablePath);
 
 		provider.OpenDocument(filePath, initialContent);
 
 		await WaitForConditionAsync(
 			() => provider.GetDiagnostics(filePath).Count > 0,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected bundled LuaLS to publish diagnostics for the syntax error in the opened document.");
 
 		provider.UpdateDocument(filePath, updatedContent);
 
 		await WaitForConditionAsync(
 			() => provider.GetSemanticTokens(filePath).Any(token => token.Line >= 2),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected semantic tokens to reflect the updated live document content.");
 
 		IReadOnlyList<TextCompletionItem> completionItems = await WaitForCompletionItemsAsync(
 			() => provider.GetCompletionItemsAsync(filePath, updatedContent, 3, 3),
 			items => items.Any(item => string.Equals(item.Label, "updated_local", StringComparison.Ordinal)),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected bundled LuaLS to return completion items for the updated local variable.");
 
 		Assert.IsTrue(completionItems.Any(item => string.Equals(item.Label, "updated_local", StringComparison.Ordinal)));
 
 		TextHoverInfo hover = await WaitForHoverAsync(
 			() => provider.GetHoverAsync(filePath, updatedContent, 2, 8),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected bundled LuaLS to return hover information for the updated document.");
 
 		Assert.IsFalse(string.IsNullOrWhiteSpace(hover.Content));
@@ -83,7 +83,7 @@ public class LuaLanguageServerRealIntegrationTests
 		IReadOnlyList<TextCompletionItem> libraryItems = await WaitForCompletionItemsAsync(
 			() => provider.GetCompletionItemsAsync(filePath, libraryAwareContent, 4, 3),
 			items => items.Any(item => item.Label.StartsWith("generated_function", StringComparison.Ordinal)),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected a newly forwarded .API library symbol to appear in completions after the live workspace change.");
 
 		Assert.IsTrue(libraryItems.Any(item => item.Label.StartsWith("generated_function", StringComparison.Ordinal)));
@@ -94,7 +94,7 @@ public class LuaLanguageServerRealIntegrationTests
 
 		await WaitForProcessExitAsync(
 			processId,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected disposing the provider to stop the live Lua language-server process.");
 	}
 
@@ -112,14 +112,14 @@ public class LuaLanguageServerRealIntegrationTests
 		Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? session.WorkspaceRoot);
 		File.WriteAllText(filePath, initialContent);
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(session.WorkspaceRoot, session.ExecutablePath);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(session.WorkspaceRoot, session.ExecutablePath);
 
 		provider.OpenDocument(filePath, initialContent);
 
 		IReadOnlyList<TextCompletionItem> initialItems = await WaitForCompletionItemsAsync(
 			() => provider.GetCompletionItemsAsync(filePath, initialContent, 1, 3),
 			items => items.Any(item => string.Equals(item.Label, "restart_probe", StringComparison.Ordinal)),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected bundled LuaLS to return the initial completion before restart.");
 
 		Assert.IsTrue(initialItems.Any(item => string.Equals(item.Label, "restart_probe", StringComparison.Ordinal)));
@@ -133,12 +133,12 @@ public class LuaLanguageServerRealIntegrationTests
 
 		await WaitForProcessExitAsync(
 			initialProcessId,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the live Lua language-server process to exit after the simulated crash.");
 
 		await WaitForConditionAsync(
 			() => !client.IsReady,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the client to observe the live LuaLS transport disconnect.");
 
 		provider.UpdateDocument(filePath, restartedContent);
@@ -146,7 +146,7 @@ public class LuaLanguageServerRealIntegrationTests
 		IReadOnlyList<TextCompletionItem> restartedItems = await WaitForCompletionItemsAsync(
 			() => provider.GetCompletionItemsAsync(filePath, restartedContent, 2, 3),
 			items => items.Any(item => string.Equals(item.Label, "after_restart", StringComparison.Ordinal)),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the provider to restart the live server and resume completions after the crash.");
 
 		Assert.IsTrue(restartedItems.Any(item => string.Equals(item.Label, "after_restart", StringComparison.Ordinal)));
@@ -161,7 +161,7 @@ public class LuaLanguageServerRealIntegrationTests
 
 		await WaitForProcessExitAsync(
 			restartedProcessId,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the restarted live Lua language-server process to stop on provider disposal.");
 	}
 
@@ -180,18 +180,18 @@ public class LuaLanguageServerRealIntegrationTests
 		Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? session.WorkspaceRoot);
 		File.WriteAllText(filePath, content);
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(session.WorkspaceRoot, session.ExecutablePath);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(session.WorkspaceRoot, session.ExecutablePath);
 
 		provider.OpenDocument(filePath, content);
 
 		await WaitForConditionAsync(
 			() => provider.SupportsReferences,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the bundled Lua language server to advertise reference support.");
 
 		TextDefinitionLocation definition = await WaitForDefinitionAsync(
 			() => provider.GetDefinitionAsync(filePath, content, 1, 19),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the bundled Lua language server to resolve the local symbol definition.");
 
 		Assert.IsTrue(string.Equals(filePath, definition.FilePath, StringComparison.OrdinalIgnoreCase));
@@ -201,7 +201,7 @@ public class LuaLanguageServerRealIntegrationTests
 		IReadOnlyList<TextReferenceLocation> references = await WaitForReferencesAsync(
 			() => provider.GetReferencesAsync(filePath, content, 1, 19),
 			referenceLocations => referenceLocations.Count >= 3,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the bundled Lua language server to return declaration and usage references for the local symbol.");
 
 		Assert.AreEqual(3, references.Count(location => string.Equals(location.FilePath, filePath, StringComparison.OrdinalIgnoreCase)));
@@ -224,18 +224,18 @@ public class LuaLanguageServerRealIntegrationTests
 		Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? session.WorkspaceRoot);
 		File.WriteAllText(filePath, content);
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(session.WorkspaceRoot, session.ExecutablePath);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(session.WorkspaceRoot, session.ExecutablePath);
 
 		provider.OpenDocument(filePath, content);
 
 		await WaitForConditionAsync(
 			() => provider.SupportsRename,
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the bundled Lua language server to advertise rename support.");
 
 		TextWorkspaceEdit workspaceEdit = await WaitForWorkspaceEditAsync(
 			() => provider.RenameSymbolAsync(new TextRenameRequest(filePath, content, 0, 8, "renamed_value")),
-			IntegrationTimeout,
+			s_integrationTimeout,
 			"Expected the bundled Lua language server to return a rename workspace edit for the local symbol.");
 
 		Assert.IsTrue(workspaceEdit.HasEdits);
@@ -249,7 +249,7 @@ public class LuaLanguageServerRealIntegrationTests
 	}
 
 	private static async Task DispatchWorkspaceFileChangeAsync(
-		LuaLanguageServerIntellisenseProvider provider,
+		LuaLanguageServerIntelliSenseProvider provider,
 		string filePath,
 		FileChangeKind kind,
 		CancellationToken cancellationToken)
@@ -259,12 +259,12 @@ public class LuaLanguageServerRealIntegrationTests
 			new WorkspaceFileChange(filePath, kind)
 		]);
 
-		await LuaLanguageServerIntellisenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken).ConfigureAwait(false);
+		await LuaLanguageServerIntelliSenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken).ConfigureAwait(false);
 	}
 
-	private static LanguageServerClient GetRequiredClient(LuaLanguageServerIntellisenseProvider provider)
+	private static LanguageServerClient GetRequiredClient(LuaLanguageServerIntelliSenseProvider provider)
 	{
-		FieldInfo field = typeof(LuaLanguageServerIntellisenseProvider).GetField("_client", BindingFlags.Instance | BindingFlags.NonPublic)
+		FieldInfo field = typeof(LuaLanguageServerIntelliSenseProvider).GetField("_client", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_client' was not found.");
 
 		return (LanguageServerClient)(field.GetValue(provider)
@@ -286,7 +286,7 @@ public class LuaLanguageServerRealIntegrationTests
 			?? throw new InvalidOperationException("The active transport session did not expose a live server process."));
 	}
 
-	private static int GetRequiredServerProcessId(LuaLanguageServerIntellisenseProvider provider)
+	private static int GetRequiredServerProcessId(LuaLanguageServerIntelliSenseProvider provider)
 		=> GetRequiredServerProcess(GetRequiredClient(provider)).Id;
 
 	private static async Task<IReadOnlyList<TextCompletionItem>> WaitForCompletionItemsAsync(
@@ -305,7 +305,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (predicate(lastResult))
 				return lastResult;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage + Environment.NewLine + "Last completion labels: "
@@ -329,7 +329,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (lastResult is not null)
 				return lastResult;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage);
@@ -351,7 +351,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (lastResult is not null)
 				return lastResult;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage);
@@ -374,7 +374,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (predicate(lastResult))
 				return lastResult;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage + Environment.NewLine + "Last reference count: " + lastResult.Count);
@@ -396,7 +396,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (lastResult?.HasEdits == true)
 				return lastResult;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage);
@@ -415,7 +415,7 @@ public class LuaLanguageServerRealIntegrationTests
 			if (predicate())
 				return;
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage);
@@ -436,7 +436,7 @@ public class LuaLanguageServerRealIntegrationTests
 					return;
 			}
 
-			await Task.Delay(PollInterval).ConfigureAwait(false);
+			await Task.Delay(s_pollInterval).ConfigureAwait(false);
 		}
 
 		Assert.Fail(failureMessage);
@@ -462,10 +462,14 @@ public class LuaLanguageServerRealIntegrationTests
 
 		public RealLuaLanguageServerTestSession()
 		{
-			string archivePath = TryFindRepositoryFile(Path.Combine("TombIDE", "TombIDE.Shared", "TIDE", "LuaLS.zip"))
+			string? configuredArchivePath = Environment.GetEnvironmentVariable("NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE");
+
+			string archivePath = configuredArchivePath is not null && File.Exists(configuredArchivePath)
+				? configuredArchivePath
+				: TryFindRepositoryFile(Path.Combine("Tests", "TestAssets", "LuaLS.zip"))
 				?? throw new AssertInconclusiveException(
-					"Could not locate TombIDE/TombIDE.Shared/TIDE/LuaLS.zip from the test output directory. " +
-					"See Tests/Nickelony.LanguageServer.Lua.Tests/Integration/LuaLanguageServerIntegrationTests.md for prerequisites.");
+					"LuaLS integration fixture is not configured. Set NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE " +
+					"or provide Tests/TestAssets/LuaLS.zip.");
 
 			_extractionRoot = Path.Combine(Path.GetTempPath(), "LuaLsExtract_" + Guid.NewGuid().ToString("N"));
 			WorkspaceRoot = Path.Combine(Path.GetTempPath(), "LuaLsWorkspace_" + Guid.NewGuid().ToString("N"));
@@ -473,12 +477,13 @@ public class LuaLanguageServerRealIntegrationTests
 			ZipFile.ExtractToDirectory(archivePath, _extractionRoot);
 			Directory.CreateDirectory(WorkspaceRoot);
 
-			string executablePath = Path.Combine(_extractionRoot, "bin", "lua-language-server.exe");
+			string executableName = OperatingSystem.IsWindows() ? "lua-language-server.exe" : "lua-language-server";
+			string executablePath = Path.Combine(_extractionRoot, "bin", executableName);
 
 			if (!File.Exists(executablePath))
 			{
 				throw new AssertInconclusiveException(
-					"The bundled LuaLS archive was found, but bin/lua-language-server.exe was missing after extraction.");
+					$"The configured LuaLS archive was found, but bin/{executableName} was missing after extraction.");
 			}
 
 			ExecutablePath = executablePath;

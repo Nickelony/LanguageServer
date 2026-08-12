@@ -53,7 +53,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <returns>The callback result, or <paramref name="defaultValue"/> when no document is tracked.</returns>
 	protected TResult WithTrackedDocument<TResult>(string filePath, Func<TTrackedDocumentState, TResult> accessTrackedDocument, TResult defaultValue)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
 		{
@@ -70,7 +70,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="mutateTrackedDocument">The callback to execute when the document exists.</param>
 	protected void WithTrackedDocument(string filePath, Action<TTrackedDocumentState> mutateTrackedDocument)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
 		{

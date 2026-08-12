@@ -18,7 +18,7 @@ internal static partial class LuaLanguageServerResponseParser
 			return null;
 		}
 
-		return new TextDefinitionLocation(
+		return new(
 			response.LineNumber,
 			response.ColumnNumber,
 			LanguageServerPathHelper.NormalizeLocalPath(parsedUri));

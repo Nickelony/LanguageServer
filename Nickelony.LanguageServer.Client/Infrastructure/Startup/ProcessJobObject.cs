@@ -5,7 +5,7 @@ using System.Runtime.Versioning;
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Wraps a Windows job object configured with <c>JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE</c> so that any
+/// Wraps a Windows job object configured with <c>JobObjectLimitKillOnJobClose</c> so that any
 /// child processes assigned to it are forcibly terminated when the host application crashes or the
 /// last handle to the job is released. This prevents stranded server processes if the host never
 /// gets a chance to run its disposal path.
@@ -13,18 +13,20 @@ namespace Nickelony.LanguageServer.Client;
 [SupportedOSPlatform("windows")]
 internal static class ProcessJobObject
 {
-	private static ILogger _logger = NullLogger.Instance;
+	private const uint JobObjectLimitKillOnJobClose = 0x2000;
 
-	private static readonly object SyncRoot = new();
-	private static IntPtr _jobHandle = IntPtr.Zero;
-	private static bool _initializationFailed;
+	private static ILogger s_logger = NullLogger.Instance;
+
+	private static readonly object s_syncRoot = new();
+	private static IntPtr s_jobHandle = IntPtr.Zero;
+	private static bool s_initializationFailed;
 
 	/// <summary>
 	/// Sets the logger used for job-object allocation diagnostics.
 	/// </summary>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
 	internal static void InitializeLogger(ILogger logger)
-		=> _logger = logger ?? NullLogger.Instance;
+		=> s_logger = logger ?? NullLogger.Instance;
 
 	/// <summary>
 	/// Attempts to assign the supplied process to the shared kill-on-close Windows job object.
@@ -50,12 +52,12 @@ internal static class ProcessJobObject
 				int errorCode = Marshal.GetLastWin32Error();
 
 				// ERROR_ACCESS_DENIED is expected when the process is already inside an unbreakable job.
-				_logger.LogDebug("AssignProcessToJobObject failed with Win32 error {ErrorCode} for the language-server process.", errorCode);
+				s_logger.LogDebug("AssignProcessToJobObject failed with Win32 error {ErrorCode} for the language-server process.", errorCode);
 			}
 		}
 		catch (Exception exception)
 		{
-			_logger.LogDebug(exception, "Failed to assign the language-server process to the kill-on-close job object.");
+			s_logger.LogDebug(exception, "Failed to assign the language-server process to the kill-on-close job object.");
 		}
 	}
 
@@ -65,33 +67,33 @@ internal static class ProcessJobObject
 	/// <returns>The shared job handle, or <see cref="IntPtr.Zero"/> when initialization failed.</returns>
 	private static IntPtr EnsureJobHandle()
 	{
-		if (_jobHandle != IntPtr.Zero)
-			return _jobHandle;
+		if (s_jobHandle != IntPtr.Zero)
+			return s_jobHandle;
 
-		if (_initializationFailed)
+		if (s_initializationFailed)
 			return IntPtr.Zero;
 
-		lock (SyncRoot)
+		lock (s_syncRoot)
 		{
-			if (_jobHandle != IntPtr.Zero)
-				return _jobHandle;
+			if (s_jobHandle != IntPtr.Zero)
+				return s_jobHandle;
 
-			if (_initializationFailed)
+			if (s_initializationFailed)
 				return IntPtr.Zero;
 
 			IntPtr handle = CreateJobObject(IntPtr.Zero, lpName: null);
 
 			if (handle == IntPtr.Zero)
 			{
-				_initializationFailed = true;
+				s_initializationFailed = true;
 
-				_logger.LogDebug("CreateJobObject returned NULL (Win32 error {ErrorCode}); the language server will rely on graceful shutdown.", Marshal.GetLastWin32Error());
+				s_logger.LogDebug("CreateJobObject returned NULL (Win32 error {ErrorCode}); the language server will rely on graceful shutdown.", Marshal.GetLastWin32Error());
 
 				return IntPtr.Zero;
 			}
 
 			JobObjectExtendedLimitInformation extendedLimit = default;
-			extendedLimit.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+			extendedLimit.BasicLimitInformation.LimitFlags = JobObjectLimitKillOnJobClose;
 
 			int payloadSize = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
 			IntPtr payloadPointer = Marshal.AllocHGlobal(payloadSize);
@@ -105,9 +107,9 @@ internal static class ProcessJobObject
 					int errorCode = Marshal.GetLastWin32Error();
 
 					CloseHandle(handle);
-					_initializationFailed = true;
+					s_initializationFailed = true;
 
-					_logger.LogDebug("SetInformationJobObject failed with Win32 error {ErrorCode}; the language server will rely on graceful shutdown.", errorCode);
+					s_logger.LogDebug("SetInformationJobObject failed with Win32 error {ErrorCode}; the language server will rely on graceful shutdown.", errorCode);
 
 					return IntPtr.Zero;
 				}
@@ -117,14 +119,12 @@ internal static class ProcessJobObject
 				Marshal.FreeHGlobal(payloadPointer);
 			}
 
-			_jobHandle = handle;
+			s_jobHandle = handle;
 
 			AppDomain.CurrentDomain.ProcessExit += (_, _) => CloseHandle(handle);
 			return handle;
 		}
 	}
-
-	private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
 
 	/// <summary>
 	/// Identifies the job object information class used to set extended limit information.

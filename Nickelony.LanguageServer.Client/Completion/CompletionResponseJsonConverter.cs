@@ -9,20 +9,27 @@ namespace Nickelony.LanguageServer.Client;
 /// </summary>
 public sealed class CompletionResponseJsonConverter : JsonConverter<CompletionResponse>
 {
-	private static ILogger _logger = NullLogger.Instance;
+	private readonly ILogger _logger;
 
 	/// <summary>
-	/// Sets the logger used for malformed-payload diagnostics.
+	/// Initializes a new instance of the <see cref="CompletionResponseJsonConverter"/> class.
 	/// </summary>
-	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
-	internal static void InitializeLogger(ILogger logger)
+	public CompletionResponseJsonConverter()
+		: this(NullLogger.Instance)
+	{ }
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="CompletionResponseJsonConverter"/> class.
+	/// </summary>
+	/// <param name="logger">The logger used for malformed-payload diagnostics.</param>
+	internal CompletionResponseJsonConverter(ILogger? logger = null)
 		=> _logger = logger ?? NullLogger.Instance;
 
 	/// <inheritdoc/>
 	public override CompletionResponse? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
 		if (reader.TokenType == JsonTokenType.Null)
-			return new CompletionResponse(null);
+			return new(null);
 
 		using JsonDocument document = JsonDocument.ParseValue(ref reader);
 		JsonElement root = document.RootElement;
@@ -72,7 +79,7 @@ public sealed class CompletionResponseJsonConverter : JsonConverter<CompletionRe
 			}
 		}
 
-		return new CompletionResponse(items, isIncomplete);
+		return new(items, isIncomplete);
 	}
 
 	private static IReadOnlyList<CompletionItemPayload> DeserializeCompletionListItems(

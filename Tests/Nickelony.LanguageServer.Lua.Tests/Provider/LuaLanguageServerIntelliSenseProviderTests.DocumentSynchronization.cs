@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntellisenseProviderTests
+public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task RenameDocument_MovesDiagnosticsAndSemanticTokensToNewPath()
@@ -20,7 +20,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SemanticTokenTypes = ["variable"]
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var semanticTokensUpdated = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		provider.SemanticTokensUpdated += (filePath, tokens) =>
@@ -40,7 +40,6 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		Assert.AreEqual(1, provider.GetSemanticTokens(oldFilePath).Count);
 
 		provider.RenameDocument(oldFilePath, newFilePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TimeSpan.FromSeconds(1)));
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 2, TimeSpan.FromSeconds(1)));
 
@@ -69,24 +68,20 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(oldFilePath, content);
 		provider.OpenDocument(oldFilePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
 
 		provider.RenameDocument(oldFilePath, newFilePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TimeSpan.FromSeconds(1)));
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 2, TimeSpan.FromSeconds(1)));
 
 		provider.CloseDocument(newFilePath);
-
 		Assert.IsFalse(await client.WaitForMethodCountAsync("textDocument/didClose", 2, TimeSpan.FromMilliseconds(250)));
 
 		provider.CloseDocument(newFilePath);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 2, TimeSpan.FromSeconds(1)));
 	}
 
@@ -104,7 +99,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SupportsSemanticTokensFull = false
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(oldFilePath, originalContent);
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
@@ -112,16 +107,13 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		client.BlockNextOpenNotification();
 
 		provider.RenameDocument(oldFilePath, newFilePath, originalContent);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TimeSpan.FromSeconds(1)));
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 2, TimeSpan.FromSeconds(1)));
 
 		provider.UpdateDocument(newFilePath, updatedContent);
-
 		Assert.IsFalse(await client.WaitForMethodCountAsync("textDocument/didChange", 1, TimeSpan.FromMilliseconds(250)));
 
 		client.ReleaseOpenNotification();
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didChange", 1, TimeSpan.FromSeconds(1)));
 
 		CollectionAssert.AreEqual(
@@ -148,7 +140,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SupportsSemanticTokensFull = false
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		int movedDiagnosticsUpdatedCount = 0;
 
 		provider.DiagnosticsUpdated += (filePath, _) =>
@@ -164,8 +156,8 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		Assert.AreEqual(1, provider.GetDiagnostics(oldFilePath).Count);
 
 		client.BlockNextOpenNotification();
-		provider.RenameDocument(oldFilePath, newFilePath, content);
 
+		provider.RenameDocument(oldFilePath, newFilePath, content);
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 2, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 
@@ -197,7 +189,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(
+		using var provider = new LuaLanguageServerIntelliSenseProvider(
 			workspaceRoot,
 			client,
 			requestTimeout: TimeSpan.FromMilliseconds(50),
@@ -254,14 +246,13 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(
+		using var provider = new LuaLanguageServerIntelliSenseProvider(
 			workspaceRoot,
 			client,
 			requestTimeout: TimeSpan.FromMilliseconds(200),
 			requestTimeoutRestartThreshold: 1);
 
 		Task<TextHoverInfo?> timedOutHoverTask = provider.GetHoverAsync(filePath, content, 0, 0);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/hover", 1, TimeSpan.FromSeconds(1)));
 
 		client.MarkTransportUnhealthy();
@@ -310,8 +301,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
-
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		await provider.GetHoverAsync(filePath, content, 0, 0);
 
 		client.IsReady = false;
@@ -319,9 +309,10 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		using var cancellationTokenSource = new CancellationTokenSource();
 		cancellationTokenSource.Cancel();
 
-		TextHoverInfo? hover = await provider.GetHoverAsync(filePath, content, 0, 0, cancellationTokenSource.Token);
+		Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(filePath, content, 0, 0, cancellationTokenSource.Token);
 
-		Assert.IsNull(hover);
+		await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => hoverTask);
+
 		Assert.AreEqual(1, client.StartCallCount);
 		Assert.AreEqual(1, client.StartCancellationTokenCanBeCanceled.Count);
 	}
@@ -346,7 +337,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(
+		using var provider = new LuaLanguageServerIntelliSenseProvider(
 			workspaceRoot,
 			client,
 			requestTimeout: TimeSpan.FromMilliseconds(50),
@@ -392,19 +383,17 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 
 		client.BlockNextHoverRequest();
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		using var cancellationTokenSource = new CancellationTokenSource();
 
 		provider.OpenDocument(filePath, content);
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 
 		Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(filePath, content, 0, 0, cancellationTokenSource.Token);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/hover", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 
 		cancellationTokenSource.Cancel();
-
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => hoverTask).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => hoverTask).ConfigureAwait(false);
 
 		provider.CloseDocument(filePath);
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
@@ -423,11 +412,10 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			TextDocumentSyncKind = TextDocumentSyncKind.Full
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, "local value = 1");
 		provider.UpdateDocument(filePath, "local value = 2");
-
 		Assert.IsTrue(await client.WaitForNotificationAsync("textDocument/didChange", TimeSpan.FromSeconds(1)));
 
 		JsonElement parameters = client.GetLastNotificationParameters("textDocument/didChange");
@@ -445,14 +433,12 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
 
 		provider.UpdateDocument(filePath, content);
-
 		Assert.IsFalse(await client.WaitForNotificationAsync("textDocument/didChange", TimeSpan.FromMilliseconds(250)));
 
 		CollectionAssert.AreEqual(
@@ -471,7 +457,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			TextDocumentSyncKind = TextDocumentSyncKind.Full
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, "local value = 1");
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
@@ -518,12 +504,13 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(firstFilePath, "local first = 1");
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
 
 		client.BlockNextChangeNotification();
+
 		provider.UpdateDocument(firstFilePath, "local first = 2");
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didChange", 1, TimeSpan.FromSeconds(1)));
 
@@ -536,6 +523,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		Assert.AreEqual(1, CountSentMethods(client, "textDocument/hover"));
 
 		client.ReleaseChangeNotification();
+
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didChange", 1, TimeSpan.FromSeconds(1)));
 	}
 
@@ -552,20 +540,17 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SupportsSemanticTokensDelta = true
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, "local value = 1");
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/semanticTokens/full", 1, TimeSpan.FromSeconds(1)));
 
 		client.ThrowIOExceptionOnNextDidChange = true;
 
 		provider.UpdateDocument(filePath, "local value = 2");
-
 		Assert.IsTrue(await client.WaitForNotificationAsync("textDocument/didChange", TimeSpan.FromSeconds(1)));
 
 		provider.UpdateDocument(filePath, "local value = 2");
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 2, TimeSpan.FromSeconds(1)));
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/semanticTokens/full", 2, TimeSpan.FromSeconds(1)));
 
@@ -589,7 +574,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -637,8 +622,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
-
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		provider.OpenDocument(openedFilePath, openedContent);
 
 		await Task.Delay(100).ConfigureAwait(false);
@@ -688,7 +672,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(firstFilePath, firstContent);
 		provider.OpenDocument(secondFilePath, secondContent);
@@ -733,7 +717,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string secondContent = "local second = 2";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		int diagnosticsUpdatedCount = 0;
 		provider.DiagnosticsUpdated += (_, _) => diagnosticsUpdatedCount++;
@@ -742,10 +726,12 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		await provider.GetHoverAsync(filePath, secondContent, 0, 0);
 
 		client.PublishDiagnostics(CreateDiagnostics(filePath, 1, 6, 12, "Stale warning."));
+
 		Assert.AreEqual(0, diagnosticsUpdatedCount);
 		Assert.AreEqual(0, provider.GetDiagnostics(filePath).Count);
 
 		client.PublishDiagnostics(CreateDiagnostics(filePath, 3, 6, 12, "Future warning."));
+
 		Assert.AreEqual(0, diagnosticsUpdatedCount);
 		Assert.AreEqual(0, provider.GetDiagnostics(filePath).Count);
 
@@ -767,7 +753,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		int diagnosticsUpdatedCount = 0;
 
 		provider.DiagnosticsUpdated += (_, _) => diagnosticsUpdatedCount++;
@@ -793,7 +779,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		int notifiedSubscribers = 0;
 
 		provider.DiagnosticsUpdated += (_, _) =>
@@ -818,7 +804,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		int firstSubscriberCalls = 0;
 		int secondSubscriberCalls = 0;
 
@@ -838,13 +824,47 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 	}
 
 	[TestMethod]
+	public async Task DiagnosticsPublished_DisposeWhileSubscriberIsRunning_DoesNotAdmitLaterSubscribers()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+		const string content = "local value = 1";
+
+		using var client = new FakeLanguageServerClient();
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		var firstSubscriberEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var releaseFirstSubscriber = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int secondSubscriberCalls = 0;
+
+		provider.DiagnosticsUpdated += (_, _) =>
+		{
+			firstSubscriberEntered.TrySetResult(true);
+			releaseFirstSubscriber.Task.GetAwaiter().GetResult();
+		};
+
+		provider.DiagnosticsUpdated += (_, _) => secondSubscriberCalls++;
+
+		await provider.GetHoverAsync(filePath, content, 0, 0);
+
+		Task publishTask = Task.Run(() => client.PublishDiagnostics(CreateDiagnostics(filePath, 1, 6, 12, "Current warning.")));
+		Task enteredTask = await Task.WhenAny(firstSubscriberEntered.Task, Task.Delay(TimeSpan.FromSeconds(1))).ConfigureAwait(false);
+		Assert.AreSame(firstSubscriberEntered.Task, enteredTask);
+
+		provider.Dispose();
+		releaseFirstSubscriber.TrySetResult(true);
+		await publishTask.ConfigureAwait(false);
+
+		Assert.AreEqual(0, secondSubscriberCalls);
+	}
+
+	[TestMethod]
 	public async Task UpdateDocument_WaitsForEarlierOpenNotificationToFinish()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		client.BlockNextOpenNotification();
 
@@ -869,7 +889,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		client.BlockNextOpenNotification();
 
@@ -895,7 +915,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			ThrowIOExceptionOnNextDidChange = true
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		await provider.GetHoverAsync(filePath, "local value = 1", 0, 0);
 		provider.UpdateDocument(filePath, "local value = 2");
@@ -923,7 +943,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		client.BlockNextOpenNotification();
 
@@ -948,7 +968,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, "local value = 1");
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));

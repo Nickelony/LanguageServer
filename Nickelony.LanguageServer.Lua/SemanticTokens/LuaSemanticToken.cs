@@ -19,7 +19,10 @@ public sealed class LuaSemanticToken
 		Character = Math.Max(0, character);
 		Length = Math.Max(0, length);
 		Type = type;
-		Modifiers = modifiers;
+
+		Modifiers = modifiers is { Count: > 0 }
+			? Array.AsReadOnly([.. modifiers])
+			: [];
 	}
 
 	/// <summary>
@@ -43,7 +46,7 @@ public sealed class LuaSemanticToken
 	public string Type { get; }
 
 	/// <summary>
-	/// Gets the semantic token modifiers.
+	/// Gets the owned immutable snapshot of semantic token modifiers.
 	/// </summary>
 	public IReadOnlyList<string> Modifiers { get; }
 

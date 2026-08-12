@@ -5,7 +5,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_RaisesEventAndReturnsNull()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		var refreshRequested = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -17,15 +17,15 @@ public partial class LanguageServerClientTests
 		client.SemanticTokensRefreshRequested += () => refreshRequested.TrySetResult(true);
 
 		object? result = await InvokePrivateTaskAsync<object?>(rpcTarget, "RefreshSemanticTokensAsync").ConfigureAwait(false);
-
 		Assert.IsNull(result);
+
 		await refreshRequested.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 	}
 
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_ReturnsBeforeSlowHandlerCompletes()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		var handlerEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowHandlerToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -54,7 +54,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_SlowSubscriberDoesNotBlockLaterSubscriber()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		var firstSubscriberEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondSubscriberObserved = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -87,7 +87,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task InvokeSemanticTokensRefreshRequested_WhenSubscriberIsBusy_CoalescesPendingSignalsPerSubscriber()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstInvocationEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstInvocationToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondInvocationEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -132,7 +132,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_CoalescesRepeatedRequestsWhileHandlerIsBusy()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		var firstHandlerEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstHandlerToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -193,7 +193,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task InvokeSemanticTokensRefreshRequested_AfterUnsubscribe_DoesNotDeliverQueuedCallbacks()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var firstInvocationEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstInvocationToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var unexpectedSecondInvocation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -234,7 +234,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_IgnoresStaleTransportGeneration()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 		int refreshRequestedCount = 0;
@@ -254,29 +254,32 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_WhenTransportIsAttachedButNotReady_DeliversRefreshCallback()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		var refreshRequested = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		SetActiveSession(client, session);
+
 		client.SemanticTokensRefreshRequested += () => refreshRequested.TrySetResult(true);
 
 		object rpcTarget = CreateRpcTarget(client, GetTransportGeneration(session));
 		object? result = await InvokePrivateTaskAsync<object?>(rpcTarget, "RefreshSemanticTokensAsync").ConfigureAwait(false);
 
 		Assert.IsNull(result);
+
 		await refreshRequested.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 	}
 
 	[TestMethod]
 	public async Task HandleSemanticTokensRefreshRequestAsync_IgnoresUnhealthyTransportGeneration()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		int refreshRequestedCount = 0;
 
 		SetActiveSession(client, session);
 		SetReadyState(client, true);
+
 		client.SemanticTokensRefreshRequested += () => refreshRequestedCount++;
 
 		client.MarkTransportUnhealthy();

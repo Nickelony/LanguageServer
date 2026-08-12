@@ -28,13 +28,13 @@ public sealed class SupportedCapabilityJsonConverter : JsonConverter<SupportedCa
 	private static SupportedCapability ReadObject(ref Utf8JsonReader reader)
 	{
 		using JsonDocument ignored = JsonDocument.ParseValue(ref reader);
-		return new SupportedCapability(true);
+		return new(true);
 	}
 
 	private static SupportedCapability ReadUnsupported(ref Utf8JsonReader reader)
 	{
 		using JsonDocument ignored = JsonDocument.ParseValue(ref reader);
-		return new SupportedCapability(false);
+		return new(false);
 	}
 }
 
@@ -66,7 +66,7 @@ public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<Text
 				using (JsonDocument ignored = JsonDocument.ParseValue(ref reader))
 				{ }
 
-				return new TextDocumentSyncCapability(TextDocumentSyncKind.None);
+				return new(TextDocumentSyncKind.None);
 		}
 	}
 
@@ -81,10 +81,10 @@ public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<Text
 		if (payload.Change.ValueKind != JsonValueKind.Number
 			|| !payload.Change.TryGetInt32(out int rawSyncKind))
 		{
-			return new TextDocumentSyncCapability(TextDocumentSyncKind.None);
+			return new(TextDocumentSyncKind.None);
 		}
 
-		return new TextDocumentSyncCapability(ParseTextDocumentSyncKind(rawSyncKind));
+		return new(ParseTextDocumentSyncKind(rawSyncKind));
 	}
 
 	private static TextDocumentSyncKind ParseTextDocumentSyncKind(int rawSyncKind) => rawSyncKind switch
@@ -126,12 +126,12 @@ public sealed class SemanticTokensFullCapabilityJsonConverter : JsonConverter<Se
 		SemanticTokensFullCapabilityObject payload = JsonSerializer.Deserialize<SemanticTokensFullCapabilityObject>(ref reader, options);
 		bool supportsDelta = payload.Delta.ValueKind == JsonValueKind.True;
 
-		return new SemanticTokensFullCapability(true, supportsDelta);
+		return new(true, supportsDelta);
 	}
 
 	private static SemanticTokensFullCapability ReadUnsupported(ref Utf8JsonReader reader)
 	{
 		using JsonDocument ignored = JsonDocument.ParseValue(ref reader);
-		return new SemanticTokensFullCapability(false, false);
+		return new(false, false);
 	}
 }

@@ -16,7 +16,7 @@ The contract surface, grouped by IntelliSense feature:
 
 | Area | Types |
 |---|---|
-| Provider | `ILanguageServerIntellisenseProvider` |
+| Provider | `ILanguageServerIntelliSenseProvider` |
 | Document lifecycle | `OpenDocument`, `UpdateDocument`, `CloseDocument`, `RenameDocument` |
 | Completion | `TextCompletionItem`, `TextCompletionItemKind`, `TextCompletionPosition`, `TextCompletionRange`, `TextCompletionTextEdit` |
 | Diagnostics | `TextEditorDiagnostic`, `TextEditorDiagnosticSeverity` |
@@ -45,7 +45,7 @@ using Nickelony.LanguageServer.Abstractions;
 using Nickelony.LanguageServer.Abstractions.Completion;
 
 // An editor consumes the contract, whatever provider backs it:
-ILanguageServerIntellisenseProvider provider = GetProvider(); // e.g. the Lua provider
+ILanguageServerIntelliSenseProvider provider = GetProvider(); // e.g. the Lua provider
 
 provider.DiagnosticsUpdated += (filePath, diagnostics) =>
 {

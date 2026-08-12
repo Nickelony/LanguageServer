@@ -83,7 +83,7 @@ internal sealed class WorkspaceChangeAccumulator
 	public FileChangeBatch DrainBatch()
 	{
 		List<WorkspaceFileChange> changes = DrainChanges();
-		return new FileChangeBatch(changes);
+		return new(changes);
 	}
 
 	/// <summary>

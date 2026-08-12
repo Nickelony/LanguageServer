@@ -6,7 +6,7 @@ namespace Nickelony.LanguageServer.Lua;
 /// </summary>
 internal static class LuaLanguageServerSemanticTokensDecoder
 {
-	private static readonly IReadOnlyList<string> EmptyModifiers = [];
+	private static readonly IReadOnlyList<string> s_emptyModifiers = [];
 
 	/// <summary>
 	/// Decodes a raw semantic token integer stream into the typed token objects expected by the editor.
@@ -67,7 +67,7 @@ internal static class LuaLanguageServerSemanticTokensDecoder
 		IReadOnlyList<string>? tokenModifiers)
 	{
 		if (modifierMask == 0 || tokenModifiers is null || tokenModifiers.Count == 0)
-			return EmptyModifiers;
+			return s_emptyModifiers;
 
 		cache ??= [];
 

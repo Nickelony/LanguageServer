@@ -7,12 +7,12 @@ namespace Nickelony.LanguageServer.Lua;
 /// </summary>
 internal sealed class LuaDiagnosticsCache
 {
-	private static readonly IReadOnlyList<TextEditorDiagnostic> EmptyDiagnostics = Array.AsReadOnly(Array.Empty<TextEditorDiagnostic>());
+	private static readonly IReadOnlyList<TextEditorDiagnostic> s_emptyDiagnostics = Array.AsReadOnly(Array.Empty<TextEditorDiagnostic>());
 
 	/// <summary>
 	/// Gets the currently cached diagnostics.
 	/// </summary>
-	internal IReadOnlyList<TextEditorDiagnostic> Diagnostics { get; private set; } = EmptyDiagnostics;
+	internal IReadOnlyList<TextEditorDiagnostic> Diagnostics { get; private set; } = s_emptyDiagnostics;
 
 	/// <summary>
 	/// Gets the synchronized document version associated with the cached diagnostics.
@@ -24,7 +24,7 @@ internal sealed class LuaDiagnosticsCache
 	/// </summary>
 	internal void Clear()
 	{
-		Diagnostics = EmptyDiagnostics;
+		Diagnostics = s_emptyDiagnostics;
 		Version = 0;
 	}
 
@@ -47,7 +47,7 @@ internal sealed class LuaDiagnosticsCache
 	private static IReadOnlyList<TextEditorDiagnostic> CreateReadOnlyDiagnostics(IReadOnlyList<TextEditorDiagnostic>? diagnostics)
 	{
 		return diagnostics is null || diagnostics.Count == 0
-			? EmptyDiagnostics
+			? s_emptyDiagnostics
 			: Array.AsReadOnly([.. diagnostics]);
 	}
 }

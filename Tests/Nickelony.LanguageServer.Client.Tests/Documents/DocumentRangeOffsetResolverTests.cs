@@ -4,7 +4,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public class DocumentRangeOffsetResolverTests
 {
 	[TestMethod]
-	public void TryResolveOffsets_ClampsStaleLineIndicesWithoutThrowing()
+	public void TryResolveOffsets_ClampsStaleLineIndicesToDocumentBounds()
 	{
 		DocumentLineOffsets lineOffsets = DocumentLineOffsets.Build("\nvalue");
 

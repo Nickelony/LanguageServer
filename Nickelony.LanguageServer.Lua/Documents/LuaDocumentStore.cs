@@ -62,16 +62,16 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 
 	/// <summary>
 	/// Returns the cached semantic tokens delta state for <paramref name="filePath"/>, if any.
-	/// Used by the provider to send `semanticTokens/full/delta` requests with the previous result id.
+	/// Used by the provider to send <c>semanticTokens/full/delta</c> requests with the previous result id.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <returns>The cached delta state, if available.</returns>
 	internal SemanticTokensDeltaState GetSemanticTokensDeltaState(string filePath)
-		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.GetDeltaState(), new SemanticTokensDeltaState(null, null));
+		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.GetDeltaState(), new(null, null));
 
 	/// <summary>
-	/// Stores the raw `data` payload returned by `semanticTokens/full(/delta)` along with the
-	/// associated `resultId`, so subsequent requests can ask LuaLS for incremental edits.
+	/// Stores the raw <c>data</c> payload returned by <c>semanticTokens/full(/delta)</c> along with the
+	/// associated <c>resultId</c>, so subsequent requests can ask LuaLS for incremental edits.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="resultId">The server-provided semantic token result id.</param>

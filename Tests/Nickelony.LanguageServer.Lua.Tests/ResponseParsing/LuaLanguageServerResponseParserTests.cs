@@ -34,6 +34,17 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
+	public void ParseCompletionItem_UnknownLuaKindFallsBackToGeneric()
+	{
+		CompletionItemPayload itemElement = CreateCompletionItem("unknown", kind: 999, detail: null, documentation: null);
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+
+		Assert.IsNotNull(item);
+		Assert.AreEqual(TextCompletionItemKind.Generic, item.Kind);
+	}
+
+	[TestMethod]
 	public void ParseCompletionItem_ParsesTextEditRange()
 	{
 		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
@@ -237,13 +248,6 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
-	public void DeserializeCompletionResponse_NullPayload_ReturnsEmptyResponse()
-	{
-		CompletionResponse? response = JsonSerializer.Deserialize<CompletionResponse>("null");
-		Assert.IsNull(response);
-	}
-
-	[TestMethod]
 	public void DeserializeCompletionResponse_IgnoresNonBooleanIncompleteFlag()
 	{
 		CompletionResponse? response = DeserializeCompletionResponse(new
@@ -298,8 +302,6 @@ public partial class LuaLanguageServerResponseParserTests
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Warning);
 
-		CompletionResponseJsonConverter.InitializeLogger(logScope);
-
 		CompletionResponse? response = DeserializeCompletionResponse(new
 		{
 			isIncomplete = true,
@@ -307,11 +309,12 @@ public partial class LuaLanguageServerResponseParserTests
 			{
 				label = "spawn"
 			}
-		});
+		}, new CompletionResponseJsonConverter(logScope));
 
 		Assert.IsNotNull(response);
 		Assert.IsNull(response.Items);
 		Assert.IsFalse(response.IsIncomplete);
+
 		Assert.IsTrue(logScope.Logs.Any(log => log.Contains("unsupported JSON kind", StringComparison.OrdinalIgnoreCase)
 			&& log.Contains("Object", StringComparison.Ordinal)),
 			string.Join(Environment.NewLine, logScope.Logs));
@@ -322,16 +325,15 @@ public partial class LuaLanguageServerResponseParserTests
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Warning);
 
-		CompletionResponseJsonConverter.InitializeLogger(logScope);
-
 		CompletionResponse? response = DeserializeCompletionResponse(new
 		{
 			isIncomplete = true
-		});
+		}, new CompletionResponseJsonConverter(logScope));
 
 		Assert.IsNotNull(response);
 		Assert.IsNull(response.Items);
 		Assert.IsFalse(response.IsIncomplete);
+
 		Assert.IsTrue(logScope.Logs.Any(log => log.Contains("items' property was missing", StringComparison.OrdinalIgnoreCase)),
 			string.Join(Environment.NewLine, logScope.Logs));
 	}

@@ -58,7 +58,8 @@ public sealed partial class LanguageServerClient
 	/// Occurs when the server publishes diagnostics for a tracked document.
 	/// Each subscribed handler is queued independently on the thread pool. Reentrant notifications for the same handler
 	/// are serialized, and repeated pending diagnostics for the same document may coalesce to the latest payload while a handler is still busy.
-	/// Different handlers may run concurrently and must marshal to a UI thread when required.
+	/// Different handlers may run concurrently, handler failures are isolated, and each handler receives an owned detached
+	/// diagnostics snapshot. The event may be raised on a background thread; consumers must marshal to a UI thread when required.
 	/// </summary>
 	public event Action<PublishDiagnosticsParams>? DiagnosticsPublished
 	{
@@ -70,7 +71,8 @@ public sealed partial class LanguageServerClient
 	/// Occurs when the server requests that semantic tokens be refreshed.
 	/// Each subscribed handler is queued independently on the thread pool. Reentrant notifications for the same handler
 	/// are serialized, and repeated pending refresh requests may coalesce while a handler is still busy.
-	/// Different handlers may run concurrently and must marshal to a UI thread when required.
+	/// Different handlers may run concurrently, and handler failures are isolated. The event may be raised on a background
+	/// thread; consumers must marshal to a UI thread when required.
 	/// </summary>
 	public event Action? SemanticTokensRefreshRequested
 	{
@@ -137,9 +139,9 @@ public sealed partial class LanguageServerClient
 	private DiagnosticsQueueKey GetDiagnosticsQueueKey(long transportGeneration, PublishDiagnosticsParams parameters)
 	{
 		if (!string.IsNullOrWhiteSpace(parameters.Uri))
-			return new DiagnosticsQueueKey(transportGeneration, NormalizeDiagnosticsDocumentKey(parameters.Uri));
+			return new(transportGeneration, NormalizeDiagnosticsDocumentKey(parameters.Uri));
 
-		return new DiagnosticsQueueKey(transportGeneration,
+		return new(transportGeneration,
 			"diagnostics:" + Interlocked.Increment(ref _diagnosticsFallbackSequence));
 	}
 

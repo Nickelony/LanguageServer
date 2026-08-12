@@ -131,7 +131,7 @@ public abstract class TrackedDocumentState
 	public DocumentSnapshot CreateSnapshot()
 	{
 		lock (_stateSyncRoot)
-			return new DocumentSnapshot(_filePath, _uri, _content, _version);
+			return new(_filePath, _uri, _content, _version);
 	}
 
 	/// <summary>

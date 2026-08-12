@@ -69,7 +69,7 @@ public sealed partial class WorkspaceFileWatcher
 			int consecutiveDispatchFailures = 0;
 
 			bool willRetry = false;
-			TimeSpan retryDelay = DispatchDebounce;
+			TimeSpan retryDelay = s_dispatchDebounce;
 
 			if (batch is not null)
 			{
@@ -143,9 +143,9 @@ public sealed partial class WorkspaceFileWatcher
 	private static TimeSpan GetDispatchRetryDelay(int consecutiveDispatchFailures)
 	{
 		int exponentialShift = Math.Clamp(consecutiveDispatchFailures - 1, 0, 4);
-		double retryDelayMilliseconds = DispatchDebounce.TotalMilliseconds * (1 << exponentialShift);
+		double retryDelayMilliseconds = s_dispatchDebounce.TotalMilliseconds * (1 << exponentialShift);
 
-		return TimeSpan.FromMilliseconds(Math.Min(MaxDispatchRetryDelay.TotalMilliseconds, retryDelayMilliseconds));
+		return TimeSpan.FromMilliseconds(Math.Min(s_maxDispatchRetryDelay.TotalMilliseconds, retryDelayMilliseconds));
 	}
 
 	private bool TryEnterDispatchOperation()

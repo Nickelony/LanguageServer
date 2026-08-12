@@ -7,7 +7,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void FreshClient_ExposesConservativeCapabilitiesBeforeStartup()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		Assert.IsFalse(client.IsReady);
 		Assert.AreEqual(0L, client.TransportGeneration);
@@ -25,7 +25,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void ActiveSessionBeforeHandshake_ExposesConservativeCapabilities()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -46,7 +46,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_UsesFullTextSyncWhenServerAdvertisesFullSync()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 			"""
@@ -65,9 +65,9 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_RejectsMissingDocumentChangeSupport()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
-		TargetInvocationException exception = Assert.ThrowsException<TargetInvocationException>(() =>
+		TargetInvocationException exception = Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 				"""
 				{
@@ -83,7 +83,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_RecognizesReferenceRenameAndFormattingProviders()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 			"""
@@ -107,7 +107,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_RecognizesSemanticTokensLegendAndDeltaSupport()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 			"""
@@ -131,6 +131,7 @@ public partial class LanguageServerClientTests
 
 		Assert.IsTrue(client.SupportsSemanticTokensDelta);
 		Assert.IsTrue(client.SupportsSemanticTokensFull);
+
 		CollectionAssert.AreEqual(new[] { "function", "variable" }, client.SemanticTokenTypes.ToArray());
 		CollectionAssert.AreEqual(new[] { "declaration" }, client.SemanticTokenModifiers.ToArray());
 	}
@@ -138,7 +139,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_TracksWhenFullSemanticTokensAreUnsupported()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 			"""
@@ -160,15 +161,16 @@ public partial class LanguageServerClientTests
 
 		Assert.IsFalse(client.SupportsSemanticTokensFull);
 		Assert.IsFalse(client.SupportsSemanticTokensDelta);
+
 		CollectionAssert.AreEqual(new[] { "function" }, client.SemanticTokenTypes.ToArray());
 	}
 
 	[TestMethod]
 	public void CaptureServerCapabilities_RejectsMissingCapabilitiesPayload()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
-		TargetInvocationException exception = Assert.ThrowsException<TargetInvocationException>(() =>
+		TargetInvocationException exception = Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse("""{}""")));
 
 		Assert.IsInstanceOfType(exception.InnerException, typeof(NotSupportedException));
@@ -177,9 +179,9 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilities_RejectsMissingTextDocumentSyncCapability()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
-		TargetInvocationException exception = Assert.ThrowsException<TargetInvocationException>(() =>
+		TargetInvocationException exception = Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 				"""
 				{
@@ -223,6 +225,7 @@ public partial class LanguageServerClientTests
 		Assert.IsFalse(response.Capabilities.RenameProvider?.IsSupported ?? true);
 		Assert.IsFalse(response.Capabilities.DocumentFormattingProvider?.IsSupported ?? true);
 		Assert.IsFalse(response.Capabilities.SemanticTokensProvider?.Full?.SupportsDelta ?? true);
+
 		CollectionAssert.AreEqual(new[] { "function" }, response.Capabilities.SemanticTokensProvider?.Legend?.TokenTypes);
 		CollectionAssert.AreEqual(new[] { "declaration" }, response.Capabilities.SemanticTokensProvider?.Legend?.TokenModifiers);
 	}
@@ -244,9 +247,9 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void SemanticTokenCapabilityLists_AreNotExposedAsMutableArrays()
+	public void SemanticTokenCapabilityLists_CannotBeMutatedThroughCollectionCasts()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
 		InvokePrivateMethod(client, "CaptureServerCapabilities", DeserializeInitializeResponse(
 			"""
@@ -265,7 +268,10 @@ public partial class LanguageServerClientTests
 			}
 			"""));
 
-		Assert.IsFalse(client.SemanticTokenTypes is string[]);
-		Assert.IsFalse(client.SemanticTokenModifiers is string[]);
+		Assert.ThrowsExactly<NotSupportedException>(() => ((IList<string>)client.SemanticTokenTypes)[0] = "class");
+		Assert.ThrowsExactly<NotSupportedException>(() => ((IList<string>)client.SemanticTokenModifiers)[0] = "readonly");
+
+		CollectionAssert.AreEqual(new[] { "function" }, client.SemanticTokenTypes.ToArray());
+		CollectionAssert.AreEqual(new[] { "declaration" }, client.SemanticTokenModifiers.ToArray());
 	}
 }

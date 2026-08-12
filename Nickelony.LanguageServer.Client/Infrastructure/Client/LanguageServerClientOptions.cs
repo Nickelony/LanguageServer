@@ -67,11 +67,11 @@ public sealed class LanguageServerClientOptions
 
 	private static TimeSpan ValidateTimeout(TimeSpan value, string propertyName)
 	{
-		if (value <= TimeSpan.Zero)
-			throw new ArgumentOutOfRangeException(propertyName, value, "The timeout must be greater than zero.");
-
 		if (value == Timeout.InfiniteTimeSpan)
 			throw new ArgumentOutOfRangeException(propertyName, value, "Infinite timeouts are not supported for transport lifecycle operations.");
+
+		if (value <= TimeSpan.Zero)
+			throw new ArgumentOutOfRangeException(propertyName, value, "The timeout must be greater than zero.");
 
 		return value;
 	}

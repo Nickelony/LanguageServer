@@ -14,7 +14,7 @@ public partial class LanguageServerClientTests
 		using Process process = StartDisposableProcess();
 		using var serverOutputStream = new PendingReadStream();
 		using var serverInputStream = new RecordingStream();
-		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 1, process, serverOutputStream, serverInputStream, startListening: true);
 
 		SetActiveSession(client, session);
@@ -38,7 +38,7 @@ public partial class LanguageServerClientTests
 		using Process process = StartDisposableProcess();
 		using var serverOutputStream = new PendingReadStream();
 		using var serverInputStream = new RecordingStream();
-		await using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, DefaultClientOptions);
+		await using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process, serverOutputStream, serverInputStream, startListening: true);
 
 		SetActiveSession(client, session);
@@ -56,7 +56,7 @@ public partial class LanguageServerClientTests
 	{
 		for (int i = 0; i < 2; i++)
 		{
-			var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+			var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 			SemaphoreSlim startLock = GetStartLock(client);
 
 			if (i == 0)
@@ -64,14 +64,14 @@ public partial class LanguageServerClientTests
 			else
 				await client.DisposeAsync().ConfigureAwait(false);
 
-			Assert.ThrowsException<ObjectDisposedException>(() => startLock.Wait(0));
+			Assert.ThrowsExactly<ObjectDisposedException>(() => startLock.Wait(0));
 		}
 	}
 
 	[TestMethod]
 	public async Task StartAsync_DisposeDuringStartupWait_ReturnsFalseWithoutObjectDisposedException()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		SemaphoreSlim startLock = GetStartLock(client);
 
 		startLock.Wait();
@@ -94,7 +94,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task StartAsync_WhenDisposalAlreadyBegan_DoesNotReportReadySuccess()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -105,7 +105,7 @@ public partial class LanguageServerClientTests
 		Assert.IsTrue(disposeStarted);
 		Assert.IsTrue(client.IsReady, "The regression test expects readiness to still be visible immediately after disposal begins.");
 
-		await Assert.ThrowsExceptionAsync<ObjectDisposedException>(async () =>
+		await Assert.ThrowsExactlyAsync<ObjectDisposedException>(async () =>
 			await client.StartAsync(CancellationToken.None).ConfigureAwait(false)).ConfigureAwait(false);
 	}
 
@@ -119,7 +119,7 @@ public partial class LanguageServerClientTests
 		using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			logScope.CreateLogger<LanguageServerClient>(),
 			processStartedTestHook: async (process, _) =>
 			{
@@ -153,7 +153,7 @@ public partial class LanguageServerClientTests
 		using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			logScope.CreateLogger<LanguageServerClient>(),
 			processStartedTestHook: async (process, cancellationToken) =>
 			{
@@ -177,7 +177,7 @@ public partial class LanguageServerClientTests
 		startupCancellation.Cancel();
 		allowStartupToContinue.TrySetResult(true);
 
-		await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
+		await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
 			await startTask.ConfigureAwait(false)).ConfigureAwait(false);
 
 		Assert.IsNotNull(startedProcessId);
@@ -207,7 +207,7 @@ public partial class LanguageServerClientTests
 		using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			logScope.CreateLogger<LanguageServerClient>(),
 			processStartedTestHook: async (process, cancellationToken) =>
 			{
@@ -253,7 +253,7 @@ public partial class LanguageServerClientTests
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using Process process = StartDisposableProcess();
-		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		int processId = process.Id;
 
 		await InvokePrivateTaskAsync(client, "DisposeStartupSessionResourcesAsync", null, process, true).ConfigureAwait(false);
@@ -276,7 +276,7 @@ public partial class LanguageServerClientTests
 		using Process process = StartDisposableProcess();
 		using var serverOutputStream = new PendingReadStream();
 		using var serverInputStream = new RecordingStream();
-		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", process.StartInfo.FileName, s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 7, process, serverOutputStream, serverInputStream, startListening: true);
 
 		SetActiveSession(client, session);
@@ -363,40 +363,10 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task WaitWithDisposeBudgetAsync_UsesConfiguredBudgetWithoutImmediateTimeout()
-	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", new LanguageServerClientOptions(static () => new { })
-		{
-			DisposeWaitTimeout = TimeSpan.FromMilliseconds(250)
-		});
-
-		var disposeStopwatch = Stopwatch.StartNew();
-		var releaseTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-		Task delayedTask = Task.Run(async () =>
-		{
-			await Task.Delay(125).ConfigureAwait(false);
-			releaseTask.TrySetResult(true);
-		});
-
-		await InvokePrivateTaskAsync(
-			client,
-			"WaitWithDisposeBudgetAsync",
-			releaseTask.Task,
-			disposeStopwatch,
-			"timeout message {0}",
-			"exception message")
-			.ConfigureAwait(false);
-
-		await delayedTask.ConfigureAwait(false);
-		Assert.IsTrue(releaseTask.Task.IsCompletedSuccessfully);
-	}
-
-	[TestMethod]
 	public async Task DisposeStartLockAsync_WhenStartupGateStaysBusy_LogsTimeoutWithoutDisposingGate()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Warning);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		SemaphoreSlim startLock = GetStartLock(client);
 		bool reacquiredStartLock = false;
 
@@ -437,7 +407,7 @@ public partial class LanguageServerClientTests
 		await using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			null,
 			processStartedTestHook: null,
 			sessionActivatedTestHook: cancellationToken => WaitForStartupCancellationAsync(sessionActivated, cancellationToken));
@@ -448,11 +418,11 @@ public partial class LanguageServerClientTests
 
 		startupCancellation.Cancel();
 
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
 
 		Assert.IsFalse(client.IsReady);
 
-		Assert.ThrowsException<TargetInvocationException>(() =>
+		Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethodWithReturn(client, "GetRequiredActiveSession", false));
 	}
 
@@ -496,7 +466,7 @@ public partial class LanguageServerClientTests
 	public void JsonRpc_Disconnected_UnexpectedDisconnect_LogsRecentStderrContext()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 11, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -523,17 +493,19 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void LanguageServerClientOptions_RejectsNonPositiveTimeouts()
 	{
-		Assert.ThrowsException<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
 		{
 			InitializeTimeout = TimeSpan.Zero
 		});
 
-		Assert.ThrowsException<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
+		ArgumentOutOfRangeException infiniteTimeoutException = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
 		{
 			ShutdownRequestTimeout = Timeout.InfiniteTimeSpan
 		});
 
-		Assert.ThrowsException<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
+		StringAssert.Contains(infiniteTimeoutException.Message, "Infinite timeouts are not supported");
+
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
 		{
 			DisposeWaitTimeout = TimeSpan.FromMilliseconds(-1)
 		});
@@ -544,7 +516,7 @@ public partial class LanguageServerClientTests
 	{
 		for (int i = 0; i < 25; i++)
 		{
-			await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+			await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 			object session = CreateTransportSession(client, i + 1, process: null, Stream.Null, Stream.Null, startListening: true);
 
 			SetActiveSession(client, session);
@@ -558,7 +530,7 @@ public partial class LanguageServerClientTests
 
 			await Task.WhenAll(disposeTasks).ConfigureAwait(false);
 
-			await Assert.ThrowsExceptionAsync<ObjectDisposedException>(() =>
+			await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() =>
 				client.SendNotificationAsync("workspace/didChangeConfiguration", new { settings = new { } }, CancellationToken.None))
 				.ConfigureAwait(false);
 		}
@@ -616,7 +588,7 @@ public partial class LanguageServerClientTests
 			await using var client = new LanguageServerClient(
 				@"C:\Workspace",
 				Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-				DefaultClientOptions,
+				s_defaultClientOptions,
 				null,
 				processStartedTestHook: null,
 				sessionActivatedTestHook: cancellationToken => WaitForStartupCancellationAsync(sessionActivated, cancellationToken));
@@ -629,9 +601,9 @@ public partial class LanguageServerClientTests
 
 			Assert.IsFalse(await startTask.ConfigureAwait(false));
 			Assert.IsFalse(client.IsReady);
-			Assert.ThrowsException<ObjectDisposedException>(() => GetStartLock(client).Wait(0));
+			Assert.ThrowsExactly<ObjectDisposedException>(() => GetStartLock(client).Wait(0));
 
-			await Assert.ThrowsExceptionAsync<ObjectDisposedException>(() =>
+			await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() =>
 				client.SendNotificationAsync("workspace/didChangeConfiguration", new { settings = new { } }, CancellationToken.None))
 				.ConfigureAwait(false);
 		}

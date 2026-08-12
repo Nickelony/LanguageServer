@@ -2,7 +2,7 @@ using Nickelony.LanguageServer.Abstractions.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 
-public sealed partial class LuaLanguageServerIntellisenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider
 {
 	private const int CompletionTriggerKindInvoked = 1;
 	private const int CompletionTriggerKindTriggerCharacter = 2;
@@ -46,7 +46,10 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		ILanguageServerClient? client = _client;
 
 		if (client is null)
+		{
+			ReportMissingClientFailure();
 			return unresolvedItem;
+		}
 
 		if (!client.SupportsCompletionResolve)
 			return unresolvedItem;

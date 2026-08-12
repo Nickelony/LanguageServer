@@ -334,6 +334,48 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
+	public void ParseWorkspaceEdit_GroupsPathsUsingLocalPathIdentity()
+	{
+		string firstPath = Path.Combine(Path.GetTempPath(), "Scripts", "case.lua");
+		string secondPath = Path.Combine(Path.GetTempPath(), "Scripts", "CASE.lua");
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(
+			DeserializeWorkspaceEditResponse(new
+			{
+				changes = new Dictionary<string, object[]>
+				{
+					[new Uri(firstPath).AbsoluteUri] =
+					[
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 1 }
+							},
+							newText = "first"
+						}
+					],
+					[new Uri(secondPath).AbsoluteUri] =
+					[
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 1 }
+							},
+							newText = "second"
+						}
+					]
+				}
+			}));
+
+		Assert.IsNotNull(workspaceEdit);
+		Assert.AreEqual(LanguageServerPathHelper.UsesCaseSensitiveLocalPaths ? 2 : 1, workspaceEdit.DocumentEdits.Count);
+	}
+
+	[TestMethod]
 	public void ParseWorkspaceEdit_ReturnsNullWhenDocumentChangesContainUnsupportedResourceOperation()
 	{
 		string firstPath = Path.GetFullPath(@"C:\Workspace\Scripts\first.lua");

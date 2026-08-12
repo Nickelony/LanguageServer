@@ -44,7 +44,7 @@ internal sealed class CapabilityUnregistrationParamsJsonConverter : JsonConverte
 		else if (root.TryGetProperty("unregisterations", out JsonElement legacyProperty))
 			unregistrations = legacyProperty.Deserialize<CapabilityUnregistrationPayload[]>(options);
 
-		return new CapabilityUnregistrationParams(unregistrations);
+		return new(unregistrations);
 	}
 
 	public override void Write(Utf8JsonWriter writer, CapabilityUnregistrationParams value, JsonSerializerOptions options)

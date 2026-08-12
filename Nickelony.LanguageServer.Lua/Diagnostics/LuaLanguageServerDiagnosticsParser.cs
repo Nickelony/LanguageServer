@@ -46,9 +46,6 @@ internal static class LuaLanguageServerDiagnosticsParser
 		{
 			TextEditorDiagnosticSeverity severity = GetDiagnosticSeverity(diagnosticElement);
 
-			if (severity > TextEditorDiagnosticSeverity.Warning)
-				continue;
-
 			if (!TryCreateDiagnostic(lineOffsets, diagnosticElement, severity, out TextEditorDiagnostic? diagnostic))
 				continue;
 

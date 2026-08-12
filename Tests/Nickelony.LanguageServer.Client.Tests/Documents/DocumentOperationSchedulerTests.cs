@@ -32,7 +32,7 @@ public class DocumentOperationSchedulerTests
 		allowFirstToFinish.TrySetResult(true);
 
 		await firstTask.ConfigureAwait(false);
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
 
 		Assert.AreEqual(0, canceledOperationCallCount);
 	}
@@ -66,7 +66,7 @@ public class DocumentOperationSchedulerTests
 		allowFirstToFinish.TrySetResult(true);
 
 		await firstTask.ConfigureAwait(false);
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
 
 		Assert.AreEqual(0, canceledOperationCallCount);
 	}
@@ -107,7 +107,7 @@ public class DocumentOperationSchedulerTests
 		allowFirstToFinish.TrySetResult(true);
 
 		await firstTask.ConfigureAwait(false);
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => canceledTask).ConfigureAwait(false);
 		Assert.IsTrue(await laterTask.ConfigureAwait(false));
 
 		Assert.AreEqual(0, canceledOperationCallCount);

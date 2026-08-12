@@ -122,7 +122,7 @@ internal sealed class SerializedSignalSubscriberSet<THandler>
 			if (Interlocked.CompareExchange(ref _drainScheduled, 1, 0) != 0)
 				return;
 
-			ThreadPool.QueueUserWorkItem(static state => ((Subscription)state!).Drain(), this, preferLocal: false);
+			ThreadPool.QueueUserWorkItem(static state => ((Subscription)state).Drain(), this, preferLocal: false);
 		}
 
 		private void Drain()

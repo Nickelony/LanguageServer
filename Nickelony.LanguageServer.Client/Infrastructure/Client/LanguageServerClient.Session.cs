@@ -6,6 +6,11 @@ namespace Nickelony.LanguageServer.Client;
 
 public sealed partial class LanguageServerClient
 {
+	private static readonly Action<ILogger, Exception?> s_logTransportUnavailableSubscriberFailure = LoggerMessage.Define(
+		LogLevel.Warning,
+		new EventId(1, nameof(TransportUnavailable)),
+		"Language server transport-unavailable subscriber threw; later subscribers will still be notified.");
+
 	/// <summary>
 	/// Creates a transport session from a started language-server process.
 	/// </summary>
@@ -29,7 +34,7 @@ public sealed partial class LanguageServerClient
 	{
 		Process? process = session.Process;
 
-		session.MessageHandler = CreateMessageHandler(session.ServerInputStream, session.ServerOutputStream);
+		session.MessageHandler = CreateMessageHandlerWithLogger(session.ServerInputStream, session.ServerOutputStream);
 		session.RpcTarget = new LanguageServerClientRpcTarget(this, session.Generation, _workspaceRootDirectoryPath, _workspaceFolderName, _logger);
 		session.JsonRpc = CreateJsonRpc(session);
 		session.RpcCompletionTask = session.JsonRpc.Completion;
@@ -60,13 +65,23 @@ public sealed partial class LanguageServerClient
 	/// <param name="serverOutputStream">The readable stream carrying server responses back to the host.</param>
 	/// <returns>The configured message handler.</returns>
 	private static HeaderDelimitedMessageHandler CreateMessageHandler(Stream serverInputStream, Stream serverOutputStream)
+		=> CreateMessageHandlerCore(serverInputStream, serverOutputStream, NullLogger.Instance);
+
+	private HeaderDelimitedMessageHandler CreateMessageHandlerWithLogger(Stream serverInputStream, Stream serverOutputStream)
+		=> CreateMessageHandlerCore(serverInputStream, serverOutputStream, _logger);
+
+	private static HeaderDelimitedMessageHandler CreateMessageHandlerCore(Stream serverInputStream, Stream serverOutputStream, ILogger logger)
 	{
+		var serializerOptions = new JsonSerializerOptions
+		{
+			PropertyNameCaseInsensitive = true
+		};
+
+		serializerOptions.Converters.Add(new CompletionResponseJsonConverter(logger));
+
 		var formatter = new SystemTextJsonFormatter
 		{
-			JsonSerializerOptions = new JsonSerializerOptions
-			{
-				PropertyNameCaseInsensitive = true
-			}
+			JsonSerializerOptions = serializerOptions
 		};
 
 		return new HeaderDelimitedMessageHandler(serverInputStream, serverOutputStream, formatter);
@@ -173,13 +188,18 @@ public sealed partial class LanguageServerClient
 	/// Detaches the supplied session only when it is still the current active transport session.
 	/// </summary>
 	/// <param name="session">The session to detach.</param>
+	/// <param name="wasReady">Receives whether the detached session was ready.</param>
 	/// <returns><see langword="true"/> when the session was detached; otherwise, <see langword="false"/>.</returns>
-	private bool TryDetachSpecificActiveSession(LanguageServerTransportSession session)
+	private bool TryDetachSpecificActiveSession(LanguageServerTransportSession session, out bool wasReady)
 	{
+		wasReady = false;
+
 		lock (_publishedCapabilitySnapshotSyncRoot)
 		{
 			if (!ReferenceEquals(_activeSession, session))
 				return false;
+
+			wasReady = Volatile.Read(ref _publishedCapabilitySnapshot).IsReady;
 
 			_activeSession = null;
 			PublishCapabilitySnapshot(CreateDefaultCapabilitySnapshot());
@@ -205,8 +225,11 @@ public sealed partial class LanguageServerClient
 	/// <param name="session">The session whose process exited.</param>
 	private void Process_Exited(LanguageServerTransportSession session)
 	{
-		if (!TryDetachSpecificActiveSession(session))
+		if (!TryDetachSpecificActiveSession(session, out bool wasReady))
 			return;
+
+		if (wasReady)
+			RaiseTransportUnavailable(session.Generation);
 
 		DisposeFailedSessionInBackground(session, "process exit");
 
@@ -269,7 +292,7 @@ public sealed partial class LanguageServerClient
 	/// <param name="eventArgs">The disconnect event arguments.</param>
 	private void JsonRpc_Disconnected(LanguageServerTransportSession session, JsonRpcDisconnectedEventArgs eventArgs)
 	{
-		if (!TryDetachSpecificActiveSession(session))
+		if (!TryDetachSpecificActiveSession(session, out bool wasReady))
 		{
 			_logger.LogDebug("Ignoring disconnect from stale language server transport generation {Generation}: {Description}",
 				session.Generation,
@@ -300,6 +323,9 @@ public sealed partial class LanguageServerClient
 			return;
 		}
 
+		if (wasReady)
+			RaiseTransportUnavailable(session.Generation);
+
 		Exception? exception = eventArgs.Exception;
 
 		if (exception is not null)
@@ -323,6 +349,36 @@ public sealed partial class LanguageServerClient
 			eventArgs.Description);
 
 		LogRecentStandardErrorContext(session, "Unexpected transport disconnect");
+	}
+
+	/// <summary>
+	/// Notifies subscribers that one active ready transport was lost.
+	/// </summary>
+	/// <param name="transportGeneration">The generation that was lost.</param>
+	private void RaiseTransportUnavailable(long transportGeneration)
+	{
+		if (_isDisposed)
+			return;
+
+		Action<long>? handlers = TransportUnavailable;
+
+		if (handlers is null)
+			return;
+
+		foreach (Action<long> handler in handlers.GetInvocationList())
+		{
+			if (_isDisposed)
+				return;
+
+			try
+			{
+				handler(transportGeneration);
+			}
+			catch (Exception exception)
+			{
+				s_logTransportUnavailableSubscriberFailure(_logger, exception);
+			}
+		}
 	}
 
 	/// <summary>
@@ -510,7 +566,8 @@ public sealed partial class LanguageServerClient
 		task.ContinueWith(
 			static (completedTask, state) =>
 			{
-				BackgroundLoopObservation observation = (BackgroundLoopObservation)state!;
+				if (state is not BackgroundLoopObservation observation)
+					return;
 
 				observation.Owner.LogUnexpectedBackgroundLoopTermination(
 					completedTask,
@@ -652,10 +709,21 @@ public sealed partial class LanguageServerClient
 
 		switch (messageType)
 		{
-			case 1: _logger.LogError("[LS {Method}] {Message}", method, messageText); break;
-			case 2: _logger.LogWarning("[LS {Method}] {Message}", method, messageText); break;
-			case 3: _logger.LogInformation("[LS {Method}] {Message}", method, messageText); break;
-			default: _logger.LogDebug("[LS {Method}] {Message}", method, messageText); break;
+			case 1:
+				_logger.LogError("[LS {Method}] {Message}", method, messageText);
+				break;
+
+			case 2:
+				_logger.LogWarning("[LS {Method}] {Message}", method, messageText);
+				break;
+
+			case 3:
+				_logger.LogInformation("[LS {Method}] {Message}", method, messageText);
+				break;
+
+			default:
+				_logger.LogDebug("[LS {Method}] {Message}", method, messageText);
+				break;
 		}
 	}
 

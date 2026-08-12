@@ -88,7 +88,7 @@ internal static partial class LuaLanguageServerResponseParser
 		string? searchableDescription = LuaMarkupTextHelper.NormalizeMarkupText(description.Text);
 		var textAnalysis = new LuaCompletionTextAnalysis(detail, searchableDescription);
 
-		return new TextCompletionItem(
+		return new(
 			label,
 			insertText,
 			description.Text,
@@ -117,12 +117,12 @@ internal static partial class LuaLanguageServerResponseParser
 	private static TextCompletionTextEdit? ParseCompletionTextEdit(CompletionTextEditPayload textEditElement)
 	{
 		if (TryParseCompletionRange(textEditElement.Range, out TextCompletionRange range))
-			return new TextCompletionTextEdit(range);
+			return new(range);
 
 		if (TryParseCompletionRange(textEditElement.Insert, out TextCompletionRange insertRange)
 			&& TryParseCompletionRange(textEditElement.Replace, out TextCompletionRange replaceRange))
 		{
-			return new TextCompletionTextEdit(insertRange, replaceRange);
+			return new(insertRange, replaceRange);
 		}
 
 		return null;
@@ -256,7 +256,7 @@ internal static partial class LuaLanguageServerResponseParser
 			return default;
 
 		string? normalizedText = documentation.IsMarkdown
-			? LuaMarkupTextHelper.NormalizeMarkdownText(documentation.Text)
+			? MarkupContentReader.NormalizeMarkdownText(documentation.Text)
 			: LuaMarkupTextHelper.NormalizeMarkupText(documentation.Text);
 
 		return string.IsNullOrWhiteSpace(normalizedText)
@@ -270,7 +270,7 @@ internal static partial class LuaLanguageServerResponseParser
 	private static LuaSnippetPlaceholderResult StripSnippetPlaceholders(string snippet)
 	{
 		if (string.IsNullOrWhiteSpace(snippet))
-			return new LuaSnippetPlaceholderResult(snippet, null);
+			return new(snippet, null);
 
 		var builder = new StringBuilder(snippet.Length);
 		int? caretOffset = null;
@@ -335,6 +335,6 @@ internal static partial class LuaLanguageServerResponseParser
 			index++;
 		}
 
-		return new LuaSnippetPlaceholderResult(builder.ToString(), caretOffset);
+		return new(builder.ToString(), caretOffset);
 	}
 }

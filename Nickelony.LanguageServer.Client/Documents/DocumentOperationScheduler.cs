@@ -44,6 +44,4 @@ public sealed partial class DocumentOperationScheduler
 		await WaitForQueuedOperationAsync(secondOperation).ConfigureAwait(false);
 	}
 
-	private static string NormalizeDocumentPath(string filePath)
-		=> LanguageServerPathHelper.NormalizeLocalPath(filePath);
 }

@@ -9,8 +9,11 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 	where THandler : Delegate
 {
 	private readonly object _syncRoot = new();
+
 	private readonly Action<THandler, PublishDiagnosticsParams> _invokeHandler;
 	private readonly Action<Exception> _logHandlerFailure;
+	private readonly Action<PublishDiagnosticsParams>? _beforePendingPayloadReplacement;
+
 	private readonly List<Subscription> _subscriptions = [];
 
 	/// <summary>
@@ -19,9 +22,17 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 	/// <param name="invokeHandler">Invokes one subscribed handler with one diagnostics payload.</param>
 	/// <param name="logHandlerFailure">Logs one handler exception without interrupting later subscribers.</param>
 	public SerializedDiagnosticsSubscriberSet(Action<THandler, PublishDiagnosticsParams> invokeHandler, Action<Exception> logHandlerFailure)
+		: this(invokeHandler, logHandlerFailure, beforePendingPayloadReplacement: null)
+	{ }
+
+	internal SerializedDiagnosticsSubscriberSet(
+		Action<THandler, PublishDiagnosticsParams> invokeHandler,
+		Action<Exception> logHandlerFailure,
+		Action<PublishDiagnosticsParams>? beforePendingPayloadReplacement)
 	{
 		_invokeHandler = invokeHandler;
 		_logHandlerFailure = logHandlerFailure;
+		_beforePendingPayloadReplacement = beforePendingPayloadReplacement;
 	}
 
 	/// <summary>
@@ -34,7 +45,7 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 			return;
 
 		lock (_syncRoot)
-			_subscriptions.Add(new Subscription(handler, _invokeHandler, _logHandlerFailure));
+			_subscriptions.Add(new Subscription(handler, _invokeHandler, _logHandlerFailure, _beforePendingPayloadReplacement));
 	}
 
 	/// <summary>
@@ -89,6 +100,8 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 	{
 		private readonly Action<THandler, PublishDiagnosticsParams> _invokeHandler;
 		private readonly Action<Exception> _logHandlerFailure;
+		private readonly Action<PublishDiagnosticsParams>? _beforePendingPayloadReplacement;
+
 		private readonly ConcurrentDictionary<string, PendingDiagnosticsPayload> _pendingPayloads = new(StringComparer.Ordinal);
 
 		private int _drainScheduled;
@@ -98,12 +111,17 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 		private readonly record struct PendingDiagnosticsPayload(long Sequence, PublishDiagnosticsParams Parameters);
 		private readonly record struct DrainedDiagnosticsPayload(long Sequence, PublishDiagnosticsParams Parameters);
 
-		public Subscription(THandler handler, Action<THandler, PublishDiagnosticsParams> invokeHandler, Action<Exception> logHandlerFailure)
+		public Subscription(
+			THandler handler,
+			Action<THandler, PublishDiagnosticsParams> invokeHandler,
+			Action<Exception> logHandlerFailure,
+			Action<PublishDiagnosticsParams>? beforePendingPayloadReplacement)
 		{
 			Handler = handler;
 
 			_invokeHandler = invokeHandler;
 			_logHandlerFailure = logHandlerFailure;
+			_beforePendingPayloadReplacement = beforePendingPayloadReplacement;
 		}
 
 		public THandler Handler { get; }
@@ -113,20 +131,28 @@ internal sealed class SerializedDiagnosticsSubscriberSet<THandler>
 			if (Volatile.Read(ref _isDisposed) != 0)
 				return;
 
+			// Allocate the sequence when this enqueue begins, even when the document already
+			// has a pending payload. A retry must never allow an older caller to replace a
+			// payload published later by another concurrent caller.
+			long incomingSequence = Interlocked.Increment(ref _nextSequence);
+
 			while (true)
 			{
 				if (!_pendingPayloads.TryGetValue(documentKey, out PendingDiagnosticsPayload existingPayload))
 				{
-					long sequence = Interlocked.Increment(ref _nextSequence);
-
-					if (_pendingPayloads.TryAdd(documentKey, new PendingDiagnosticsPayload(sequence, parameters)))
+					if (_pendingPayloads.TryAdd(documentKey, new PendingDiagnosticsPayload(incomingSequence, parameters)))
 						break;
 
 					continue;
 				}
 
+				if (incomingSequence <= existingPayload.Sequence)
+					break;
+
+				_beforePendingPayloadReplacement?.Invoke(parameters);
+
 				if (_pendingPayloads.TryUpdate(documentKey,
-					existingPayload with { Parameters = parameters },
+					new PendingDiagnosticsPayload(incomingSequence, parameters),
 					existingPayload))
 				{
 					break;

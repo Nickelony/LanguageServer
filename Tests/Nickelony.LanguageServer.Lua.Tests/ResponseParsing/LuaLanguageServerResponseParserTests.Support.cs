@@ -19,8 +19,15 @@ public partial class LuaLanguageServerResponseParserTests
 		=> JsonSerializer.Deserialize<CompletionItemPayload>(JsonSerializer.Serialize(payload))
 			?? throw new InvalidOperationException("Failed to deserialize the Lua completion-item test payload.");
 
-	private static CompletionResponse? DeserializeCompletionResponse(object payload)
-		=> JsonSerializer.Deserialize<CompletionResponse>(JsonSerializer.Serialize(payload));
+	private static CompletionResponse? DeserializeCompletionResponse(object payload, CompletionResponseJsonConverter? converter = null)
+	{
+		var options = new JsonSerializerOptions();
+
+		if (converter is not null)
+			options.Converters.Add(converter);
+
+		return JsonSerializer.Deserialize<CompletionResponse>(JsonSerializer.Serialize(payload), options);
+	}
 
 	private static HoverResponse DeserializeHoverResponse(object payload)
 		=> JsonSerializer.Deserialize<HoverResponse>(JsonSerializer.Serialize(payload))

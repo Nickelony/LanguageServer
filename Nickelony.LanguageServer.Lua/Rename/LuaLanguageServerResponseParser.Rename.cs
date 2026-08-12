@@ -16,7 +16,7 @@ internal static partial class LuaLanguageServerResponseParser
 		if (response is null)
 			return null;
 
-		var editsByFile = new Dictionary<string, List<TextEdit>>(StringComparer.OrdinalIgnoreCase);
+		var editsByFile = new Dictionary<string, List<TextEdit>>(LanguageServerPathHelper.LocalPathComparer);
 
 		ParseChangeMap(response.Value.Changes, editsByFile);
 

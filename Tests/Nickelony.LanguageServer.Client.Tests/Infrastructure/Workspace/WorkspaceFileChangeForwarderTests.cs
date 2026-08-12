@@ -411,6 +411,7 @@ public class WorkspaceFileChangeForwarderTests
 	public async Task ReplayDeferredAsync_WhenReplayIsInFlight_DoesNotLetNewDispatchPassIt()
 	{
 		bool startResult = false;
+
 		var forwardedBatches = new List<IReadOnlyList<WorkspaceFileChange>>();
 		var replayEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowReplayToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -567,6 +568,7 @@ public class WorkspaceFileChangeForwarderTests
 	public async Task Dispose_WhileReplayIsInFlight_AllowsReplayToFinishAndBlocksNewDispatch()
 	{
 		bool startResult = false;
+
 		var forwardedBatches = new List<IReadOnlyList<WorkspaceFileChange>>();
 		var replayEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowReplayToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -621,6 +623,7 @@ public class WorkspaceFileChangeForwarderTests
 	{
 		bool ensureStartedCalled = false;
 		bool forwardCalled = false;
+
 		var firstForwardEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstForwardToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
