@@ -1,3 +1,5 @@
+using Nickelony.LanguageServer.Abstractions.Diagnostics;
+
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 [TestClass]
@@ -80,6 +82,47 @@ public class LuaLanguageServerDiagnosticsParserTests
 		Assert.AreEqual(1, publishedDiagnostics.Diagnostics.Count);
 		Assert.AreEqual(6, publishedDiagnostics.Diagnostics[0].StartOffset);
 		Assert.AreEqual(11, publishedDiagnostics.Diagnostics[0].EndOffset);
+	}
+
+	[TestMethod]
+	public void TryParse_PreservesInformationAndHintDiagnostics()
+	{
+		const string filePath = @"C:\Workspace\test.lua";
+		const string content = "local value = 1";
+
+		bool parsed = LuaLanguageServerDiagnosticsParser.TryParse(
+			new PublishDiagnosticsParams(
+				Uri: null,
+				Version: 1,
+				Diagnostics:
+				[
+					new DiagnosticPayload(
+						new ProtocolRangePayload(
+							new ProtocolNullablePosition(0, 0),
+							new ProtocolNullablePosition(0, 5)),
+						3,
+						"Informational payload.",
+						null,
+						null),
+					new DiagnosticPayload(
+						new ProtocolRangePayload(
+							new ProtocolNullablePosition(0, 6),
+							new ProtocolNullablePosition(0, 11)),
+						4,
+						"Hint payload.",
+						null,
+						null)
+				]),
+			filePath,
+			content,
+			documentVersion: 1,
+			out LuaPublishedDiagnostics? publishedDiagnostics);
+
+		Assert.IsTrue(parsed);
+		Assert.IsNotNull(publishedDiagnostics);
+		Assert.AreEqual(2, publishedDiagnostics.Diagnostics.Count);
+		Assert.AreEqual(TextEditorDiagnosticSeverity.Information, publishedDiagnostics.Diagnostics[0].Severity);
+		Assert.AreEqual(TextEditorDiagnosticSeverity.Hint, publishedDiagnostics.Diagnostics[1].Severity);
 	}
 
 	private static PublishDiagnosticsParams CreateDiagnostics(int line, int startCharacter, int endLine, int endCharacter) => new(

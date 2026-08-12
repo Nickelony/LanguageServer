@@ -17,6 +17,7 @@ public class TrackedDocumentStateTests
 			lastAccessStamp: 3);
 
 		DocumentSnapshot initialSnapshot = state.CreateSnapshot();
+
 		state.Rename(@"C:\Workspace\Scripts\renamed.lua", "file:///C:/Workspace/Scripts/renamed.lua");
 		string previousContent = state.Update("return 2");
 		state.Close();

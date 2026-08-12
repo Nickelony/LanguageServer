@@ -215,9 +215,9 @@ public sealed partial class LanguageServerClient
 	{
 		JsonElement settingsElement = settingsPayload is JsonElement jsonElement
 			? jsonElement.Clone()
-			: JsonSerializer.SerializeToElement(settingsPayload, ConfigurationJsonSerializerOptions);
+			: JsonSerializer.SerializeToElement(settingsPayload, s_configurationJsonSerializerOptions);
 
-		return new CachedSettingsSnapshot(settingsPayload, settingsElement);
+		return new(settingsPayload, settingsElement);
 	}
 
 	private void TryRefreshCachedSettingsSnapshotFromNotification(string method, object parameters)
@@ -233,7 +233,7 @@ public sealed partial class LanguageServerClient
 				return;
 			}
 
-			JsonElement payload = JsonSerializer.SerializeToElement(parameters, ConfigurationJsonSerializerOptions);
+			JsonElement payload = JsonSerializer.SerializeToElement(parameters, s_configurationJsonSerializerOptions);
 
 			if (!payload.TryGetProperty("settings", out JsonElement settingsElement))
 				return;

@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntellisenseProviderTests
+public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	private static PublishDiagnosticsParams CreateDiagnostics(string filePath, int? version, int startCharacter, int endCharacter, string message) => new(
 		new Uri(filePath).AbsoluteUri,
@@ -18,17 +18,17 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				null)
 		]);
 
-	private static WorkspaceFileWatcher? GetWorkspaceWatcher(LuaLanguageServerIntellisenseProvider provider)
-		=> LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceWatcher(provider);
+	private static WorkspaceFileWatcher? GetWorkspaceWatcher(LuaLanguageServerIntelliSenseProvider provider)
+		=> LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceWatcher(provider);
 
-	private static SemaphoreSlim GetProviderStartLock(LuaLanguageServerIntellisenseProvider provider)
-		=> LuaLanguageServerIntellisenseProviderTestAccess.GetProviderStartLock(provider);
+	private static SemaphoreSlim GetProviderStartLock(LuaLanguageServerIntelliSenseProvider provider)
+		=> LuaLanguageServerIntelliSenseProviderTestAccess.GetProviderStartLock(provider);
 
-	private static CancellationTokenSource GetProviderDisposeCancellationTokenSource(LuaLanguageServerIntellisenseProvider provider)
-		=> LuaLanguageServerIntellisenseProviderTestAccess.GetProviderDisposeCancellationTokenSource(provider);
+	private static CancellationTokenSource GetProviderDisposeCancellationTokenSource(LuaLanguageServerIntelliSenseProvider provider)
+		=> LuaLanguageServerIntelliSenseProviderTestAccess.GetProviderDisposeCancellationTokenSource(provider);
 
-	private static int GetTrackedDocumentCount(LuaLanguageServerIntellisenseProvider provider)
-		=> LuaLanguageServerIntellisenseProviderTestAccess.GetTrackedDocumentCount(provider);
+	private static int GetTrackedDocumentCount(LuaLanguageServerIntelliSenseProvider provider)
+		=> LuaLanguageServerIntelliSenseProviderTestAccess.GetTrackedDocumentCount(provider);
 
 	private static int CountSentMethods(FakeLanguageServerClient client, string method)
 	{
@@ -57,6 +57,6 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		throw new InvalidOperationException($"Private method '{methodName}' returned '{result?.GetType().FullName ?? "null"}' instead of '{typeof(T).FullName}'.");
 	}
 
-	private static Task DispatchWorkspaceFileChangesAsync(LuaLanguageServerIntellisenseProvider provider, FileChangeBatch batch, CancellationToken cancellationToken)
-		=> LuaLanguageServerIntellisenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken);
+	private static Task DispatchWorkspaceFileChangesAsync(LuaLanguageServerIntelliSenseProvider provider, FileChangeBatch batch, CancellationToken cancellationToken)
+		=> LuaLanguageServerIntelliSenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken);
 }

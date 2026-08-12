@@ -10,9 +10,9 @@ public sealed partial class LanguageServerClient : ILanguageServerClient
 {
 	private readonly ILogger _logger;
 
-	private static readonly IReadOnlyList<string> EmptyCapabilityList = Array.AsReadOnly(Array.Empty<string>());
+	private static readonly IReadOnlyList<string> s_emptyCapabilityList = Array.AsReadOnly(Array.Empty<string>());
 
-	private static readonly JsonSerializerOptions ConfigurationJsonSerializerOptions = new()
+	private static readonly JsonSerializerOptions s_configurationJsonSerializerOptions = new()
 	{
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 	};
@@ -132,6 +132,11 @@ public sealed partial class LanguageServerClient : ILanguageServerClient
 	public bool SupportsSemanticTokensDelta => Volatile.Read(ref _publishedCapabilitySnapshot).SupportsSemanticTokensDelta;
 
 	/// <summary>
+	/// Occurs when the active ready transport becomes unavailable.
+	/// </summary>
+	public event Action<long>? TransportUnavailable;
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="LanguageServerClient"/> class.
 	/// </summary>
 	/// <param name="workspaceRootDirectoryPath">The workspace root directory to host.</param>
@@ -176,8 +181,6 @@ public sealed partial class LanguageServerClient : ILanguageServerClient
 		_processStartedTestHook = processStartedTestHook;
 		_sessionActivatedTestHook = sessionActivatedTestHook;
 		_beforeInitializeRequestTestHook = beforeInitializeRequestTestHook;
-
-		CompletionResponseJsonConverter.InitializeLogger(_logger);
 
 		if (OperatingSystem.IsWindows())
 			ProcessJobObject.InitializeLogger(_logger);

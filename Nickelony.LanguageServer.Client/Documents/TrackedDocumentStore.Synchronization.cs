@@ -11,13 +11,17 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="acquireOpenReference">Whether an additional open-editor reference should be recorded.</param>
 	/// <param name="acquireRequestReference">Whether a temporary request-driven reference should be recorded.</param>
 	/// <returns>A synchronization request when the server copy must be updated; otherwise, <see langword="null"/>.</returns>
+	/// <remarks>
+	/// Synchronization can create an idle server-open record when neither reference option is selected. The record is
+	/// retained until explicitly closed or removed by request-only trimming.
+	/// </remarks>
 	public DocumentSynchronizationRequest? Synchronize(
 		string filePath,
 		string? content,
 		bool acquireOpenReference = false,
 		bool acquireRequestReference = false)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 		string safeContent = content ?? string.Empty;
 
 		lock (_syncRoot)
@@ -35,7 +39,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 					lastAccessStamp: GetNextAccessStamp());
 
 				_documents[normalizedFilePath] = state;
-				return new DocumentSynchronizationRequest(DocumentSynchronizationKind.Open, state.CreateSnapshot());
+				return new(DocumentSynchronizationKind.Open, state.CreateSnapshot());
 			}
 
 			if (acquireOpenReference)
@@ -49,7 +53,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 			if (!state.IsOpen)
 			{
 				ReopenTrackedDocumentState(state, safeContent);
-				return new DocumentSynchronizationRequest(DocumentSynchronizationKind.Open, state.CreateSnapshot());
+				return new(DocumentSynchronizationKind.Open, state.CreateSnapshot());
 			}
 
 			if (!string.Equals(state.Content, safeContent, StringComparison.Ordinal))
@@ -58,7 +62,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 				DocumentLineOffsets previousOffsets = DocumentLineOffsets.Build(previousContent);
 				DocumentChangeRange changeRange = DocumentIncrementalEditCalculator.Compute(previousContent, safeContent, previousOffsets);
 
-				return new DocumentSynchronizationRequest(DocumentSynchronizationKind.Change, state.CreateSnapshot(), changeRange);
+				return new(DocumentSynchronizationKind.Change, state.CreateSnapshot(), changeRange);
 			}
 
 			return null;

@@ -2,7 +2,7 @@ namespace Nickelony.LanguageServer.Client;
 
 public sealed partial class WorkspaceFileWatcher
 {
-	private static readonly TimeSpan DisposeFinalFlushTimeout = TimeSpan.FromSeconds(2.0);
+	private static readonly TimeSpan s_disposeFinalFlushTimeout = TimeSpan.FromSeconds(2.0);
 
 	/// <summary>
 	/// Stops active file-system watchers, waits for dispatch finalization, and releases watcher resources.
@@ -64,7 +64,7 @@ public sealed partial class WorkspaceFileWatcher
 
 			bool finalFlushTimedOut = false;
 
-			using var finalFlushTimeout = new CancellationTokenSource(DisposeFinalFlushTimeout);
+			using var finalFlushTimeout = new CancellationTokenSource(s_disposeFinalFlushTimeout);
 
 			try
 			{
@@ -79,7 +79,7 @@ public sealed partial class WorkspaceFileWatcher
 			if (finalFlushTimedOut)
 			{
 				_logger.LogWarning("Workspace file watcher final dispose flush exceeded {Timeout} for '{Workspace}'; cancellation was requested and disposal waited for the callback to unwind.",
-					DisposeFinalFlushTimeout,
+					s_disposeFinalFlushTimeout,
 					_workspaceRootDirectoryPath);
 			}
 		}

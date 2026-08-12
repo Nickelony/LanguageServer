@@ -10,7 +10,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="filePath">The local file path of the document.</param>
 	public void ReleaseRequest(string filePath)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
 		{
@@ -31,7 +31,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <returns><see langword="true"/> when the document was removed locally; otherwise, <see langword="false"/>.</returns>
 	public bool TryReleaseRequest(string filePath, out DocumentSnapshot? document)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
 		{
@@ -102,9 +102,13 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="document">When this method returns, contains the closing snapshot if the server copy is still open.</param>
 	/// <returns><see langword="true"/> when the document was removed locally; otherwise, <see langword="false"/>.</returns>
+	/// <remarks>
+	/// A call made after the state has already been removed is a no-op. An existing idle record is treated as explicit
+	/// cleanup even when it has no open reference.
+	/// </remarks>
 	public bool TryClose(string filePath, out DocumentSnapshot? document)
 	{
-		string normalizedFilePath = NormalizeTrackedFilePath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
 		{

@@ -12,8 +12,8 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <returns>The rename request that should be mirrored to the server, or <see langword="null"/> when no document was tracked.</returns>
 	public DocumentRenameRequest? Rename(string oldFilePath, string newFilePath, string? content = null)
 	{
-		string normalizedOldFilePath = NormalizeTrackedFilePath(oldFilePath);
-		string normalizedNewFilePath = NormalizeTrackedFilePath(newFilePath);
+		string normalizedOldFilePath = LanguageServerPathHelper.NormalizeLocalPath(oldFilePath);
+		string normalizedNewFilePath = LanguageServerPathHelper.NormalizeLocalPath(newFilePath);
 
 		if (LanguageServerPathHelper.AreLocalPathsEqual(normalizedOldFilePath, normalizedNewFilePath))
 			return null;
@@ -39,7 +39,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 			OnTrackedDocumentRenamed(state, contentChanged);
 
 			_documents[normalizedNewFilePath] = state;
-			return new DocumentRenameRequest(previousDocument, state.CreateSnapshot(), previousDocument is not null);
+			return new(previousDocument, state.CreateSnapshot(), previousDocument is not null);
 		}
 	}
 

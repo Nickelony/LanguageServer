@@ -4,12 +4,102 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public class TrackedDocumentStoreTests
 {
 	[TestMethod]
+	public void Synchronize_RepeatedOpenCallsRequireMatchingCloseCalls()
+	{
+		const string filePath = @"C:\Workspace\Scripts\repeated-open.lua";
+		var store = new TestTrackedDocumentStore();
+
+		Assert.IsNotNull(store.Synchronize(filePath, "return 1", acquireOpenReference: true));
+		Assert.IsNull(store.Synchronize(filePath, "return 1", acquireOpenReference: true));
+
+		Assert.IsFalse(store.TryClose(filePath, out DocumentSnapshot? firstClose));
+		Assert.IsNull(firstClose);
+		Assert.IsTrue(store.TryClose(filePath, out DocumentSnapshot? finalClose));
+		Assert.IsNotNull(finalClose);
+		Assert.IsFalse(store.TryClose(filePath, out DocumentSnapshot? repeatedClose));
+		Assert.IsNull(repeatedClose);
+	}
+
+	[TestMethod]
+	public void Synchronize_WithoutReferencesCreatesIdleServerOpenState()
+	{
+		const string filePath = @"C:\Workspace\Scripts\idle.lua";
+
+		var store = new TestTrackedDocumentStore();
+		DocumentSynchronizationRequest? request = store.Synchronize(filePath, "return 1");
+
+		Assert.IsNotNull(request);
+		Assert.AreEqual(DocumentSynchronizationKind.Open, request.Value.Kind);
+		Assert.IsNotNull(store.GetDocumentSnapshot(filePath));
+		Assert.IsTrue(store.TryClose(filePath, out DocumentSnapshot? closingDocument));
+		Assert.IsNotNull(closingDocument);
+		Assert.IsNull(store.GetDocumentSnapshot(filePath));
+	}
+
+	[TestMethod]
+	public void SynchronizeAfterClose_CreatesAFreshTrackedStateWithNewContent()
+	{
+		const string filePath = @"C:\Workspace\Scripts\after-close.lua";
+
+		var store = new TestTrackedDocumentStore();
+		store.Synchronize(filePath, "return 1", acquireOpenReference: true);
+
+		Assert.IsTrue(store.TryClose(filePath, out _));
+
+		DocumentSynchronizationRequest? reopenRequest = store.Synchronize(filePath, "return 2");
+
+		Assert.IsNotNull(reopenRequest);
+		Assert.AreEqual(DocumentSynchronizationKind.Open, reopenRequest.Value.Kind);
+		Assert.AreEqual("return 2", reopenRequest.Value.Document.Content);
+		Assert.AreEqual(1, reopenRequest.Value.Document.Version);
+	}
+
+	[TestMethod]
+	public void Rename_UnknownSourceDoesNotCreateDestinationState()
+	{
+		const string oldFilePath = @"C:\Workspace\Scripts\missing.lua";
+		const string newFilePath = @"C:\Workspace\Scripts\created.lua";
+
+		var store = new TestTrackedDocumentStore();
+
+		Assert.IsNull(store.Rename(oldFilePath, newFilePath, "return 1"));
+		Assert.IsNull(store.GetDocumentSnapshot(oldFilePath));
+		Assert.IsNull(store.GetDocumentSnapshot(newFilePath));
+	}
+
+	[TestMethod]
+	public void Rename_PreservesTrackedContentAndReferences()
+	{
+		const string oldFilePath = @"C:\Workspace\Scripts\before.lua";
+		const string newFilePath = @"C:\Workspace\Scripts\after.lua";
+
+		var store = new TestTrackedDocumentStore();
+		store.Synchronize(oldFilePath, "return 1", acquireOpenReference: true);
+		store.Synchronize(oldFilePath, "return 1", acquireOpenReference: true, acquireRequestReference: true);
+
+		DocumentRenameRequest? renameRequest = store.Rename(oldFilePath, newFilePath, "return 1");
+
+		Assert.IsNotNull(renameRequest);
+		Assert.IsTrue(renameRequest.Value.ReopenServerDocument);
+		Assert.AreEqual("return 1", renameRequest.Value.RenamedDocument.Content);
+		Assert.AreEqual(1, renameRequest.Value.RenamedDocument.Version);
+		Assert.IsNull(store.GetDocumentSnapshot(oldFilePath));
+		Assert.IsNotNull(store.GetDocumentSnapshot(newFilePath));
+
+		Assert.IsFalse(store.TryClose(newFilePath, out _));
+		Assert.IsFalse(store.TryClose(newFilePath, out _));
+		Assert.IsTrue(store.TryReleaseRequest(newFilePath, out DocumentSnapshot? finalDocument));
+		Assert.IsNotNull(finalDocument);
+		Assert.IsNull(store.GetDocumentSnapshot(newFilePath));
+	}
+
+	[TestMethod]
 	public void Rename_ReturnsNullAndPreservesTrackedDocuments_WhenDestinationIsAlreadyTracked()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string oldFilePath = @"C:\Workspace\Scripts\source.lua";
 		const string newFilePath = @"C:\Workspace\Scripts\target.lua";
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(oldFilePath, "return 1", acquireOpenReference: true);
 		store.Synchronize(newFilePath, "return 2", acquireOpenReference: true);
 
@@ -32,11 +122,11 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void Rename_PathCaseOnlyDifference_FollowsPlatformPathSensitivity()
 	{
-		var store = new TestTrackedDocumentStore();
 		string directoryPath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "TrackedDocumentStoreTests"));
 		string originalFilePath = LanguageServerPathHelper.NormalizeLocalPath(Path.Combine(directoryPath, "test.lua"));
 		string renamedFilePath = LanguageServerPathHelper.NormalizeLocalPath(Path.Combine(directoryPath, "TEST.lua"));
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(originalFilePath, "return 1", acquireOpenReference: true);
 
 		DocumentRenameRequest? renameRequest = store.Rename(originalFilePath, renamedFilePath, "return 1");
@@ -62,10 +152,10 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void Synchronize_AndLookup_NormalizeEquivalentPaths()
 	{
-		var store = new TestTrackedDocumentStore();
 		string canonicalFilePath = Path.Combine(Path.GetTempPath(), "TrackedDocumentStoreTests", "scripts", "test.lua");
 		string aliasedFilePath = Path.Combine(Path.GetDirectoryName(canonicalFilePath)!, ".", Path.GetFileName(canonicalFilePath));
 
+		var store = new TestTrackedDocumentStore();
 		DocumentSynchronizationRequest? synchronizationRequest = store.Synchronize(canonicalFilePath, "return 1", acquireOpenReference: true);
 
 		Assert.IsNotNull(synchronizationRequest);
@@ -83,10 +173,11 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void TryClose_RemovesTrackedDocumentWhileRestartReplayIsPending()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string filePath = @"C:\Workspace\Scripts\pending.lua";
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(filePath, "return 1", acquireOpenReference: true);
+
 		IReadOnlyList<DocumentSnapshot> documentsToReopen = store.PrepareForRestart();
 
 		Assert.AreEqual(1, documentsToReopen.Count);
@@ -98,9 +189,9 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void TryReleaseRequest_RemovesRequestOnlyTrackedDocument()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string filePath = @"C:\Workspace\Scripts\hover.lua";
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(filePath, "return 1", acquireRequestReference: true);
 
 		Assert.IsTrue(store.TryReleaseRequest(filePath, out DocumentSnapshot? closingDocument));
@@ -112,9 +203,9 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void TryReleaseRequest_PreservesEditorOwnedTrackedDocument()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string filePath = @"C:\Workspace\Scripts\open.lua";
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(filePath, "return 1", acquireOpenReference: true);
 		store.Synchronize(filePath, "return 1", acquireRequestReference: true);
 
@@ -128,9 +219,9 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void TryClose_PreservesRequestOwnedTrackedDocumentUntilRequestRelease()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string filePath = @"C:\Workspace\Scripts\request-owned.lua";
 
+		var store = new TestTrackedDocumentStore();
 		store.Synchronize(filePath, "return 1", acquireOpenReference: true);
 		store.Synchronize(filePath, "return 1", acquireRequestReference: true);
 
@@ -145,9 +236,9 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void Synchronize_ReopensTrackedDocumentAfterRestartPreparation()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string filePath = @"C:\Workspace\Scripts\reopen.lua";
 
+		var store = new TestTrackedDocumentStore();
 		DocumentSynchronizationRequest? initialRequest = store.Synchronize(filePath, "return 1", acquireOpenReference: true);
 
 		Assert.IsNotNull(initialRequest);
@@ -177,10 +268,11 @@ public class TrackedDocumentStoreTests
 	[TestMethod]
 	public void TrimRequestOnlyDocuments_RemovesOldestIdleRequestOnlyDocuments()
 	{
-		var store = new TestTrackedDocumentStore();
 		const string firstFilePath = @"C:\Workspace\Scripts\first.lua";
 		const string secondFilePath = @"C:\Workspace\Scripts\second.lua";
 		const string thirdFilePath = @"C:\Workspace\Scripts\third.lua";
+
+		var store = new TestTrackedDocumentStore();
 
 		store.Synchronize(firstFilePath, "return 1", acquireRequestReference: true);
 		store.ReleaseRequest(firstFilePath);
@@ -209,6 +301,6 @@ public class TrackedDocumentStoreTests
 	public void TrimRequestOnlyDocuments_NegativeMaxCount_ThrowsArgumentOutOfRangeException()
 	{
 		var store = new TestTrackedDocumentStore();
-		Assert.ThrowsException<ArgumentOutOfRangeException>(() => store.TrimRequestOnlyDocuments(-1));
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => store.TrimRequestOnlyDocuments(-1));
 	}
 }

@@ -1,6 +1,6 @@
 namespace Nickelony.LanguageServer.Lua;
 
-public sealed partial class LuaLanguageServerIntellisenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider
 {
 	private Task QueueLatestDocumentUpdateAsync(string filePath, string content)
 	{
@@ -15,8 +15,16 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	private async Task<bool> SynchronizeDocumentAsync(string filePath, string content,
 		bool acquireOpenReference, bool acquireRequestReference, bool refreshSemanticTokens, CancellationToken cancellationToken)
 	{
-		if (_isDisposed || string.IsNullOrWhiteSpace(filePath) || _client is null)
+		cancellationToken.ThrowIfCancellationRequested();
+
+		if (_isDisposed || string.IsNullOrWhiteSpace(filePath))
 			return false;
+
+		if (_client is null)
+		{
+			ReportMissingClientFailure();
+			return false;
+		}
 
 		try
 		{
@@ -35,7 +43,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
-			return false;
+			throw;
 		}
 		catch (IOException)
 		{
@@ -76,7 +84,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 
 		ObserveBackgroundTask(
 			RenameDocumentAsync(normalizedOldFilePath, normalizedNewFilePath, content, CancellationToken.None),
-			"Document rename");
+			$"Document rename '{normalizedOldFilePath}' to '{normalizedNewFilePath}'");
 	}
 
 	private async Task<bool> RenameDocumentAsync(string oldFilePath, string newFilePath, string content, CancellationToken cancellationToken)
@@ -133,16 +141,16 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			if (shouldTrackLocallyWhileUnavailable)
 				_documents.Synchronize(filePath, content, acquireOpenReference, acquireRequestReference: false);
 
-			return new DocumentSynchronizationResult(false, null);
+			return new(false, null);
 		}
 
 		DocumentSynchronizationRequest? request = _documents.Synchronize(filePath, content, acquireOpenReference, acquireRequestReference);
 
 		if (request is not { } pendingRequest)
-			return new DocumentSynchronizationResult(true, null);
+			return new(true, null);
 
 		await SendDocumentSynchronizationNotificationAsync(pendingRequest, cancellationToken).ConfigureAwait(false);
-		return new DocumentSynchronizationResult(true, pendingRequest.Document);
+		return new(true, pendingRequest.Document);
 	}
 
 	private async Task<DocumentRenameRequest?> RenameDocumentCoreAsync(

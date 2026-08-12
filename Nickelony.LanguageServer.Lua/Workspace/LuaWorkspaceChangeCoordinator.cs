@@ -303,7 +303,7 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 	/// <summary>
 	/// Restarts a failed workspace file watcher and reports whether recovery succeeded.
 	/// </summary>
-	/// <remarks>This method is used by <c>LuaLanguageServerIntellisenseProviderTests</c> via reflection. Do not remove without updating the tests.</remarks>
+	/// <remarks>This method is used by <c>LuaLanguageServerIntelliSenseProviderTests</c> via reflection. Do not remove without updating the tests.</remarks>
 	private bool TryRestartWorkspaceFileWatcher(WorkspaceFileWatcher failedWatcher)
 		=> RecoverWorkspaceFileWatcher(failedWatcher) == WorkspaceWatcherRecoveryResult.Recovered;
 
@@ -440,7 +440,10 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 				if (completedTask.Exception is not { } exception)
 					return;
 
-				(string OperationName, string Workspace) = ((string OperationName, string Workspace))state!;
+				if (state is not ValueTuple<string, string> stateTuple)
+					return;
+
+				(string OperationName, string Workspace) = stateTuple;
 				_logger.LogWarning(exception.Flatten(), "{OperationName} failed for '{Workspace}'.", OperationName, Workspace);
 			},
 			(operationName, _workspaceRootDirectoryPath),

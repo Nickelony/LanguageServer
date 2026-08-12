@@ -10,10 +10,10 @@ public sealed class TextWorkspaceEdit
 	/// </summary>
 	/// <param name="documentEdits">The per-document edits in the workspace change set.</param>
 	public TextWorkspaceEdit(IReadOnlyList<TextDocumentEdit> documentEdits)
-		=> DocumentEdits = documentEdits;
+		=> DocumentEdits = Array.AsReadOnly([.. documentEdits]);
 
 	/// <summary>
-	/// Gets the per-document edits in the workspace change set.
+	/// Gets the owned immutable snapshot of per-document edits in the workspace change set.
 	/// </summary>
 	public IReadOnlyList<TextDocumentEdit> DocumentEdits { get; }
 

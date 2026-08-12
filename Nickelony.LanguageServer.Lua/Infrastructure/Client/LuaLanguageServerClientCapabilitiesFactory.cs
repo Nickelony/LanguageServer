@@ -1,13 +1,13 @@
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Builds the client-capabilities payload advertised to the bundled Lua language server during initialization.
+/// Builds the client-capabilities payload advertised to the external Lua language server during initialization.
 /// </summary>
 internal static class LuaLanguageServerClientCapabilitiesFactory
 {
-	private static readonly string[] SupportedDocumentationFormats = ["markdown", "plaintext"];
+	private static readonly string[] s_supportedDocumentationFormats = ["markdown", "plaintext"];
 
-	private static readonly string[] SupportedSemanticTokenTypes =
+	private static readonly string[] s_supportedSemanticTokenTypes =
 	[
 		"namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
 		"parameter", "variable", "property", "enumMember", "event", "function", "method",
@@ -15,7 +15,7 @@ internal static class LuaLanguageServerClientCapabilitiesFactory
 		"operator", "decorator"
 	];
 
-	private static readonly string[] SupportedSemanticTokenModifiers =
+	private static readonly string[] s_supportedSemanticTokenModifiers =
 	[
 		"declaration", "definition", "readonly", "static", "deprecated", "abstract",
 		"async", "modification", "documentation", "defaultLibrary", "global"
@@ -43,7 +43,7 @@ internal static class LuaLanguageServerClientCapabilitiesFactory
 					completionItem = new
 					{
 						snippetSupport = false,
-						documentationFormat = SupportedDocumentationFormats,
+						documentationFormat = s_supportedDocumentationFormats,
 						resolveSupport = new
 						{
 							properties = new[] { "detail", "documentation" }
@@ -52,7 +52,7 @@ internal static class LuaLanguageServerClientCapabilitiesFactory
 				},
 				hover = new
 				{
-					contentFormat = SupportedDocumentationFormats
+					contentFormat = s_supportedDocumentationFormats
 				},
 				definition = new
 				{
@@ -79,7 +79,7 @@ internal static class LuaLanguageServerClientCapabilitiesFactory
 				{
 					signatureInformation = new
 					{
-						documentationFormat = SupportedDocumentationFormats,
+						documentationFormat = s_supportedDocumentationFormats,
 						parameterInformation = new
 						{
 							labelOffsetSupport = true
@@ -94,8 +94,8 @@ internal static class LuaLanguageServerClientCapabilitiesFactory
 						range = false,
 						full = new { delta = true }
 					},
-					tokenTypes = SupportedSemanticTokenTypes,
-					tokenModifiers = SupportedSemanticTokenModifiers,
+					tokenTypes = s_supportedSemanticTokenTypes,
+					tokenModifiers = s_supportedSemanticTokenModifiers,
 					formats = new[] { "relative" },
 					multilineTokenSupport = false,
 					overlappingTokenSupport = false,

@@ -2,15 +2,18 @@ using System.Reflection;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-internal static class LuaLanguageServerIntellisenseProviderTestAccess
+internal static class LuaLanguageServerIntelliSenseProviderTestAccess
 {
 	public static Task DispatchWorkspaceFileChangesAsync(
-		LuaLanguageServerIntellisenseProvider provider,
+		LuaLanguageServerIntelliSenseProvider provider,
 		FileChangeBatch batch,
 		CancellationToken cancellationToken)
-		=> GetWorkspaceChangeCoordinator(provider).DispatchWorkspaceFileChangesAsync(batch, cancellationToken);
+	{
+		return GetWorkspaceChangeCoordinator(provider)
+			.DispatchWorkspaceFileChangesAsync(batch, cancellationToken);
+	}
 
-	public static WorkspaceFileWatcher? GetWorkspaceWatcher(LuaLanguageServerIntellisenseProvider provider)
+	public static WorkspaceFileWatcher? GetWorkspaceWatcher(LuaLanguageServerIntelliSenseProvider provider)
 	{
 		LuaWorkspaceChangeCoordinator coordinator = GetWorkspaceChangeCoordinator(provider);
 
@@ -20,27 +23,27 @@ internal static class LuaLanguageServerIntellisenseProviderTestAccess
 		return currentWatcherProperty.GetValue(coordinator) as WorkspaceFileWatcher;
 	}
 
-	public static SemaphoreSlim GetProviderStartLock(LuaLanguageServerIntellisenseProvider provider)
+	public static SemaphoreSlim GetProviderStartLock(LuaLanguageServerIntelliSenseProvider provider)
 	{
-		FieldInfo field = typeof(LuaLanguageServerIntellisenseProvider).GetField("_startLock", BindingFlags.Instance | BindingFlags.NonPublic)
+		FieldInfo field = typeof(LuaLanguageServerIntelliSenseProvider).GetField("_startLock", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_startLock' was not found.");
 
 		return (SemaphoreSlim)(field.GetValue(provider)
 			?? throw new InvalidOperationException("Provider start lock was null."));
 	}
 
-	public static CancellationTokenSource GetProviderDisposeCancellationTokenSource(LuaLanguageServerIntellisenseProvider provider)
+	public static CancellationTokenSource GetProviderDisposeCancellationTokenSource(LuaLanguageServerIntelliSenseProvider provider)
 	{
-		FieldInfo field = typeof(LuaLanguageServerIntellisenseProvider).GetField("_disposeCts", BindingFlags.Instance | BindingFlags.NonPublic)
+		FieldInfo field = typeof(LuaLanguageServerIntelliSenseProvider).GetField("_disposeCts", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_disposeCts' was not found.");
 
 		return (CancellationTokenSource)(field.GetValue(provider)
 			?? throw new InvalidOperationException("Provider dispose token source was null."));
 	}
 
-	public static int GetTrackedDocumentCount(LuaLanguageServerIntellisenseProvider provider)
+	public static int GetTrackedDocumentCount(LuaLanguageServerIntelliSenseProvider provider)
 	{
-		FieldInfo field = typeof(LuaLanguageServerIntellisenseProvider).GetField("_documents", BindingFlags.Instance | BindingFlags.NonPublic)
+		FieldInfo field = typeof(LuaLanguageServerIntelliSenseProvider).GetField("_documents", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_documents' was not found.");
 
 		var documentStore = (LuaDocumentStore)(field.GetValue(provider)
@@ -49,9 +52,9 @@ internal static class LuaLanguageServerIntellisenseProviderTestAccess
 		return documentStore.TrackedDocumentCount;
 	}
 
-	public static LuaWorkspaceChangeCoordinator GetWorkspaceChangeCoordinator(LuaLanguageServerIntellisenseProvider provider)
+	public static LuaWorkspaceChangeCoordinator GetWorkspaceChangeCoordinator(LuaLanguageServerIntelliSenseProvider provider)
 	{
-		FieldInfo coordinatorField = typeof(LuaLanguageServerIntellisenseProvider).GetField("_workspaceChanges", BindingFlags.Instance | BindingFlags.NonPublic)
+		FieldInfo coordinatorField = typeof(LuaLanguageServerIntelliSenseProvider).GetField("_workspaceChanges", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_workspaceChanges' was not found.");
 
 		return (LuaWorkspaceChangeCoordinator)(coordinatorField.GetValue(provider)

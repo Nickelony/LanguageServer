@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Client.Tests;
@@ -65,5 +66,25 @@ public class CompletionResponseJsonConverterTests
 		Assert.IsNotNull(secondItem.ExtensionData);
 		Assert.IsTrue(secondItem.ExtensionData.TryGetValue("data", out JsonElement secondItemData));
 		Assert.AreEqual("defaults", secondItemData.GetProperty("origin").GetString());
+	}
+
+	[TestMethod]
+	public void DeserializeCompletionResponse_UsesConverterInstanceLogger()
+	{
+		using var firstLogScope = new TestLoggerScope(LogLevel.Warning);
+		using var secondLogScope = new TestLoggerScope(LogLevel.Warning);
+
+		var firstOptions = new JsonSerializerOptions();
+		firstOptions.Converters.Add(new CompletionResponseJsonConverter(firstLogScope));
+
+		var secondOptions = new JsonSerializerOptions();
+		secondOptions.Converters.Add(new CompletionResponseJsonConverter(secondLogScope));
+
+		JsonSerializer.Deserialize<CompletionResponse>("{}", firstOptions);
+		JsonSerializer.Deserialize<CompletionResponse>("{}", secondOptions);
+		JsonSerializer.Deserialize<CompletionResponse>("{}", firstOptions);
+
+		Assert.AreEqual(2, firstLogScope.Logs.Count);
+		Assert.AreEqual(1, secondLogScope.Logs.Count);
 	}
 }

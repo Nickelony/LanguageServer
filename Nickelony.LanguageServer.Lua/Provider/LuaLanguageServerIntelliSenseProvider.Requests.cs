@@ -5,7 +5,7 @@ using Nickelony.LanguageServer.Abstractions.Signatures;
 
 namespace Nickelony.LanguageServer.Lua;
 
-public sealed partial class LuaLanguageServerIntellisenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider
 {
 	/// <inheritdoc/>
 	public async Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(TextReferenceRequest request, CancellationToken cancellationToken = default)
@@ -35,11 +35,11 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	public Task<TextDefinitionLocation?> GetDefinitionAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
-		return SendPositionRequestAsync<DefinitionResponse, TextDefinitionLocation?>(
+		return SendPositionRequestAsync<DefinitionResponse?, TextDefinitionLocation?>(
 			filePath, content, line, column, "textDocument/definition",
 			static (textDocument, position) => new TextDocumentPositionParams(textDocument, position),
-			LuaLanguageServerResponseParser.ParseDefinitionLocation,
-			timeoutValue: default!,
+			response => response is null ? null : LuaLanguageServerResponseParser.ParseDefinitionLocation(response),
+			timeoutValue: null,
 			defaultValue: null,
 			cancellationToken);
 	}
@@ -56,10 +56,15 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	public async Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+
 		ILanguageServerClient? client = _client;
 
 		if (client is null)
+		{
+			ReportMissingClientFailure();
 			return [];
+		}
 
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
 			return [];
@@ -94,13 +99,18 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> RenameSymbolAsync(TextRenameRequest request, CancellationToken cancellationToken = default)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+
 		if (string.IsNullOrWhiteSpace(request.NewName))
 			return null;
 
 		ILanguageServerClient? client = _client;
 
 		if (client is null)
+		{
+			ReportMissingClientFailure();
 			return null;
+		}
 
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(request.FilePath, out string normalizedFilePath))
 			return null;
@@ -135,10 +145,15 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> FormatDocumentAsync(TextFormatRequest request, CancellationToken cancellationToken = default)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+
 		ILanguageServerClient? client = _client;
 
 		if (client is null)
+		{
+			ReportMissingClientFailure();
 			return null;
+		}
 
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(request.FilePath, out string normalizedFilePath))
 			return null;
@@ -166,7 +181,7 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			return textEdits.Count == 0
 				? null
 				: new TextWorkspaceEdit([
-					new TextDocumentEdit(request.FilePath, textEdits)
+					new TextDocumentEdit(normalizedFilePath, textEdits)
 				]);
 		}
 		finally
@@ -201,10 +216,15 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		TResult defaultValue,
 		CancellationToken cancellationToken)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+
 		ILanguageServerClient? client = _client;
 
 		if (client is null)
+		{
+			ReportMissingClientFailure();
 			return defaultValue;
+		}
 
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
 			return defaultValue;
@@ -252,6 +272,8 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		TResponse timeoutValue,
 		CancellationToken cancellationToken)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+
 		long transportGeneration = client.TransportGeneration;
 
 		using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
@@ -262,7 +284,14 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			// Primary attempt on the current transport generation.
 			TResponse response = await client.SendRequestAsync<TResponse>(method, parameters, timeoutCts.Token).ConfigureAwait(false);
 			ResetRequestTimeoutTracking(transportGeneration);
+
+			cancellationToken.ThrowIfCancellationRequested();
+
 			return response;
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
 		}
 		catch (OperationCanceledException) when (_isDisposed || _disposeCts.IsCancellationRequested)
 		{
@@ -299,6 +328,8 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 		}
 
 		// If the transport changed underneath the request, ensure the client is healthy before retrying once.
+		cancellationToken.ThrowIfCancellationRequested();
+
 		if (!await EnsureStartedAsync(cancellationToken).ConfigureAwait(false))
 			return timeoutValue;
 
@@ -312,7 +343,14 @@ public sealed partial class LuaLanguageServerIntellisenseProvider
 			// Retry once on the refreshed transport generation.
 			TResponse response = await client.SendRequestAsync<TResponse>(method, parameters, retryTimeoutCts.Token).ConfigureAwait(false);
 			ResetRequestTimeoutTracking(transportGeneration);
+
+			cancellationToken.ThrowIfCancellationRequested();
+
 			return response;
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			throw;
 		}
 		catch (OperationCanceledException) when (_isDisposed || _disposeCts.IsCancellationRequested)
 		{

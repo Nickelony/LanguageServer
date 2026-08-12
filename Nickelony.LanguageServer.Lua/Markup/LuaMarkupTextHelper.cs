@@ -46,14 +46,6 @@ internal static class LuaMarkupTextHelper
 	}
 
 	/// <summary>
-	/// Normalizes markdown text while preserving markdown semantics expected by the editor.
-	/// </summary>
-	/// <param name="text">The markdown text to normalize.</param>
-	/// <returns>The normalized markdown text.</returns>
-	internal static string? NormalizeMarkdownText(string? text)
-		=> MarkupContentReader.NormalizeMarkdownText(text);
-
-	/// <summary>
 	/// Reports whether one trimmed line is a standalone markdown fence marker.
 	/// </summary>
 	private static bool IsFenceLine(string line)

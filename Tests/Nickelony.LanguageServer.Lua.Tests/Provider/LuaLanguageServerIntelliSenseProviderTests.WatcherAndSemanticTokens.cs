@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntellisenseProviderTests
+public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task GetHoverAsync_RetriesWorkspaceWatcherStartAfterWorkspaceDirectoryAppears()
@@ -14,7 +14,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 		try
 		{
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 			var failures = new List<WorkspaceWatcherFailure>();
 
 			provider.WorkspaceWatcherFailed += failure => failures.Add(failure);
@@ -51,13 +51,13 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 
 			using var client = new FakeLanguageServerClient();
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(
+			using var provider = new LuaLanguageServerIntelliSenseProvider(
 				workspaceRoot,
 				client,
 				workspaceFileWatcherFactory: (rootPath, dispatchAsync, watcherFailed) => new WorkspaceFileWatcher(
 					rootPath,
 					dispatchAsync,
-					LuaLanguageServerIntellisenseProvider.WorkspaceWatchSpecifications,
+					LuaLanguageServerIntelliSenseProvider.WorkspaceWatchSpecifications,
 					watcherFailed,
 					static (_, _) => throw new InvalidOperationException("Simulated watcher creation failure.")));
 
@@ -91,7 +91,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Directory.CreateDirectory(workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 			var failures = new List<WorkspaceWatcherFailure>();
 
 			provider.WorkspaceWatcherFailed += failures.Add;
@@ -137,7 +137,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			var createdWatchers = new List<WorkspaceFileWatcher>();
 			int watcherCreationCount = 0;
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(
+			using var provider = new LuaLanguageServerIntelliSenseProvider(
 				workspaceRoot,
 				client,
 				workspaceFileWatcherFactory: (rootPath, dispatchAsync, watcherFailed) =>
@@ -145,7 +145,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 					var watcher = new WorkspaceFileWatcher(
 						rootPath,
 						dispatchAsync,
-						LuaLanguageServerIntellisenseProvider.WorkspaceWatchSpecifications,
+						LuaLanguageServerIntelliSenseProvider.WorkspaceWatchSpecifications,
 						watcherFailed,
 						watcherCreationCount++ == 0
 							? null
@@ -193,7 +193,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Directory.CreateDirectory(workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 			var failures = new List<WorkspaceWatcherFailure>();
 
 			provider.WorkspaceWatcherFailed += failures.Add;
@@ -244,7 +244,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -254,7 +254,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			watcher.Dispose();
 			File.WriteAllText(missedFilePath, "return 1");
 
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
 
 			Assert.IsTrue(recovered);
 			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeWatchedFiles", 1, TimeSpan.FromSeconds(1)));
@@ -284,7 +284,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -294,7 +294,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			watcher.Dispose();
 			File.WriteAllText(configFilePath, "{\"Lua.workspace.maxPreload\": 1000}");
 
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
 
 			Assert.IsTrue(recovered);
 			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeConfiguration", 1, TimeSpan.FromSeconds(1)));
@@ -331,7 +331,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			File.WriteAllText(filePath, content);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -350,10 +350,12 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				?? throw new AssertFailedException("Expected the workspace watcher to start.");
 
 			watcher.Dispose();
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
 
 			Assert.IsTrue(recovered);
+
 			await Task.Delay(150).ConfigureAwait(false);
+
 			Assert.AreEqual(1, CountSentMethods(client, "workspace/didChangeWatchedFiles"));
 		}
 		finally
@@ -389,7 +391,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -411,7 +413,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			watcher.Dispose();
 
 			bool recovered = InvokePrivateMethodWithReturn<bool>(
-				LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
 				"TryRestartWorkspaceFileWatcher",
 				watcher);
 
@@ -444,7 +446,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 			await provider.GetHoverAsync(filePath, content, 0, 0);
 
@@ -468,7 +470,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeWatchedFiles", 1, TimeSpan.FromSeconds(1)));
 
 			bool recovered = InvokePrivateMethodWithReturn<bool>(
-				LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
 				"TryRestartWorkspaceFileWatcher",
 				watcher);
 
@@ -485,12 +487,14 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			replacementWatcher.Dispose();
 
 			bool recoveredAgain = InvokePrivateMethodWithReturn<bool>(
-				LuaLanguageServerIntellisenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
 				"TryRestartWorkspaceFileWatcher",
 				replacementWatcher);
 
 			Assert.IsTrue(recoveredAgain);
+
 			await Task.Delay(150).ConfigureAwait(false);
+
 			Assert.AreEqual(2, CountSentMethods(client, "workspace/didChangeWatchedFiles"));
 		}
 		finally
@@ -513,7 +517,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SemanticTokenTypes = ["variable"]
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var semanticTokensUpdated = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		provider.SemanticTokensUpdated += (updatedFilePath, tokens) =>
@@ -554,13 +558,12 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 
 		client.BlockNextSemanticTokensFullRequest();
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var semanticTokensUpdated = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		provider.SemanticTokensUpdated += (_, tokens) => semanticTokensUpdated.TrySetResult(tokens);
 
 		provider.OpenDocument(filePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/semanticTokens/full", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 
 		provider.Dispose();
@@ -584,7 +587,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SemanticTokenTypes = ["variable"]
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var initialTokensUpdated = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var clearedTokensUpdated = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -636,10 +639,9 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SemanticTokenTypes = ["variable"]
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/semanticTokens/full", 1, TimeSpan.FromSeconds(1)));
 
 		JsonElement parameters = client.GetLastRequestParameters("textDocument/semanticTokens/full");
@@ -679,7 +681,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			resultId = "tokens-3"
 		}));
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var firstRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -757,7 +759,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			resultId = "tokens-3"
 		}));
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var firstRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -836,7 +838,7 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			resultId = "tokens-3"
 		}));
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 		var firstRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var secondRefresh = new TaskCompletionSource<IReadOnlyList<LuaSemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -892,10 +894,9 @@ public partial class LuaLanguageServerIntellisenseProviderTests
 			SemanticTokenTypes = ["variable"]
 		};
 
-		using var provider = new LuaLanguageServerIntellisenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
 
 		provider.OpenDocument(filePath, content);
-
 		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
 
 		CollectionAssert.DoesNotContain(client.GetSentMethodNames(), "textDocument/semanticTokens/full");

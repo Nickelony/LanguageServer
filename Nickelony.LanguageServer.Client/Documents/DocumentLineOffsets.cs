@@ -87,7 +87,7 @@ public sealed class DocumentLineOffsets
 		string text = content ?? string.Empty;
 
 		if (text.Length == 0)
-			return new DocumentLineOffsets(text, [0], [0]);
+			return new(text, [0], [0]);
 
 		var startOffsets = new List<int>(64) { 0 };
 		var lengths = new List<int>(64);
@@ -116,6 +116,6 @@ public sealed class DocumentLineOffsets
 		}
 
 		lengths.Add(text.Length - currentStart);
-		return new DocumentLineOffsets(text, [.. startOffsets], [.. lengths]);
+		return new(text, [.. startOffsets], [.. lengths]);
 	}
 }

@@ -31,7 +31,7 @@ public static class DocumentIncrementalEditCalculator
 		(int startLine, int startCharacter) = OffsetToPosition(oldOffsets, prefixLength);
 		(int endLine, int endCharacter) = OffsetToPosition(oldOffsets, oldEnd);
 
-		return new DocumentChangeRange(startLine, startCharacter, endLine, endCharacter, replacement);
+		return new(startLine, startCharacter, endLine, endCharacter, replacement);
 	}
 
 	/// <summary>

@@ -13,7 +13,7 @@ internal sealed class LuaWorkspaceSnapshotTracker
 	private readonly string _workspaceRootDirectoryPath;
 	private readonly IReadOnlyList<WorkspaceWatchSpecification> _watchSpecifications;
 	private readonly object _snapshotSyncRoot = new();
-	private Dictionary<string, LuaWorkspaceSnapshotEntry> _trackedSnapshot = new(StringComparer.OrdinalIgnoreCase);
+	private Dictionary<string, LuaWorkspaceSnapshotEntry> _trackedSnapshot = new(LanguageServerPathHelper.LocalPathComparer);
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LuaWorkspaceSnapshotTracker"/> class.
@@ -122,13 +122,13 @@ internal sealed class LuaWorkspaceSnapshotTracker
 				changes.Add(new WorkspaceFileChange(path, FileChangeKind.Created));
 		}
 
-		changes.Sort(static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.Path, right.Path));
-		return new FileChangeBatch(changes);
+		changes.Sort(static (left, right) => LanguageServerPathHelper.LocalPathComparer.Compare(left.Path, right.Path));
+		return new(changes);
 	}
 
 	private Dictionary<string, LuaWorkspaceSnapshotEntry> CaptureSnapshot()
 	{
-		var snapshot = new Dictionary<string, LuaWorkspaceSnapshotEntry>(StringComparer.OrdinalIgnoreCase);
+		var snapshot = new Dictionary<string, LuaWorkspaceSnapshotEntry>(LanguageServerPathHelper.LocalPathComparer);
 
 		if (!Directory.Exists(_workspaceRootDirectoryPath))
 			return snapshot;
@@ -170,7 +170,7 @@ internal sealed class LuaWorkspaceSnapshotTracker
 	}
 
 	private static Dictionary<string, LuaWorkspaceSnapshotEntry> CloneSnapshot(Dictionary<string, LuaWorkspaceSnapshotEntry> snapshot)
-		=> new(snapshot, StringComparer.OrdinalIgnoreCase);
+		=> new(snapshot, LanguageServerPathHelper.LocalPathComparer);
 
 	private static bool TryCreateSnapshotEntry(string normalizedPath, out LuaWorkspaceSnapshotEntry entry, ILogger? logger = null)
 	{

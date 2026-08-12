@@ -7,7 +7,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void Add_DeleteThenCreateForSamePath_PreservesDeleteThenCreatePair()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Deleted);
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Created);
 
@@ -25,7 +24,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void Add_CreatedThenChangedForSamePath_PreservesCreated()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Created);
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Changed);
 
@@ -39,7 +37,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void Add_CreatedThenDeletedForSamePath_RemovesBufferedEntry()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Created);
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Deleted);
 
@@ -53,7 +50,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void Add_CreatedChangedThenDeletedForSamePath_RemovesBufferedEntry()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Created);
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Changed);
 		accumulator.Add(@"C:\Workspace\Scripts\test.lua", FileChangeKind.Deleted);
@@ -68,7 +64,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void Add_TreatsPathsCaseInsensitively()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\Test.lua", FileChangeKind.Deleted);
 		accumulator.Add(@"c:\workspace\scripts\test.lua", FileChangeKind.Created);
 
@@ -83,7 +78,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void DrainBatch_ClearsBufferedEntries()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Changed);
 		accumulator.Add(@"C:\Workspace\Scripts\second.lua", FileChangeKind.Deleted);
 
@@ -99,12 +93,11 @@ public class WorkspaceChangeAccumulatorTests
 	public void DrainBatch_EntriesAreExposedAsReadOnlyView()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Changed);
 
 		FileChangeBatch drainedBatch = accumulator.DrainBatch();
 
-		Assert.ThrowsException<NotSupportedException>(() => ((IList<WorkspaceFileChange>)drainedBatch.Entries)[0] =
+		Assert.ThrowsExactly<NotSupportedException>(() => ((IList<WorkspaceFileChange>)drainedBatch.Entries)[0] =
 			new WorkspaceFileChange(@"C:\Workspace\Scripts\second.lua", FileChangeKind.Deleted));
 	}
 
@@ -112,7 +105,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void DrainChanges_MultiplePaths_PreservesFirstPendingOccurrenceOrder()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Created);
 		accumulator.Add(@"C:\Workspace\Scripts\second.lua", FileChangeKind.Changed);
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Changed);
@@ -143,7 +135,6 @@ public class WorkspaceChangeAccumulatorTests
 	public void DrainChanges_PathRemovedAndReadded_GetsNewPendingOrder()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
-
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Created);
 		accumulator.Add(@"C:\Workspace\Scripts\first.lua", FileChangeKind.Deleted);
 		accumulator.Add(@"C:\Workspace\Scripts\second.lua", FileChangeKind.Changed);

@@ -10,13 +10,13 @@ namespace Nickelony.LanguageServer.Client.Tests;
 [TestClass]
 public partial class LanguageServerClientTests
 {
-	private static readonly LanguageServerClientOptions DefaultClientOptions = new(static () => new { });
+	private static readonly LanguageServerClientOptions s_defaultClientOptions = new(static () => new { });
 
 	[TestMethod]
 	public async Task SendNotificationAsync_CompletesAfterLocalDispatchEvenWhenTransportWriteRemainsBlocked()
 	{
 		using var blockingWriteStream = new BlockingWriteStream();
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, blockingWriteStream, Stream.Null);
 		using var cancellationSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
@@ -115,14 +115,14 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void GetRequiredReadySession_WhenClientIsNotReady_ThrowsIOException()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
 
 		Assert.IsFalse(client.IsReady);
 
-		TargetInvocationException exception = Assert.ThrowsException<TargetInvocationException>(() =>
+		TargetInvocationException exception = Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethodWithReturn(client, "GetRequiredReadySession", false));
 
 		Assert.IsInstanceOfType(exception.InnerException, typeof(IOException));
@@ -131,7 +131,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void GetRequiredReadySession_WhenActiveSessionGenerationDoesNotMatchPublishedReadyGeneration_ThrowsIOException()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object readySession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object replacementSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
@@ -139,7 +139,7 @@ public partial class LanguageServerClientTests
 		SetReadyState(client, true);
 		SetPrivateField(client, "_activeSession", replacementSession);
 
-		TargetInvocationException exception = Assert.ThrowsException<TargetInvocationException>(() =>
+		TargetInvocationException exception = Assert.ThrowsExactly<TargetInvocationException>(() =>
 			InvokePrivateMethodWithReturn(client, "GetRequiredReadySession", false));
 
 		Assert.IsInstanceOfType(exception.InnerException, typeof(IOException));
@@ -149,14 +149,14 @@ public partial class LanguageServerClientTests
 	public async Task SendNotificationAsync_WhenClientIsNotReady_ThrowsIOException()
 	{
 		using var blockingWriteStream = new BlockingWriteStream();
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, blockingWriteStream, Stream.Null);
 
 		SetActiveSession(client, session);
 
 		Assert.IsFalse(client.IsReady);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendNotificationAsync(
 				"workspace/didChangeConfiguration",
 				new { settings = new { } },
@@ -166,10 +166,10 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task SendNotificationAsync_WhenPayloadSerializationFails_DoesNotInvalidateTransport()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 10, process: null, Stream.Null, Stream.Null);
-		var cyclicPayload = new Dictionary<string, object>();
 
+		var cyclicPayload = new Dictionary<string, object>();
 		cyclicPayload["self"] = cyclicPayload;
 
 		SetActiveSession(client, session);
@@ -196,14 +196,14 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public async Task SendRequestAsync_WhenClientIsNotReady_ThrowsIOException()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
 
 		Assert.IsFalse(client.IsReady);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendRequestAsync<JsonElement>(
 				"workspace/configuration",
 				new WorkspaceConfigurationParams([]),
@@ -214,7 +214,7 @@ public partial class LanguageServerClientTests
 	public async Task MarkTransportUnhealthy_DuringInFlightRequest_DoesNotCancelOwnedSessionButBlocksFutureRequests()
 	{
 		using var serverOutputStream = new PendingReadStream();
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, serverOutputStream, Stream.Null, startListening: true);
 
 		SetActiveSession(client, session);
@@ -232,7 +232,7 @@ public partial class LanguageServerClientTests
 
 		Assert.IsFalse(client.IsReady);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendRequestAsync<JsonElement>(
 				"workspace/configuration",
 				new WorkspaceConfigurationParams([]),
@@ -250,7 +250,7 @@ public partial class LanguageServerClientTests
 	public async Task ActiveSessionDisconnect_WhileRequestIsInFlight_CompletesPendingRequestAndMarksClientNotReady()
 	{
 		using var serverOutputStream = new PendingReadStream();
-		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, serverOutputStream, Stream.Null, startListening: true);
 
 		SetActiveSession(client, session);
@@ -270,7 +270,7 @@ public partial class LanguageServerClientTests
 		Assert.AreSame(requestTask, completedTask);
 		Assert.IsFalse(client.IsReady);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendRequestAsync<JsonElement>(
 				"workspace/configuration",
 				new WorkspaceConfigurationParams([]),
@@ -284,7 +284,7 @@ public partial class LanguageServerClientTests
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var serverOutputStream = new PendingReadStream();
-		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 7, process: null, serverOutputStream, Stream.Null, startListening: true);
 
 		SetActiveSession(client, session);
@@ -315,7 +315,7 @@ public partial class LanguageServerClientTests
 	{
 		using var deferredServerOutputStream = new DeferredPersistentJsonRpcResponseStream();
 		using var serverInputStream = new RecordingStream();
-		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 9, process: null, deferredServerOutputStream, serverInputStream, startListening: true);
 
 		SetActiveSession(client, session);
@@ -351,7 +351,7 @@ public partial class LanguageServerClientTests
 	public void JsonRpc_Disconnected_LocallyDisposedActiveTransport_LogsExpectedShutdownAtInfo()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -368,10 +368,38 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
+	public void JsonRpc_Disconnected_UnexpectedActiveTransportPublishesLostGenerationAfterReset()
+	{
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
+		object session = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
+		long unavailableGeneration = 0;
+		long publishedGenerationDuringCallback = -1;
+
+		SetActiveSession(client, session);
+		SetReadyState(client, true);
+
+		client.TransportUnavailable += generation =>
+		{
+			unavailableGeneration = generation;
+			publishedGenerationDuringCallback = client.TransportGeneration;
+		};
+
+		InvokePrivateMethod(client, "JsonRpc_Disconnected",
+			session,
+			new JsonRpcDisconnectedEventArgs("active transport failed", DisconnectedReason.StreamError));
+
+		Assert.IsFalse(client.IsReady);
+		Assert.AreEqual(0L, client.TransportGeneration);
+		Assert.AreEqual(3L, unavailableGeneration);
+		Assert.AreEqual(0L, publishedGenerationDuringCallback);
+		Assert.IsNull(GetPrivateFieldAllowingNull(client, "_activeSession"));
+	}
+
+	[TestMethod]
 	public async Task JsonRpc_Disconnected_DuringClientDisposal_LogsDebugWithoutWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 4, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -403,7 +431,7 @@ public partial class LanguageServerClientTests
 	public void MarkTransportUnhealthy_WhenReady_LogsRestartBoundary()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 5, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -431,6 +459,15 @@ public partial class LanguageServerClientTests
 
 		SetReadyState(client, true);
 
+		int transportUnavailableCount = 0;
+		long unavailableGeneration = 0;
+
+		client.TransportUnavailable += generation =>
+		{
+			transportUnavailableCount++;
+			unavailableGeneration = generation;
+		};
+
 		client.MarkTransportUnhealthy();
 
 		Assert.IsFalse(client.IsReady);
@@ -443,6 +480,8 @@ public partial class LanguageServerClientTests
 		Assert.IsFalse(client.SupportsRename);
 		Assert.IsFalse(client.SupportsFormatting);
 		Assert.IsFalse(client.SupportsSemanticTokensDelta);
+		Assert.AreEqual(1, transportUnavailableCount);
+		Assert.AreEqual(5L, unavailableGeneration);
 
 		Assert.IsTrue(logScope.Logs.Any(log => log.StartsWith("Warn|", StringComparison.Ordinal)
 			&& log.Contains("generation 5", StringComparison.OrdinalIgnoreCase)
@@ -453,7 +492,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void TryMarkTransportUnhealthy_StaleGenerationDoesNotOverwriteActiveSnapshot()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 5, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);
 
@@ -473,6 +512,9 @@ public partial class LanguageServerClientTests
 
 		SetReadyState(client, true);
 
+		int transportUnavailableCount = 0;
+		client.TransportUnavailable += _ => transportUnavailableCount++;
+
 		bool markedUnhealthy = client.TryMarkTransportUnhealthy(GetTransportGeneration(oldSession));
 
 		Assert.IsFalse(markedUnhealthy);
@@ -481,12 +523,13 @@ public partial class LanguageServerClientTests
 		Assert.IsTrue(client.IsReady);
 		Assert.AreEqual(TextDocumentSyncKind.Full, client.TextDocumentSyncKind);
 		Assert.IsTrue(client.SupportsRename);
+		Assert.AreEqual(0, transportUnavailableCount);
 	}
 
 	[TestMethod]
 	public void DetachActiveSession_ResetsPublishedCapabilitySnapshot()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 9, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -540,7 +583,7 @@ public partial class LanguageServerClientTests
 		await using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			null,
 			processStartedTestHook: null,
 			sessionActivatedTestHook: cancellationToken => WaitForStartupCancellationAsync(sessionActivated, cancellationToken));
@@ -549,7 +592,7 @@ public partial class LanguageServerClientTests
 
 		await sessionActivated.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendNotificationAsync(
 				"workspace/didChangeConfiguration",
 				new { settings = new { } },
@@ -557,7 +600,7 @@ public partial class LanguageServerClientTests
 
 		startupCancellation.Cancel();
 
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
 	}
 
 	[TestMethod]
@@ -569,7 +612,7 @@ public partial class LanguageServerClientTests
 		await using var client = new LanguageServerClient(
 			@"C:\Workspace",
 			Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-			DefaultClientOptions,
+			s_defaultClientOptions,
 			null,
 			processStartedTestHook: null,
 			sessionActivatedTestHook: cancellationToken => WaitForStartupCancellationAsync(sessionActivated, cancellationToken));
@@ -578,7 +621,7 @@ public partial class LanguageServerClientTests
 
 		await sessionActivated.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
 
-		await Assert.ThrowsExceptionAsync<IOException>(async () =>
+		await Assert.ThrowsExactlyAsync<IOException>(async () =>
 			await client.SendRequestAsync<JsonElement>(
 				"workspace/configuration",
 				new WorkspaceConfigurationParams([]),
@@ -586,14 +629,14 @@ public partial class LanguageServerClientTests
 
 		startupCancellation.Cancel();
 
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await startTask.ConfigureAwait(false)).ConfigureAwait(false);
 	}
 
 	[TestMethod]
 	public void RegisterCapability_IgnoresDynamicRegistrationAndLogsWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -619,7 +662,7 @@ public partial class LanguageServerClientTests
 	public void UnregisterCapability_IgnoresDynamicUnregistrationAndLogsWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -645,7 +688,7 @@ public partial class LanguageServerClientTests
 	public void RegisterCapability_StaleTransportGeneration_LogsDebugWithoutWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object oldSession = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 4, process: null, Stream.Null, Stream.Null);
 
@@ -672,10 +715,10 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void Hello_IgnoresArrayPayloadWithoutThrowing()
+	public void Hello_ArrayPayload_LogsReceiptAtDebugLevel()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object session = CreateTransportSession(client, 5, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -696,7 +739,7 @@ public partial class LanguageServerClientTests
 	{
 		using var deferredServerOutputStream = new DeferredJsonRpcResponseStream();
 		using var serverInputStream = new RecordingStream();
-		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object originalSession = CreateTransportSession(client, 1, process: null, deferredServerOutputStream, serverInputStream, startListening: true);
 		object replacementSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
@@ -712,15 +755,16 @@ public partial class LanguageServerClientTests
 
 		SetActiveSession(client, replacementSession);
 		SetReadyState(client, true);
+
 		deferredServerOutputStream.SetPayload(CreateJsonRpcResultMessage(requestId, "{\"value\":1}"));
 
-		await Assert.ThrowsExceptionAsync<LanguageServerTransportChangedException>(async () => await requestTask.ConfigureAwait(false)).ConfigureAwait(false);
+		await Assert.ThrowsExactlyAsync<LanguageServerTransportChangedException>(async () => await requestTask.ConfigureAwait(false)).ConfigureAwait(false);
 	}
 
 	[TestMethod]
 	public void JsonRpc_Disconnected_OldTransportGenerationDoesNotAffectActiveSession()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
@@ -745,7 +789,7 @@ public partial class LanguageServerClientTests
 	public void Process_Exited_SupersededTransportGenerationDoesNotAffectActiveSessionOrWarn()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
@@ -766,22 +810,34 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void Process_Exited_ActiveTransport_DetachesActiveSessionImmediately()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
 		SetReadyState(client, true);
 
+		long unavailableGeneration = 0;
+		long publishedGenerationDuringCallback = -1;
+
+		client.TransportUnavailable += generation =>
+		{
+			unavailableGeneration = generation;
+			publishedGenerationDuringCallback = client.TransportGeneration;
+		};
+
 		InvokePrivateMethod(client, "Process_Exited", session);
 
 		Assert.IsFalse(client.IsReady);
+		Assert.AreEqual(0L, client.TransportGeneration);
+		Assert.AreEqual(2L, unavailableGeneration);
+		Assert.AreEqual(0L, publishedGenerationDuringCallback);
 		Assert.IsNull(GetPrivateFieldAllowingNull(client, "_activeSession"));
 	}
 
 	[TestMethod]
 	public async Task DisposeAsync_WaitsForDetachedFailedSessionCleanup()
 	{
-		var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var queuedCleanup = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		SetPrivateField(client, "_queuedFailedSessionDisposal", queuedCleanup.Task);
@@ -798,7 +854,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void SetCapabilityReadinessForGeneration_StaleGenerationDoesNotClearActiveSnapshot()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 
@@ -829,7 +885,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void CaptureServerCapabilitiesForGeneration_StaleGenerationDoesNotOverwriteActiveCapabilities()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
 		object newSession = CreateTransportSession(client, 4, process: null, Stream.Null, Stream.Null);
 
@@ -874,8 +930,10 @@ public partial class LanguageServerClientTests
 		Assert.AreEqual(4L, client.TransportGeneration);
 		Assert.AreEqual(TextDocumentSyncKind.Full, client.TextDocumentSyncKind);
 		Assert.IsTrue(client.SupportsSemanticTokensDelta);
+
 		CollectionAssert.AreEqual(new[] { "function" }, client.SemanticTokenTypes.ToArray());
 		CollectionAssert.AreEqual(new[] { "declaration" }, client.SemanticTokenModifiers.ToArray());
+
 		Assert.IsFalse(client.SupportsRename);
 	}
 
@@ -1028,14 +1086,10 @@ public partial class LanguageServerClientTests
 	}
 
 	private static void SetActiveSession(LanguageServerClient client, object session)
-	{
-		InvokePrivateMethod(client, "SetActiveSession", session);
-	}
+		=> InvokePrivateMethod(client, "SetActiveSession", session);
 
 	private static void SetReadyState(LanguageServerClient client, bool isReady)
-	{
-		InvokePrivateMethod(client, "SetCapabilityReadiness", isReady);
-	}
+		=> InvokePrivateMethod(client, "SetCapabilityReadiness", isReady);
 
 	private static long GetTransportGeneration(object session)
 	{
@@ -1111,8 +1165,10 @@ public partial class LanguageServerClientTests
 	}
 
 	private static InitializeResponse DeserializeInitializeResponse(string json)
-		=> JsonSerializer.Deserialize<InitializeResponse>(json)
+	{
+		return JsonSerializer.Deserialize<InitializeResponse>(json)
 			?? throw new InvalidOperationException("Failed to deserialize the Lua initialize response test payload.");
+	}
 
 	private static PublishDiagnosticsParams CreateDiagnosticsParameters(string uri, string message) => new(
 		uri,

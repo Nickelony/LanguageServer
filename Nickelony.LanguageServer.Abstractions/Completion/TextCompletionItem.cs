@@ -33,7 +33,7 @@ public sealed class TextCompletionItem
 		string? insertText = null,
 		string? description = null,
 		double priority = 0.0,
-		TextCompletionItemKind kind = TextCompletionItemKind.Generic,
+		TextCompletionItemKind? kind = null,
 		string? detail = null,
 		string? filterText = null,
 		bool isDescriptionMarkdown = false,
@@ -47,7 +47,7 @@ public sealed class TextCompletionItem
 		InsertText = string.IsNullOrWhiteSpace(insertText) ? label : insertText;
 		Description = string.IsNullOrWhiteSpace(description) ? null : isDescriptionMarkdown ? description : description.Trim();
 		Priority = priority;
-		Kind = kind;
+		Kind = kind ?? TextCompletionItemKind.Generic;
 		Detail = string.IsNullOrWhiteSpace(detail) ? null : detail.Trim();
 		FilterText = string.IsNullOrWhiteSpace(filterText) ? label : filterText;
 		IsDescriptionMarkdown = isDescriptionMarkdown;
@@ -161,10 +161,12 @@ public sealed class TextCompletionItem
 		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = _resolveAsync is null
 			? null
 			: async cancellationToken =>
-				(await _resolveAsync(cancellationToken).ConfigureAwait(false))
-					.WithRequestContext(requestDocumentVersion, requestGeneration);
+			{
+				TextCompletionItem resolvedItem = await _resolveAsync(cancellationToken).ConfigureAwait(false);
+				return resolvedItem.WithRequestContext(requestDocumentVersion, requestGeneration);
+			};
 
-		return new TextCompletionItem(Label, InsertText, Description, Priority, Kind, Detail, FilterText,
+		return new(Label, InsertText, Description, Priority, Kind, Detail, FilterText,
 			IsDescriptionMarkdown, resolveAsync, TextEdit, requestDocumentVersion, requestGeneration, InsertCaretOffset);
 	}
 
@@ -186,10 +188,12 @@ public sealed class TextCompletionItem
 		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = _resolveAsync is null
 			? null
 			: async cancellationToken =>
-				(await _resolveAsync(cancellationToken).ConfigureAwait(false))
-					.WithFilteredCommitContext(requestDocumentVersion, requestGeneration);
+			{
+				TextCompletionItem resolvedItem = await _resolveAsync(cancellationToken).ConfigureAwait(false);
+				return resolvedItem.WithFilteredCommitContext(requestDocumentVersion, requestGeneration);
+			};
 
-		return new TextCompletionItem(
+		return new(
 			Label, InsertText, Description, Priority, Kind, Detail, FilterText, IsDescriptionMarkdown, resolveAsync,
 			textEdit: null,
 			requestDocumentVersion: requestDocumentVersion,
@@ -213,7 +217,7 @@ public sealed class TextCompletionItem
 
 		TextCompletionItemKind kind = resolvedItem.Kind == TextCompletionItemKind.Generic ? Kind : resolvedItem.Kind;
 
-		return new TextCompletionItem(
+		return new(
 			Label, InsertText, description, Priority, kind, detail, FilterText, isDescriptionMarkdown,
 			resolveAsync: null,
 			textEdit: TextEdit,

@@ -147,7 +147,7 @@ public partial class LanguageServerClientTests
 
 		Assert.AreEqual("Lua 5.4", JsonSerializer.SerializeToElement(initialResponse[0]).GetProperty("version").GetString());
 
-		await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () =>
 			await client.SendNotificationAsync(
 				"workspace/didChangeConfiguration",
 				new DidChangeConfigurationParams(new
@@ -331,7 +331,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void WorkspaceFolders_ReturnsDriveRootNameWhenWorkspaceRootIsDriveRoot()
 	{
-		using var client = new LanguageServerClient(@"C:\", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 
 		SetActiveSession(client, session);
@@ -380,7 +380,7 @@ public partial class LanguageServerClientTests
 	[TestMethod]
 	public void WorkspaceFolders_StaleTransportGeneration_ReturnsEmptyArray()
 	{
-		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", DefaultClientOptions);
+		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object staleSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
 		object activeSession = CreateTransportSession(client, 2, process: null, Stream.Null, Stream.Null);
 

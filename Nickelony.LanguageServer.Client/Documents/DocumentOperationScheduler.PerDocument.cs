@@ -12,7 +12,7 @@ public sealed partial class DocumentOperationScheduler
 	/// <returns>A task that completes with the queued operation result.</returns>
 	public Task<TResult> EnqueuePerDocumentAsync<TResult>(string filePath, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
 	{
-		string normalizedFilePath = NormalizeDocumentPath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		Task scheduledOperation;
@@ -55,8 +55,8 @@ public sealed partial class DocumentOperationScheduler
 		Func<CancellationToken, Task<TResult>> operation,
 		CancellationToken cancellationToken)
 	{
-		string normalizedFirstFilePath = NormalizeDocumentPath(firstFilePath);
-		string normalizedSecondFilePath = NormalizeDocumentPath(secondFilePath);
+		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
+		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
 
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var barrierSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -95,8 +95,8 @@ public sealed partial class DocumentOperationScheduler
 	/// <returns>A task that completes when the queued operations have finished.</returns>
 	public async Task WaitForPerDocumentOperationsAsync(string firstFilePath, string secondFilePath)
 	{
-		string normalizedFirstFilePath = NormalizeDocumentPath(firstFilePath);
-		string normalizedSecondFilePath = NormalizeDocumentPath(secondFilePath);
+		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
+		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
 
 		Task[] queuedOperations = GetQueuedOperationsSnapshot(normalizedFirstFilePath, normalizedSecondFilePath, includeBarriers: true);
 

@@ -13,10 +13,10 @@ public static class SemanticTokensDeltaParser
 	public static SemanticTokensDeltaResponse Parse(SemanticTokensWireResponse? response)
 	{
 		if (response is not { } payload)
-			return new SemanticTokensDeltaResponse(ResultId: null, Data: null, Edits: null);
+			return new(ResultId: null, Data: null, Edits: null);
 
 		if (payload.Data is { } data)
-			return new SemanticTokensDeltaResponse(payload.ResultId, data, Edits: null);
+			return new(payload.ResultId, data, Edits: null);
 
 		if (payload.Edits is { } editsPayload)
 		{
@@ -27,18 +27,18 @@ public static class SemanticTokensDeltaParser
 				SemanticTokensEditPayload edit = editsPayload[i];
 
 				if (edit.Start is not { } start || edit.DeleteCount is not { } deleteCount)
-					return new SemanticTokensDeltaResponse(payload.ResultId, Data: null, Edits: null);
+					return new(payload.ResultId, Data: null, Edits: null);
 
 				if (start < 0 || deleteCount < 0)
-					return new SemanticTokensDeltaResponse(payload.ResultId, Data: null, Edits: null);
+					return new(payload.ResultId, Data: null, Edits: null);
 
 				edits.Add(new SemanticTokensEdit(start, deleteCount, edit.Data ?? []));
 			}
 
-			return new SemanticTokensDeltaResponse(payload.ResultId, Data: null, edits);
+			return new(payload.ResultId, Data: null, edits);
 		}
 
-		return new SemanticTokensDeltaResponse(payload.ResultId, Data: null, Edits: null);
+		return new(payload.ResultId, Data: null, Edits: null);
 	}
 
 	/// <summary>

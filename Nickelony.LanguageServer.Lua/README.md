@@ -44,12 +44,14 @@ dotnet add package Nickelony.LanguageServer.Lua
 
 ```csharp
 using Microsoft.Extensions.Logging;
+using Nickelony.LanguageServer.Abstractions.Editing;
+using Nickelony.LanguageServer.Abstractions.Navigation;
 using Nickelony.LanguageServer.Lua;
 
-var provider = new LuaLanguageServerIntellisenseProvider(
+var provider = new LuaLanguageServerIntelliSenseProvider(
     workspaceRootDirectoryPath: @"C:\my\workspace",
     serverExecutablePath: @"C:\tools\lua-language-server\lua-language-server.exe",
-    logger: loggerFactory.CreateLogger<LuaLanguageServerIntellisenseProvider>());
+    logger: loggerFactory.CreateLogger<LuaLanguageServerIntelliSenseProvider>());
 
 // Callbacks may fire on background threads - marshal to your UI thread before touching controls.
 provider.DiagnosticsUpdated += (filePath, diagnostics) =>
@@ -72,14 +74,20 @@ var completions = await provider.GetCompletionItemsAsync(
 var hover      = await provider.GetHoverAsync(filePath, sourceText, line, column);
 var definition = await provider.GetDefinitionAsync(filePath, sourceText, line, column);
 var signatures = await provider.GetSignatureHelpAsync(filePath, sourceText, line, column);
-var references = await provider.GetReferencesAsync(new TextReferenceRequest(filePath, line, column));
-var edits      = await provider.RenameSymbolAsync(new TextRenameRequest(filePath, line, column, "newName"));
-var formatted  = await provider.FormatDocumentAsync(new TextFormatRequest(filePath, sourceText));
+var references = await provider.GetReferencesAsync(new TextReferenceRequest(filePath, sourceText, line, column));
+var edits      = await provider.RenameSymbolAsync(new TextRenameRequest(filePath, sourceText, line, column, "newName"));
+var formatted  = await provider.FormatDocumentAsync(new TextFormatRequest(
+    filePath,
+    sourceText,
+    new TextFormattingOptions(tabSize: 4, insertSpaces: true)));
 
 provider.UpdateDocument(filePath, updatedSourceText);
 provider.CloseDocument(filePath);
 provider.Dispose();
 ```
+
+For the complete construction, disposal, UI-thread, document-reference, and cancellation
+contract, see the repository's [consumer integration guide](../docs/ConsumerIntegration.md).
 
 > **Note:** all `*Async` IntelliSense methods take the current document `content`, so you can
 > drive them from a live editor buffer without waiting for server round-trips of edits.
@@ -88,7 +96,7 @@ provider.Dispose();
 
 - `Nickelony.LanguageServer.Abstractions`
 - `Nickelony.LanguageServer.Client`
-- `Microsoft.Extensions.Logging.Abstractions` 8.0.x
+- `Microsoft.Extensions.Logging.Abstractions` 8.0.3
 
 ## License
 

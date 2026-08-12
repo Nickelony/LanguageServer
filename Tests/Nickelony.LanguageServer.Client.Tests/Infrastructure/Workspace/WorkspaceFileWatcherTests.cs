@@ -97,7 +97,7 @@ public class WorkspaceFileWatcherTests
 	}
 
 	[TestMethod]
-	public void Start_MissingWorkspaceRoot_ReturnsWorkspaceRootMissingWithoutException()
+	public void Start_MissingWorkspaceRoot_ReturnsStructuredFailureWithoutStartingWatchers()
 	{
 		string workspaceRoot = Path.Combine(Path.GetTempPath(), "WorkspaceWatcherMissing_" + Guid.NewGuid().ToString("N"));
 
@@ -358,6 +358,7 @@ public class WorkspaceFileWatcherTests
 			{
 				dispatchStarted.TrySetResult(true);
 				await allowFirstDispatchToFinish.Task.ConfigureAwait(false);
+
 				throw new IOException("Simulated dispatch failure during no-flush disposal.");
 			}
 
@@ -401,6 +402,7 @@ public class WorkspaceFileWatcherTests
 			{
 				dispatchStarted.TrySetResult(true);
 				await allowFirstDispatchToFinish.Task.ConfigureAwait(false);
+
 				throw new IOException("Simulated dispatch failure during disposal.");
 			}
 
@@ -447,6 +449,7 @@ public class WorkspaceFileWatcherTests
 			{
 				dispatchStarted.TrySetResult(true);
 				await allowFirstDispatchToFinish.Task.ConfigureAwait(false);
+
 				throw new IOException("Simulated dispatch failure during disposal.");
 			}
 
@@ -687,6 +690,7 @@ public class WorkspaceFileWatcherTests
 
 		Assert.IsFalse(watcher.HasActiveWatchers);
 		Assert.AreEqual(0, watcher.ActiveWatcherCount);
+
 		Assert.IsTrue(logScope.Logs.Any(log => log.Contains("Workspace watcher failure handler threw.", StringComparison.OrdinalIgnoreCase)
 			&& log.Contains("Simulated watcher failure callback exception.", StringComparison.Ordinal)),
 			string.Join(Environment.NewLine, logScope.Logs));

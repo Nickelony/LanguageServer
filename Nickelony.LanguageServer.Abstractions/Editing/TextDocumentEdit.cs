@@ -13,7 +13,7 @@ public sealed class TextDocumentEdit
 	public TextDocumentEdit(string filePath, IReadOnlyList<TextEdit> textEdits)
 	{
 		FilePath = filePath;
-		TextEdits = textEdits;
+		TextEdits = Array.AsReadOnly([.. textEdits]);
 	}
 
 	/// <summary>
@@ -22,7 +22,7 @@ public sealed class TextDocumentEdit
 	public string FilePath { get; }
 
 	/// <summary>
-	/// Gets the edits to apply to the file.
+	/// Gets the owned immutable snapshot of edits to apply to the file.
 	/// </summary>
 	public IReadOnlyList<TextEdit> TextEdits { get; }
 }

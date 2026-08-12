@@ -16,6 +16,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	private TaskCompletionSource<bool>? _changeNotificationGate;
 	private TaskCompletionSource<bool>? _semanticTokensFullRequestGate;
 	private TaskCompletionSource<bool>? _watchedFilesNotificationGate;
+	private long _lastIssuedTransportGeneration;
 	private readonly TaskCompletionSource<bool> _changeNotificationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private readonly TaskCompletionSource<bool> _closeNotificationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -41,6 +42,9 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	public bool SupportsSemanticTokensDelta { get; set; }
 	public bool FailStartWhenCancellationRequested { get; set; }
 	public bool CancelNextHoverRequestWithoutTimeout { get; set; }
+	public Action? BeforeReturningStartResult { get; set; }
+	public Action? BeforeReturningHoverResponse { get; set; }
+	public Action? BeforePublishingTransportUnavailable { get; set; }
 	public int StartCallCount { get; private set; }
 	public int MarkTransportUnhealthyCallCount { get; private set; }
 	public int DisposeCallCount { get; private set; }
@@ -58,6 +62,8 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 
 	public event Action? SemanticTokensRefreshRequested;
 
+	public event Action<long>? TransportUnavailable;
+
 	public async Task<bool> StartAsync(CancellationToken cancellationToken)
 	{
 		StartCallCount++;
@@ -74,7 +80,9 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		IsReady = StartResult;
 
 		if (StartResult)
-			TransportGeneration++;
+			TransportGeneration = ++_lastIssuedTransportGeneration;
+
+		BeforeReturningStartResult?.Invoke();
 
 		return StartResult;
 	}
@@ -82,7 +90,12 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	public void MarkTransportUnhealthy()
 	{
 		MarkTransportUnhealthyCallCount++;
+
+		bool wasReady = IsReady;
 		IsReady = false;
+
+		if (wasReady)
+			TransportUnavailable?.Invoke(TransportGeneration);
 	}
 
 	public bool TryMarkTransportUnhealthy(long transportGeneration)
@@ -153,6 +166,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		{
 			ThrowIOExceptionOnNextRequestMethod = null;
 			IsReady = false;
+
 			throw new LanguageServerTransportUnavailableException($"Simulated {method} transport failure.");
 		}
 
@@ -166,6 +180,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		{
 			TransportChangedRequestFailuresRemaining--;
 			IsReady = false;
+
 			throw new LanguageServerTransportChangedException();
 		}
 
@@ -187,7 +202,10 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 			}
 
 			if (HoverResponse.ValueKind != JsonValueKind.Undefined)
+			{
+				BeforeReturningHoverResponse?.Invoke();
 				return DeserializeResponseAsync<TResult>(HoverResponse);
+			}
 		}
 
 		if (method == "textDocument/completion" && CompletionResponse.ValueKind != JsonValueKind.Undefined)
@@ -241,7 +259,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		if (typeof(TResult) == typeof(JsonElement))
 			return Task.FromResult((TResult)(object)JsonSerializer.SerializeToElement(new { }));
 
-		return Task.FromResult<TResult>(CreateDefaultResponse<TResult>());
+		return Task.FromResult(CreateDefaultResponse<TResult>());
 	}
 
 	public string[] GetSentMethodNames()
@@ -294,6 +312,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	{
 		TaskCompletionSource<bool>? startGate = _startGate;
 		_startGate = null;
+
 		startGate?.TrySetResult(true);
 	}
 
@@ -301,6 +320,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	{
 		TaskCompletionSource<bool>? hoverRequestGate = _hoverRequestGate;
 		_hoverRequestGate = null;
+
 		hoverRequestGate?.TrySetResult(true);
 	}
 
@@ -317,6 +337,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	{
 		TaskCompletionSource<bool>? changeNotificationGate = _changeNotificationGate;
 		_changeNotificationGate = null;
+
 		changeNotificationGate?.TrySetResult(true);
 	}
 
@@ -324,6 +345,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	{
 		TaskCompletionSource<bool>? watchedFilesNotificationGate = _watchedFilesNotificationGate;
 		_watchedFilesNotificationGate = null;
+
 		watchedFilesNotificationGate?.TrySetResult(true);
 	}
 
@@ -331,6 +353,7 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	{
 		TaskCompletionSource<bool>? semanticTokensFullRequestGate = _semanticTokensFullRequestGate;
 		_semanticTokensFullRequestGate = null;
+
 		semanticTokensFullRequestGate?.TrySetResult(true);
 	}
 
@@ -367,6 +390,21 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 
 	public void PublishSemanticTokensRefreshRequested()
 		=> SemanticTokensRefreshRequested?.Invoke();
+
+	public void PublishTransportUnavailable(long? transportGeneration = null)
+	{
+		long generation = transportGeneration ?? TransportGeneration;
+		Action<long>? handlers = TransportUnavailable;
+
+		if (generation == TransportGeneration)
+		{
+			IsReady = false;
+			TransportGeneration = 0;
+		}
+
+		BeforePublishingTransportUnavailable?.Invoke();
+		handlers?.Invoke(generation);
+	}
 
 	public void EnqueueSemanticTokensFullResponse(JsonElement response)
 		=> _semanticTokensFullResponses.Enqueue(response);

@@ -11,7 +11,7 @@ public sealed partial class DocumentOperationScheduler
 	/// <returns>A task that represents the active update.</returns>
 	public Task QueueLatestUpdateAsync(string filePath, Func<CancellationToken, Task> operation)
 	{
-		string normalizedFilePath = NormalizeDocumentPath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 		var replacementRegistration = new QueuedUpdateRegistration(new CancellationTokenSource());
 
 		QueuedUpdateRegistration? previousRegistration = null;
@@ -52,7 +52,7 @@ public sealed partial class DocumentOperationScheduler
 	/// <param name="filePath">The document path whose queued update should be canceled.</param>
 	public void CancelQueuedUpdate(string filePath)
 	{
-		string normalizedFilePath = NormalizeDocumentPath(filePath);
+		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 		QueuedUpdateRegistration? registration;
 
 		lock (_syncRoot)

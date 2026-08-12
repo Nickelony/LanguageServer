@@ -1,3 +1,5 @@
+using Nickelony.LanguageServer.Abstractions.Infrastructure;
+
 namespace Nickelony.LanguageServer.Abstractions.Navigation;
 
 /// <summary>
@@ -22,17 +24,8 @@ public sealed class TextReferenceLocation
 	{
 		FilePath = filePath;
 
-		int safeStartLineNumber = Math.Max(1, startLineNumber);
-		int safeStartColumnNumber = Math.Max(1, startColumnNumber);
-		int safeEndLineNumber = Math.Max(1, endLineNumber);
-		int safeEndColumnNumber = Math.Max(1, endColumnNumber);
-
-		if (safeEndLineNumber < safeStartLineNumber
-			|| (safeEndLineNumber == safeStartLineNumber && safeEndColumnNumber < safeStartColumnNumber))
-		{
-			safeEndLineNumber = safeStartLineNumber;
-			safeEndColumnNumber = safeStartColumnNumber;
-		}
+		(int safeStartLineNumber, int safeStartColumnNumber, int safeEndLineNumber, int safeEndColumnNumber) =
+			TextDocumentRangeNormalizer.Normalize(startLineNumber, startColumnNumber, endLineNumber, endColumnNumber);
 
 		StartLineNumber = safeStartLineNumber;
 		StartColumnNumber = safeStartColumnNumber;

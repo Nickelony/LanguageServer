@@ -55,7 +55,7 @@ internal static partial class LuaLanguageServerResponseParser
 			}
 		}
 
-		return new TextSignatureHelpInfo(label, activeParameter, documentation, parameters);
+		return new(label, activeParameter, documentation, parameters);
 	}
 
 	private static int ResolveActiveParameter(SignatureHelpResponse response, SignatureHelpSignaturePayload signatureElement)

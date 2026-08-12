@@ -30,13 +30,13 @@ public class WorkspaceFileChangeForwarderTests
 			},
 			CancellationToken.None).ConfigureAwait(false);
 
+		await forwarder.ReplayDeferredAsync((_, _) => throw new AssertFailedException("No deferred changes should remain."), CancellationToken.None)
+			.ConfigureAwait(false);
+
 		Assert.IsTrue(ensureStartedCalled);
 		Assert.IsNotNull(forwardedChanges);
 		Assert.AreEqual(1, forwardedChanges.Count);
 		Assert.AreEqual(0, markTransportUnavailableCallCount);
-
-		await forwarder.ReplayDeferredAsync((_, _) => throw new AssertFailedException("No deferred changes should remain."), CancellationToken.None)
-			.ConfigureAwait(false);
 	}
 
 	[TestMethod]
@@ -411,6 +411,7 @@ public class WorkspaceFileChangeForwarderTests
 	public async Task ReplayDeferredAsync_WhenReplayIsInFlight_DoesNotLetNewDispatchPassIt()
 	{
 		bool startResult = false;
+
 		var forwardedBatches = new List<IReadOnlyList<WorkspaceFileChange>>();
 		var replayEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowReplayToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -567,6 +568,7 @@ public class WorkspaceFileChangeForwarderTests
 	public async Task Dispose_WhileReplayIsInFlight_AllowsReplayToFinishAndBlocksNewDispatch()
 	{
 		bool startResult = false;
+
 		var forwardedBatches = new List<IReadOnlyList<WorkspaceFileChange>>();
 		var replayEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowReplayToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -621,6 +623,7 @@ public class WorkspaceFileChangeForwarderTests
 	{
 		bool ensureStartedCalled = false;
 		bool forwardCalled = false;
+
 		var firstForwardEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstForwardToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 

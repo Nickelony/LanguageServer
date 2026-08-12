@@ -147,6 +147,38 @@ public class LuaWorkspaceSnapshotTrackerTests
 		}
 	}
 
+	[TestMethod]
+	public void CaptureTrackedSnapshot_PreservesCaseDistinctPathsOnCaseSensitiveHosts()
+	{
+		if (!LanguageServerPathHelper.UsesCaseSensitiveLocalPaths)
+			return;
+
+		string workspaceRoot = Path.Combine(Path.GetTempPath(), "LuaWorkspaceSnapshotCase_" + Guid.NewGuid().ToString("N"));
+		string firstFilePath = Path.Combine(workspaceRoot, "case.lua");
+		string secondFilePath = Path.Combine(workspaceRoot, "CASE.lua");
+
+		try
+		{
+			Directory.CreateDirectory(workspaceRoot);
+			File.WriteAllText(firstFilePath, "return 1");
+			File.WriteAllText(secondFilePath, "return 2");
+
+			var tracker = CreateTracker(workspaceRoot);
+			tracker.CaptureTrackedSnapshot();
+
+			Dictionary<string, LuaWorkspaceSnapshotEntry> snapshot = tracker.CloneTrackedSnapshot();
+
+			Assert.AreEqual(2, snapshot.Count);
+			Assert.IsTrue(snapshot.ContainsKey(LanguageServerPathHelper.NormalizeLocalPath(firstFilePath)));
+			Assert.IsTrue(snapshot.ContainsKey(LanguageServerPathHelper.NormalizeLocalPath(secondFilePath)));
+		}
+		finally
+		{
+			if (Directory.Exists(workspaceRoot))
+				Directory.Delete(workspaceRoot, recursive: true);
+		}
+	}
+
 	private static LuaWorkspaceSnapshotTracker CreateTracker(string workspaceRootDirectoryPath) => new(
 		LanguageServerPathHelper.NormalizeLocalPath(workspaceRootDirectoryPath),
 		[
