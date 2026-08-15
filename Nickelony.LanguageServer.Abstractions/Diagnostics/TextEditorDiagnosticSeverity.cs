@@ -6,6 +6,11 @@ namespace Nickelony.LanguageServer.Abstractions.Diagnostics;
 public enum TextEditorDiagnosticSeverity
 {
 	/// <summary>
+	/// The diagnostic has no severity and is not intended to be displayed to the user.
+	/// </summary>
+	None = 0,
+
+	/// <summary>
 	/// The diagnostic is an error.
 	/// </summary>
 	Error = 1,
