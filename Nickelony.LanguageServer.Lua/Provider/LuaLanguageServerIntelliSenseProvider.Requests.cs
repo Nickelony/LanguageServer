@@ -1,7 +1,6 @@
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Navigation;
-using Nickelony.LanguageServer.Abstractions.Signatures;
+using Nickelony.IDEKit.IntelliSense.Hover;
+using Nickelony.IDEKit.IntelliSense.Navigation;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -233,7 +232,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 		{
 			// Synchronize the document without triggering post-edit semantic token refresh.
 			if (
-				// Request-driven sync paths (completion / hover / definition / signature) intentionally
+				// All request-driven sync paths intentionally
 				// skip the semantic token refresh: typing a single identifier character can otherwise turn
 				// into didChange + completion + semanticTokens/full per keystroke, which is the dominant
 				// performance regression observed during normal editing. UpdateDocument (TextChangedDelayed)

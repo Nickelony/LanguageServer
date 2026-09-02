@@ -345,7 +345,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void WorkspaceConfiguration_StaleTransportGeneration_ReturnsNullValuesWithoutReadingActiveSettings()
+	public void WorkspaceConfiguration_StaleTransportGeneration_ReturnsNullValues()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", new LanguageServerClientOptions(static () => new
 		{

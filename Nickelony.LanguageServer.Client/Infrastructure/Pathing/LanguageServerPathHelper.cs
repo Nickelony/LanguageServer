@@ -11,7 +11,9 @@ public static class LanguageServerPathHelper
 	/// <summary>
 	/// Gets a value indicating whether normalized local-path identity should treat character casing as significant.
 	/// Windows and standard macOS setups default to case-insensitive matching, while Linux defaults to case-sensitive matching.
-	/// Hosts may override the default through the documented AppContext switches.
+	/// Hosts may override the default through the <c>Nickelony.LanguageServer.Client.UseCaseSensitiveLocalPaths</c>
+	/// and <c>Nickelony.LanguageServer.Client.UseCaseInsensitiveLocalPaths</c> AppContext switches.
+	/// Configure a switch before this type is first accessed.
 	/// </summary>
 	public static bool UsesCaseSensitiveLocalPaths { get; } = DeterminePathCaseSensitivity();
 
@@ -141,7 +143,7 @@ public static class LanguageServerPathHelper
 	/// Gets the case-normalized dictionary key for a normalized local path.
 	/// </summary>
 	/// <param name="normalizedFilePath">The normalized local file path.</param>
-	/// <returns>The dictionary key, uppercased when the local file system is case-insensitive.</returns>
+	/// <returns>The dictionary key, uppercased when configured local-path identity is case-insensitive.</returns>
 	internal static string GetPathKeyFromNormalizedPath(string normalizedFilePath)
 		=> UsesCaseSensitiveLocalPaths ? normalizedFilePath : normalizedFilePath.ToUpperInvariant();
 

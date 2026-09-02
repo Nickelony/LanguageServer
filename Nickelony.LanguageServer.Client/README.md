@@ -3,10 +3,10 @@
 **A lightweight LSP client for .NET**, built on [StreamJsonRpc](https://github.com/microsoft/vs-streamjsonrpc). It spawns a language-server process and speaks the Language Server Protocol over stdio.
 
 [![NuGet](https://img.shields.io/nuget/v/Nickelony.LanguageServer.Client.svg)](https://www.nuget.org/packages/Nickelony.LanguageServer.Client)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickelony/LanguageServer/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickelony/IDEKit/blob/main/LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-This package is the **LSP client machinery** of the [Nickelony Language Server](https://github.com/Nickelony/LanguageServer) family. It handles everything below the editor-facing contracts: hosting the server process, the `initialize` handshake, capability negotiation, JSON-RPC request/notification transport, document synchronization, and workspace file watching.
+This package is the **LSP client machinery** of the [Nickelony Language Server](https://github.com/Nickelony/IDEKit) family. It handles everything below the editor-facing contracts: hosting the server process, the `initialize` handshake, capability negotiation, JSON-RPC request/notification transport, document synchronization, and workspace file watching.
 
 ## Features
 

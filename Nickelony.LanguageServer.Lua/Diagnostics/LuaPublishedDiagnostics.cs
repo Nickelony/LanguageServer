@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -31,7 +31,7 @@ internal sealed class LuaPublishedDiagnostics
 	public IReadOnlyList<TextEditorDiagnostic> Diagnostics { get; }
 
 	/// <summary>
-	/// Gets the synchronized document version that produced the diagnostics.
+	/// Gets the synchronized document version that produced the diagnostics, or <c>0</c> when the server did not report a version.
 	/// </summary>
 	public int Version { get; }
 }

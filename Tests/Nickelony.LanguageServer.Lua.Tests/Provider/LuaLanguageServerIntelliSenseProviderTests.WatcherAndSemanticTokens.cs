@@ -254,7 +254,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			watcher.Dispose();
 			File.WriteAllText(missedFilePath, "return 1");
 
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+			bool recovered = InvokePrivateMethodWithReturn<bool>(
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				"TryRestartWorkspaceFileWatcher",
+				watcher);
 
 			Assert.IsTrue(recovered);
 			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeWatchedFiles", 1, TimeSpan.FromSeconds(1)));
@@ -294,7 +297,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			watcher.Dispose();
 			File.WriteAllText(configFilePath, "{\"Lua.workspace.maxPreload\": 1000}");
 
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+			bool recovered = InvokePrivateMethodWithReturn<bool>(
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				"TryRestartWorkspaceFileWatcher",
+				watcher);
 
 			Assert.IsTrue(recovered);
 			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeConfiguration", 1, TimeSpan.FromSeconds(1)));
@@ -350,7 +356,11 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				?? throw new AssertFailedException("Expected the workspace watcher to start.");
 
 			watcher.Dispose();
-			bool recovered = InvokePrivateMethodWithReturn<bool>(LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider), "TryRestartWorkspaceFileWatcher", watcher);
+
+			bool recovered = InvokePrivateMethodWithReturn<bool>(
+				LuaLanguageServerIntelliSenseProviderTestAccess.GetWorkspaceChangeCoordinator(provider),
+				"TryRestartWorkspaceFileWatcher",
+				watcher);
 
 			Assert.IsTrue(recovered);
 
@@ -505,7 +515,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task SemanticTokensRefreshRequested_RefreshesTrackedDocuments()
+	public async Task SemanticTokensRefreshRequested_RefreshesTheTrackedDocument()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
@@ -613,7 +623,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 		Task clearedCompletedTask = await Task.WhenAny(clearedTokensUpdated.Task, Task.Delay(TimeSpan.FromSeconds(1))).ConfigureAwait(false);
 		Assert.AreSame(clearedTokensUpdated.Task, clearedCompletedTask);
-		Assert.AreEqual(0, clearedTokensUpdated.Task.Result.Count);
+
+		IReadOnlyList<LuaSemanticToken> clearedTokens = await clearedTokensUpdated.Task.ConfigureAwait(false);
+
+		Assert.AreEqual(0, clearedTokens.Count);
 		Assert.AreEqual(0, provider.GetSemanticTokens(filePath).Count);
 
 		CollectionAssert.AreEqual(

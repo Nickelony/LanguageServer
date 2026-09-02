@@ -133,6 +133,8 @@ public sealed partial class LanguageServerClient : ILanguageServerClient
 
 	/// <summary>
 	/// Occurs when the active ready transport becomes unavailable.
+	/// The argument identifies the transport generation that was active immediately before the loss.
+	/// Stale transport generations do not raise this event.
 	/// </summary>
 	public event Action<long>? TransportUnavailable;
 

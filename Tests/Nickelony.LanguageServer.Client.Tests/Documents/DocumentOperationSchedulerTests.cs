@@ -119,7 +119,11 @@ public class DocumentOperationSchedulerTests
 	{
 		var scheduler = new DocumentOperationScheduler();
 		string canonicalFilePath = Path.Combine(Path.GetTempPath(), "DocumentOperationSchedulerTests", "test.lua");
-		string aliasedFilePath = Path.Combine(Path.GetDirectoryName(canonicalFilePath)!, ".", Path.GetFileName(canonicalFilePath));
+
+		string directoryPath = Path.GetDirectoryName(canonicalFilePath)
+			?? throw new InvalidOperationException("The canonical test file path did not have a directory.");
+
+		string aliasedFilePath = Path.Combine(directoryPath, ".", Path.GetFileName(canonicalFilePath));
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 

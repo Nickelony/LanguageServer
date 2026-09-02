@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 

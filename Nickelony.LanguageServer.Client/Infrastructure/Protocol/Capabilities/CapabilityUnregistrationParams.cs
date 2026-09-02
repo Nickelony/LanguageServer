@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Represents a client capability unregistration request.
+/// Represents a dynamic capability unregistration request from the language server.
 /// </summary>
 /// <remarks>
 /// The JSON wire contract accepts both the historical <c>unregisterations</c> spelling and the corrected
@@ -16,7 +16,7 @@ public readonly record struct CapabilityUnregistrationParams(
 	CapabilityUnregistrationPayload[]? Unregistrations);
 
 /// <summary>
-/// Represents a single dynamic capability unregistration entry.
+/// Represents one dynamic capability unregistration entry requested by the language server.
 /// </summary>
 /// <param name="Id">The server-defined registration identifier.</param>
 /// <param name="Method">The capability method being unregistered.</param>

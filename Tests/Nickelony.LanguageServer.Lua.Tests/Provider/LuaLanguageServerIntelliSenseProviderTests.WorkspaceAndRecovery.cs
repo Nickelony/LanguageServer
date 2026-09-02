@@ -1,6 +1,6 @@
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Navigation;
-using Nickelony.LanguageServer.Abstractions.Signatures;
+using Nickelony.IDEKit.IntelliSense.Hover;
+using Nickelony.IDEKit.IntelliSense.Navigation;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;

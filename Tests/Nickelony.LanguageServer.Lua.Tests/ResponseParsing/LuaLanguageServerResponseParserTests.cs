@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Nickelony.LanguageServer.Abstractions.Completion;
+using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense.Completion;
 using Nickelony.LanguageServer.Testing;
 using System.Text.Json;
 
@@ -9,13 +10,13 @@ namespace Nickelony.LanguageServer.Lua.Tests;
 public partial class LuaLanguageServerResponseParserTests
 {
 	[TestMethod]
-	public void ParseCompletionItem_AddsLocalAndUpvaluePriorityBonuses()
+	public void ParseCompletionItem_RaisesPriorityForLocalUpvalueItem()
 	{
 		CompletionItemPayload baselineElement = CreateCompletionItem("baseline", kind: 6, detail: "variable", documentation: "plain text");
 		CompletionItemPayload boostedElement = CreateCompletionItem("boosted", kind: 6, detail: "local variable", documentation: "upvalue");
 
-		TextCompletionItem? baselineItem = LuaLanguageServerResponseParser.ParseCompletionItem(baselineElement, 0);
-		TextCompletionItem? boostedItem = LuaLanguageServerResponseParser.ParseCompletionItem(boostedElement, 0);
+		TextCompletionItem? baselineItem = LuaLanguageServerResponseParser.ParseCompletionItem(baselineElement, 0, "text");
+		TextCompletionItem? boostedItem = LuaLanguageServerResponseParser.ParseCompletionItem(boostedElement, 0, "text");
 
 		Assert.IsNotNull(baselineItem);
 		Assert.IsNotNull(boostedItem);
@@ -27,7 +28,7 @@ public partial class LuaLanguageServerResponseParserTests
 	{
 		CompletionItemPayload itemElement = CreateCompletionItem("arg", kind: 6, detail: "parameter", documentation: null);
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual(TextCompletionItemKind.Parameter, item.Kind);
@@ -38,7 +39,7 @@ public partial class LuaLanguageServerResponseParserTests
 	{
 		CompletionItemPayload itemElement = CreateCompletionItem("unknown", kind: 999, detail: null, documentation: null);
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual(TextCompletionItemKind.Generic, item.Kind);
@@ -62,13 +63,12 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "a\nprint");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual("print", item.InsertText);
 		Assert.IsNotNull(item.TextEdit);
-		Assert.AreEqual(new TextCompletionPosition(1, 2), item.TextEdit.Value.InsertRange.Start);
-		Assert.AreEqual(new TextCompletionPosition(1, 5), item.TextEdit.Value.InsertRange.End);
+		Assert.AreEqual(new TextRange(4, 3), item.TextEdit.Value.InsertRange);
 		Assert.IsNull(item.TextEdit.Value.ReplaceRange);
 	}
 
@@ -95,15 +95,15 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "abcdef");
 
 		Assert.IsNotNull(item);
 		Assert.IsNotNull(item.TextEdit);
-		Assert.AreEqual(new TextCompletionPosition(0, 1), item.TextEdit.Value.InsertRange.Start);
-		Assert.AreEqual(new TextCompletionPosition(0, 3), item.TextEdit.Value.InsertRange.End);
-		Assert.AreEqual(new TextCompletionPosition(0, 1), item.TextEdit.Value.ReplaceRange!.Value.Start);
-		Assert.AreEqual(new TextCompletionPosition(0, 6), item.TextEdit.Value.ReplaceRange!.Value.End);
-		Assert.AreEqual(new TextCompletionPosition(0, 6), item.TextEdit.Value.ReplacementRange.End);
+		Assert.IsNotNull(item.TextEdit.Value.ReplaceRange);
+
+		Assert.AreEqual(new TextRange(1, 2), item.TextEdit.Value.InsertRange);
+		Assert.AreEqual(new TextRange(1, 5), item.TextEdit.Value.ReplaceRange.Value);
+		Assert.AreEqual(6, item.TextEdit.Value.ReplacementRange.EndOffset);
 	}
 
 	[TestMethod]
@@ -117,7 +117,7 @@ public partial class LuaLanguageServerResponseParserTests
 			insertTextFormat = 2
 		});
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual("if condition then\r\n\t\r\nend", item.InsertText);
@@ -135,7 +135,7 @@ public partial class LuaLanguageServerResponseParserTests
 			insertTextFormat = 2
 		});
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual("call(${name}, done)", item.InsertText);
@@ -150,10 +150,10 @@ public partial class LuaLanguageServerResponseParserTests
 				CreateCompletionItem("Value", kind: 6, detail: "variable", documentation: null, insertText: "Value"),
 				CreateCompletionItem("value", kind: 6, detail: "variable", documentation: null, insertText: "value"),
 				CreateCompletionItem("Value", kind: 6, detail: "variable", documentation: null, insertText: "Value")
-			]);
+			],
+			"text");
 
-		// Lua is case-sensitive: "Value" and "value" are distinct symbols, but the duplicate "Value"
-		// must still collapse so the popup does not show the same entry twice.
+		// "Value" and "value" are distinct Lua symbols, while the duplicate "Value" item is removed.
 		Assert.AreEqual(2, items.Count);
 		Assert.AreEqual("Value", items[0].Label);
 		Assert.AreEqual("value", items[1].Label);
@@ -194,11 +194,12 @@ public partial class LuaLanguageServerResponseParserTests
 						}
 					}
 				})
-			]);
+			],
+			"spawn");
 
 		Assert.AreEqual(2, items.Count);
-		Assert.AreEqual(new TextCompletionPosition(0, 0), items[0].TextEdit?.InsertRange.Start);
-		Assert.AreEqual(new TextCompletionPosition(0, 1), items[1].TextEdit?.InsertRange.Start);
+		Assert.AreEqual(0, items[0].TextEdit?.InsertRange.Offset);
+		Assert.AreEqual(1, items[1].TextEdit?.InsertRange.Offset);
 	}
 
 	[TestMethod]
@@ -377,7 +378,7 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0);
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
 		Assert.AreEqual("    local value = 1", item.Description);

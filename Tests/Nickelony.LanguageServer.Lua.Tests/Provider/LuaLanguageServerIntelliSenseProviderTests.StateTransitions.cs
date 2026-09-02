@@ -1,12 +1,11 @@
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
+using Nickelony.IDEKit.IntelliSense.Hover;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
-	public async Task HealthyFastPathDoesNotPublishStartingOrCapabilitiesTransition()
+	public async Task HealthyFastPath_DoesNotPublishAdditionalCapabilitiesTransition()
 	{
 		using var client = new FakeLanguageServerClient();
 		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
@@ -119,7 +118,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task TransportLossRacingDisposeCannotPublishCallbackOrOverwriteDisposedState()
+	public async Task TransportLossRacingDispose_DoesNotPublishAfterDisposeOrOverwriteDisposedState()
 	{
 		using var client = new FakeLanguageServerClient();
 		var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);

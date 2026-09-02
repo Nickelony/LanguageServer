@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Represents a workspace-wide set of document edits.

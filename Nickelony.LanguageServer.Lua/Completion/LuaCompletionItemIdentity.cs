@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
+using Nickelony.IDEKit.IntelliSense.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 

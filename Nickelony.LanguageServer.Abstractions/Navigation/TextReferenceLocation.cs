@@ -1,14 +1,12 @@
-using Nickelony.LanguageServer.Abstractions.Infrastructure;
-
-namespace Nickelony.LanguageServer.Abstractions.Navigation;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Identifies a source location for a symbol reference.
+/// Identifies a source location returned by symbol reference lookup.
 /// </summary>
 /// <remarks>
-/// Reference locations use one-based line and column coordinates to match the LSP convention
-/// and remain stable across documents without depending on an editor-specific offset or segment
-/// instance.
+/// Reference locations use one-based line and column coordinates for this editor-facing contract. They remain stable
+/// across documents without depending on an editor-specific offset or segment instance. Coordinates are normalized to
+/// at least one, and the end coordinate is never placed before the start coordinate.
 /// </remarks>
 public sealed class TextReferenceLocation
 {

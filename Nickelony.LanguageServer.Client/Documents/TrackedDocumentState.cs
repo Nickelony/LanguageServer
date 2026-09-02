@@ -2,9 +2,11 @@ namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
 /// Stores the neutral mirrored state for a tracked language-server document.
+/// </summary>
+/// <remarks>
 /// This type is safe for concurrent reads and mutations of its core tracked document fields.
 /// Derived types should still synchronize any additional mutable state they introduce.
-/// </summary>
+/// </remarks>
 public abstract class TrackedDocumentState
 {
 	private readonly object _stateSyncRoot = new();

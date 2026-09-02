@@ -1,15 +1,17 @@
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Describes the host-specific payload factories used to initialize a language-server client.
+/// Describes the host-specific payload factories and lifecycle timeouts used to initialize a language-server client.
+/// </summary>
+/// <remarks>
 /// The payload factories may be invoked from background transport threads and should be thread-safe,
 /// non-blocking, and cheap to execute.
-/// </summary>
+/// </remarks>
 public sealed class LanguageServerClientOptions
 {
-	private TimeSpan _initializeTimeout = TimeSpan.FromSeconds(20.0f);
-	private TimeSpan _shutdownRequestTimeout = TimeSpan.FromSeconds(3.0f);
-	private TimeSpan _disposeWaitTimeout = TimeSpan.FromSeconds(5.0f);
+	private TimeSpan _initializeTimeout = TimeSpan.FromSeconds(20.0);
+	private TimeSpan _shutdownRequestTimeout = TimeSpan.FromSeconds(3.0);
+	private TimeSpan _disposeWaitTimeout = TimeSpan.FromSeconds(5.0);
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LanguageServerClientOptions"/> class.
@@ -20,9 +22,8 @@ public sealed class LanguageServerClientOptions
 
 	/// <summary>
 	/// Gets the settings payload factory for <c>workspace/didChangeConfiguration</c>.
-	/// The returned payload is cached after the client sends or derives one configuration snapshot, so hosts should
-	/// route later configuration changes through <c>workspace/didChangeConfiguration</c> notifications to keep server
-	/// callbacks aligned with the latest settings.
+	/// The client invokes this factory lazily and caches the resulting snapshot for <c>workspace/configuration</c>
+	/// callbacks. A successfully sent <c>workspace/didChangeConfiguration</c> notification replaces the cached snapshot.
 	/// </summary>
 	public Func<object> SettingsProvider { get; }
 
@@ -55,13 +56,13 @@ public sealed class LanguageServerClientOptions
 
 	/// <summary>
 	/// Gets or initializes the client capabilities payload factory for the <c>initialize</c> request.
-	/// This delegate may run on a background transport thread during startup.
+	/// The argument is the normalized workspace root directory path. This delegate may run on a background transport thread during startup.
 	/// </summary>
 	public Func<string, object?> ClientCapabilitiesProvider { get; init; } = static _ => new { };
 
 	/// <summary>
 	/// Gets or initializes the language-specific initialization options factory for the <c>initialize</c> request.
-	/// This delegate may run on a background transport thread during startup.
+	/// The argument is the normalized workspace root directory path. This delegate may run on a background transport thread during startup.
 	/// </summary>
 	public Func<string, object?> InitializationOptionsProvider { get; init; } = static _ => new { };
 

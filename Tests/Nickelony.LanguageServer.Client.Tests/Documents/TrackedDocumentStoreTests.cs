@@ -153,7 +153,11 @@ public class TrackedDocumentStoreTests
 	public void Synchronize_AndLookup_NormalizeEquivalentPaths()
 	{
 		string canonicalFilePath = Path.Combine(Path.GetTempPath(), "TrackedDocumentStoreTests", "scripts", "test.lua");
-		string aliasedFilePath = Path.Combine(Path.GetDirectoryName(canonicalFilePath)!, ".", Path.GetFileName(canonicalFilePath));
+
+		string directoryPath = Path.GetDirectoryName(canonicalFilePath)
+			?? throw new InvalidOperationException("The canonical test file path did not have a directory.");
+
+		string aliasedFilePath = Path.Combine(directoryPath, ".", Path.GetFileName(canonicalFilePath));
 
 		var store = new TestTrackedDocumentStore();
 		DocumentSynchronizationRequest? synchronizationRequest = store.Synchronize(canonicalFilePath, "return 1", acquireOpenReference: true);

@@ -1,7 +1,8 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
+using Nickelony.IDEKit.Core.Editing;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -18,7 +19,7 @@ internal static class LuaLanguageServerDiagnosticsParser
 	/// <param name="documentContent">The current document content.</param>
 	/// <param name="documentVersion">The tracked document version to match against the diagnostics version.</param>
 	/// <param name="publishedDiagnostics">When this method returns <see langword="true"/>, contains the parsed diagnostics payload.</param>
-	/// <returns><see langword="true"/> when the payload was parsed; otherwise, <see langword="false"/>.</returns>
+	/// <returns><see langword="true"/> when the payload is current for the tracked document version; otherwise, <see langword="false"/> when it is stale.</returns>
 	internal static bool TryParse(PublishDiagnosticsParams parameters, string filePath,
 		string documentContent, int documentVersion, [NotNullWhen(true)] out LuaPublishedDiagnostics? publishedDiagnostics)
 	{
@@ -39,14 +40,14 @@ internal static class LuaLanguageServerDiagnosticsParser
 
 	private static IReadOnlyList<TextEditorDiagnostic> BuildDiagnostics(string content, DiagnosticPayload[] diagnosticsPayloads)
 	{
-		DocumentLineOffsets lineOffsets = DocumentLineOffsets.Build(content);
+		TextLineMap lineMap = TextLineMap.Build(content);
 		var diagnostics = new List<TextEditorDiagnostic>();
 
 		foreach (DiagnosticPayload diagnosticElement in diagnosticsPayloads)
 		{
 			TextEditorDiagnosticSeverity severity = GetDiagnosticSeverity(diagnosticElement);
 
-			if (!TryCreateDiagnostic(lineOffsets, diagnosticElement, severity, out TextEditorDiagnostic? diagnostic))
+			if (!TryCreateDiagnostic(lineMap, diagnosticElement, severity, out TextEditorDiagnostic? diagnostic))
 				continue;
 
 			diagnostics.Add(diagnostic);
@@ -57,12 +58,12 @@ internal static class LuaLanguageServerDiagnosticsParser
 			.ThenBy(diagnostic => diagnostic.Severity)];
 	}
 
-	private static bool TryCreateDiagnostic(DocumentLineOffsets lineOffsets, DiagnosticPayload diagnosticElement,
+	private static bool TryCreateDiagnostic(TextLineMap lineMap, DiagnosticPayload diagnosticElement,
 		TextEditorDiagnosticSeverity severity, [NotNullWhen(true)] out TextEditorDiagnostic? diagnostic)
 	{
 		diagnostic = null;
 
-		if (lineOffsets.LineCount == 0
+		if (lineMap.LineCount == 0
 			|| diagnosticElement.Range is not { } rangeElement
 			|| rangeElement.Start is not { } startElement
 			|| startElement.Line is not int lineIndex)
@@ -70,7 +71,7 @@ internal static class LuaLanguageServerDiagnosticsParser
 			return false;
 		}
 
-		lineIndex = Math.Max(0, Math.Min(lineIndex, lineOffsets.LineCount - 1));
+		lineIndex = Math.Max(0, Math.Min(lineIndex, lineMap.LineCount - 1));
 
 		int startCharacter = startElement.Character is int character
 			? Math.Max(0, character)
@@ -81,13 +82,13 @@ internal static class LuaLanguageServerDiagnosticsParser
 
 		if (rangeElement.End is { } endElement && endElement.Line is int rawEndLineIndex)
 		{
-			endLineIndex = Math.Max(lineIndex, Math.Min(rawEndLineIndex, lineOffsets.LineCount - 1));
+			endLineIndex = Math.Max(lineIndex, Math.Min(rawEndLineIndex, lineMap.LineCount - 1));
 
 			if (endElement.Character is int endCharacterValue)
 				endCharacter = Math.Max(0, endCharacterValue);
 		}
 
-		if (!DocumentRangeOffsetResolver.TryResolveOffsets(lineOffsets, lineIndex, startCharacter, endLineIndex, endCharacter,
+		if (!TextRangeOffsetResolver.TryResolveOffsets(lineMap, lineIndex, startCharacter, endLineIndex, endCharacter,
 			out int startOffset, out int endOffset))
 		{
 			return false;

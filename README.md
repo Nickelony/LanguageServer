@@ -1,23 +1,23 @@
-# <img width="32" height="32" alt="LanguageServerProtocol" src="https://github.com/user-attachments/assets/3b8c6718-3f76-4780-9872-168eee8fab74" /> Language Server Protocol .NET library family
+# <img width="32" height="32" alt="Nickelony IDEKit" src="https://github.com/user-attachments/assets/3b8c6718-3f76-4780-9872-168eee8fab74" /> Nickelony IDEKit - .NET editor and language-server libraries
 
-A lightweight .NET library family for building language-server-powered editors: a StreamJsonRpc LSP client, generic editor IntelliSense contracts, and a Lua provider backed by [LuaLS](https://github.com/LuaLS/lua-language-server).
+A lightweight .NET library family for building editors and IDEs: WPF-free editor primitives and IntelliSense contracts (`Nickelony.IDEKit.*`), an AvalonEdit editor adapter, and a language-server tier (`Nickelony.LanguageServer.*`) - a StreamJsonRpc LSP client plus a Lua provider backed by [LuaLS](https://github.com/LuaLS/lua-language-server).
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## What is this?
 
-This repository is a small, focused collection of .NET libraries that make it easy to add
-language-server-powered IntelliSense to a text editor. Instead of coupling an editor to a single
-language server, the family is split into three layers:
+This repository is a small, focused collection of .NET libraries that make it easy to build
+editors and IDEs. It hosts two sibling families: the `Nickelony.IDEKit.*` editor toolkit (text
+primitives, IntelliSense contracts, AvalonEdit adapters, key bindings, tooling) and the
+`Nickelony.LanguageServer.*` family that implements the editor contracts on top of a real
+language server. The language-server tier is split into three layers:
 
 | Package | Purpose |
 |---|---|
 | [`Nickelony.LanguageServer.Abstractions`](Nickelony.LanguageServer.Abstractions/) | Dependency-free editor IntelliSense contracts - the stable seam between an editor and any language provider. |
 | [`Nickelony.LanguageServer.Client`](Nickelony.LanguageServer.Client/) | A lightweight LSP client built on StreamJsonRpc: spawns a language-server process and speaks LSP over stdio. |
 | [`Nickelony.LanguageServer.Lua`](Nickelony.LanguageServer.Lua/) | A ready-to-use Lua provider that implements the editor contracts on top of the client and drives the real LuaLS executable. |
-
-It powers Lua IntelliSense in **Tomb Editor** (`TombIDE.ScriptingStudio`).
 
 ## Features
 
@@ -89,8 +89,8 @@ disposal, event marshaling, document references, and cancellation behavior.
                  └──────────────────────┘
 ```
 
-- **`Abstractions`** has **zero package dependencies** - it is a pure leaf any editor or provider
-  can reference safely.
+- **`Abstractions`** depends only on the in-repo `Nickelony.IDEKit.IntelliSense` contracts
+  (themselves dependency-free) - it is the stable seam any editor or provider can reference safely.
 - **`Client`** depends on `Abstractions`, `StreamJsonRpc`, and
   `Microsoft.Extensions.Logging.Abstractions`.
 - **`Lua`** depends on `Abstractions` + `Client` and shells out to an external server executable.
@@ -100,6 +100,74 @@ disposal, event marshaling, document references, and cancellation behavior.
 - .NET 8 (all packages target `net8.0`, cross-platform).
 - The **Lua** package additionally needs the `lua-language-server` executable at runtime
   (download from the [LuaLS releases](https://github.com/LuaLS/lua-language-server/releases)).
+
+## Package tiers
+
+The repository hosts two sibling families: the `Nickelony.IDEKit.*` editor toolkit
+and the `Nickelony.LanguageServer.*` family described above, which can be consumed
+independently of each other. The tiers make the dependency direction explicit:
+pick the smallest tier that covers your feature, and do not assume any higher
+tier is required.
+
+| Tier | Packages | Purpose | Dependencies |
+|---|---|---|---|
+| **Foundations** (WPF-free) | `Nickelony.IDEKit.Core`, `Nickelony.IDEKit.IntelliSense`, `Nickelony.IDEKit.Workspace` | Text primitives, editor contracts, document authority. Reusable from any UI toolkit. | Core: none. IntelliSense: Core. Workspace: Core. |
+| **Editor adapters** | `Nickelony.IDEKit.AvalonEdit`, `Nickelony.IDEKit.AvalonEdit.IntelliSense` | AvalonEdit UI bridge: editing, documents, status, and the IntelliSense controllers. | `net8.0-windows`, WPF. Both: Core. IntelliSense: `Nickelony.IDEKit.IntelliSense`. |
+| **Optional integrations** | `Nickelony.IDEKit.AvalonEdit.Extras`, `Nickelony.IDEKit.KeyBindings`, `Nickelony.IDEKit.Tooling` | Leaf packages for a specific feature; adopt only what you need. | Extras: AvalonEdit + Markdig + TextMateSharp. KeyBindings: none (WPF). Tooling: none. |
+| **Experimental extras** | `Nickelony.IDEKit.JsonSchema` | JSON Schema **vocabulary index**, not a validator or context-aware completion engine. | `Newtonsoft.Json.Schema` only (isolated). |
+| **Language-server packages** | `Nickelony.LanguageServer.Abstractions`, `Nickelony.LanguageServer.Client`, `Nickelony.LanguageServer.Lua` | Editor IntelliSense contracts, an LSP client, and a Lua provider. | Abstractions: IDEKit.IntelliSense. Client: Abstractions + StreamJsonRpc. Lua: Abstractions + Client. |
+
+### Tier notes and non-goals
+
+- **Foundations are WPF-free** - Core, IntelliSense, and Workspace target
+  `net8.0` and reference no WPF or AvalonEdit types. They are the migration seam
+  for a future toolkit switch (for example AvaloniaEdit).
+- **Document views and editor sessions are optional workspace architecture.** A
+  host that only needs the editor packages does not need `Nickelony.IDEKit.Workspace`,
+  `IWorkspaceDocumentView`, or the editor-session contracts. Those are
+  opt-in document-authority features, not a requirement for using the editor
+  adapters.
+- **Base `Nickelony.IDEKit.AvalonEdit` does not depend on `Nickelony.IDEKit.Workspace`**
+  (see the diagram below). The packages ship the document-view and
+  editor-session contracts; the AvalonEdit-to-Workspace bridge is host code, so
+  applications that need that integration combine the packages in their own host
+  code.
+- **`Nickelony.IDEKit.AvalonEdit.Extras` intentionally brings Markdig and
+  TextMateSharp**; those focused dependencies are the point of the extras
+  package and stay confined to it.
+- **`Nickelony.IDEKit.JsonSchema` is experimental** and stays so until a second
+  real consumer or a stable contract justifies promotion. It is not part of the
+  core editor contract surface and may change outside the normal preview
+  cadence. See its [README](Nickelony.IDEKit.JsonSchema/README.md) for the exact
+  vocabulary-index contract.
+
+### Dependency diagram
+
+```
+Nickelony.IDEKit.AvalonEdit.IntelliSense     (-> AvalonEdit, IntelliSense)
+Nickelony.IDEKit.AvalonEdit.Extras           (-> AvalonEdit, Markdig, TextMateSharp)
+        │
+        ▼
+Nickelony.IDEKit.AvalonEdit                  (-> Core, AvalonEdit)   no Workspace
+        │
+        ├──────────────────────────────────────┐
+        ▼                                      ▼
+Nickelony.IDEKit.IntelliSense                Nickelony.IDEKit.Workspace
+        │  (-> Core)                            │  (-> Core)
+        └───────────────┬──────────────────────┘
+                        ▼
+              Nickelony.IDEKit.Core            (WPF-free, dependency-free leaf)
+
+Optional / isolated leaves:
+  Nickelony.IDEKit.Tooling       dependency-free
+  Nickelony.IDEKit.KeyBindings   WPF, standalone
+  Nickelony.IDEKit.JsonSchema    -> Newtonsoft.Json.Schema only (experimental)
+
+Language-server packages:
+  Nickelony.LanguageServer.Abstractions  dependency-free leaf
+  Nickelony.LanguageServer.Client        -> Abstractions, StreamJsonRpc
+  Nickelony.LanguageServer.Lua           -> Abstractions, Client
+```
 
 ## Building and testing
 
@@ -114,10 +182,20 @@ require a local LuaLS bundle. Run `dotnet test` for the current counts.
 ## Repository layout
 
 ```
+Nickelony.IDEKit.Core/                      WPF-free foundations: text primitives + editor contracts
+Nickelony.IDEKit.IntelliSense/              WPF-free IntelliSense contracts and payloads
+Nickelony.IDEKit.Workspace/                 WPF-free document authority, document views, editor sessions
+Nickelony.IDEKit.AvalonEdit/                AvalonEdit editor adapter (no Workspace dependency)
+Nickelony.IDEKit.AvalonEdit.IntelliSense/   AvalonEdit IntelliSense controllers
+Nickelony.IDEKit.AvalonEdit.Extras/         Markdown tooltips (Markdig) + TextMate highlighting (TextMateSharp)
+Nickelony.IDEKit.Tooling/                   External-process execution
+Nickelony.IDEKit.KeyBindings/               WPF command + keyboard shortcut system
+Nickelony.IDEKit.JsonSchema/                Experimental JSON Schema vocabulary index
 Nickelony.LanguageServer.Abstractions/   editor contracts (zero dependencies)
 Nickelony.LanguageServer.Client/         LSP client + protocol machinery
 Nickelony.LanguageServer.Lua/            Lua provider backed by LuaLS
 Tests/
+  Nickelony.IDEKit.*.Tests/                 per-package test projects
   Nickelony.LanguageServer.Client.Tests/
   Nickelony.LanguageServer.Lua.Tests/
   TestSupport/                           shared test logger

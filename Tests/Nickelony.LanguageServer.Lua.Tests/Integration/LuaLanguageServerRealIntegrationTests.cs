@@ -1,7 +1,6 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Navigation;
+using Nickelony.IDEKit.IntelliSense.Completion;
+using Nickelony.IDEKit.IntelliSense.Hover;
+using Nickelony.IDEKit.IntelliSense.Navigation;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
@@ -10,11 +9,10 @@ using System.Reflection;
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 /// <summary>
-/// Live integration coverage for a configured Lua language server.
-/// These tests require an archive configured by NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE or the neutral
-/// Tests/TestAssets/LuaLS.zip fallback, and they typically take several seconds each because they launch
-/// a real language-server process, wait for diagnostics and semantic token round-trips, and exercise
-/// restart or shutdown behavior.
+/// Live integration tests for a configured Lua language server.
+/// Tests skip when no existing archive is available from NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE
+/// or the Tests/TestAssets/LuaLS.zip fallback. They launch a real server process and cover
+/// diagnostics, semantic tokens, completion, navigation, rename, configuration reload, restart, and shutdown.
 /// </summary>
 [TestClass]
 public class LuaLanguageServerRealIntegrationTests

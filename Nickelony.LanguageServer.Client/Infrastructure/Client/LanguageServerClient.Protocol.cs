@@ -1,5 +1,5 @@
-using StreamJsonRpc;
 using System.Text.Json;
+using StreamJsonRpc;
 
 namespace Nickelony.LanguageServer.Client;
 
@@ -11,6 +11,7 @@ public sealed partial class LanguageServerClient
 	/// <param name="method">The LSP method name.</param>
 	/// <param name="parameters">The notification payload.</param>
 	/// <param name="cancellationToken">A token that can cancel the local dispatch attempt while the JSON-RPC notification task is still incomplete.</param>
+	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before local dispatch completes.</exception>
 	public async Task SendNotificationAsync(string method, object parameters, CancellationToken cancellationToken)
 	{
 		LanguageServerTransportSession session = GetRequiredReadySession(allowDisposed: false);
@@ -46,6 +47,7 @@ public sealed partial class LanguageServerClient
 	/// <param name="parameters">The request payload.</param>
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
 	/// <returns>The typed response payload.</returns>
+	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before the request completes.</exception>
 	public async Task<TResult> SendRequestAsync<TResult>(string method, object parameters, CancellationToken cancellationToken)
 	{
 		LanguageServerTransportSession session = GetRequiredReadySession(allowDisposed: false);

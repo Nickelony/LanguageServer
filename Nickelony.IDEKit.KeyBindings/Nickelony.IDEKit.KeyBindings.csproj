@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Nickelony.IDEKit.KeyBindings</RootNamespace>
+    <AssemblyName>Nickelony.IDEKit.KeyBindings</AssemblyName>
+    <PackageId>Nickelony.IDEKit.KeyBindings</PackageId>
+    <Description>WPF command and keyboard shortcut system: command catalog, key bindings, persisted overrides, validation, and editor key dispatch.</Description>
+    <PackageTags>text-editor;editor;wpf;commands;shortcuts;key-bindings;nickelony</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Icon\LanguageServer.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
-using Nickelony.LanguageServer.Abstractions.Signatures;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -28,7 +28,7 @@ internal static partial class LuaLanguageServerResponseParser
 		string label = signatureElement.Label;
 
 		string? documentation = signatureElement.Documentation.ValueKind != JsonValueKind.Undefined
-			? LuaMarkupTextHelper.ExtractMarkupText(signatureElement.Documentation)
+			? ExtractMarkupText(signatureElement.Documentation)
 			: null;
 
 		int activeParameter = ResolveActiveParameter(response, signatureElement);
@@ -48,7 +48,7 @@ internal static partial class LuaLanguageServerResponseParser
 						: null;
 
 				string? parameterDocumentation = paramElement.Documentation.ValueKind != JsonValueKind.Undefined
-					? LuaMarkupTextHelper.ExtractMarkupText(paramElement.Documentation)
+					? ExtractMarkupText(paramElement.Documentation)
 					: null;
 
 				parameters.Add(new TextSignatureParameterInfo(parameterLabel ?? string.Empty, parameterDocumentation));
@@ -56,6 +56,12 @@ internal static partial class LuaLanguageServerResponseParser
 		}
 
 		return new(label, activeParameter, documentation, parameters);
+	}
+
+	private static string? ExtractMarkupText(JsonElement element)
+	{
+		string text = MarkupContentReader.ExtractContent(element).Text;
+		return string.IsNullOrWhiteSpace(text) ? null : text;
 	}
 
 	private static int ResolveActiveParameter(SignatureHelpResponse response, SignatureHelpSignaturePayload signatureElement)

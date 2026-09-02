@@ -5,6 +5,6 @@ namespace Nickelony.LanguageServer.Client;
 /// </summary>
 /// <param name="Exception">The underlying forwarding exception.</param>
 /// <param name="BatchCount">The number of file changes in the affected batch.</param>
-/// <param name="FirstPath">The first affected normalized path, when available.</param>
+/// <param name="FirstPath">The first affected path, when available.</param>
 /// <param name="WasDropped">Whether the batch was dropped instead of buffered for replay.</param>
 public readonly record struct WorkspaceFileForwardingFailure(Exception Exception, int BatchCount, string? FirstPath, bool WasDropped);

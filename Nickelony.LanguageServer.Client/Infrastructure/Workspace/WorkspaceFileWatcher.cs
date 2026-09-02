@@ -2,8 +2,10 @@ namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
 /// Watches the workspace root for configured file patterns and forwards coalesced changes to the owner.
-/// A startup failure disposes the instance, so recovery requires creating a replacement watcher.
 /// </summary>
+/// <remarks>
+/// A startup failure disposes the instance, so recovery requires creating a replacement watcher.
+/// </remarks>
 public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 {
 	private const int DispatchFailureWarningThreshold = 3;
@@ -12,7 +14,7 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 	private readonly ILogger _logger;
 
 	private static readonly TimeSpan s_dispatchDebounce = TimeSpan.FromMilliseconds(250);
-	private static readonly TimeSpan s_maxDispatchRetryDelay = TimeSpan.FromSeconds(5.0f);
+	private static readonly TimeSpan s_maxDispatchRetryDelay = TimeSpan.FromSeconds(5.0);
 
 	// Watcher registration state.
 	private readonly string _workspaceRootDirectoryPath;

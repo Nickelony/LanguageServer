@@ -1,12 +1,11 @@
-namespace Nickelony.LanguageServer.Abstractions.Navigation;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Describes a reference lookup request against the current document.
 /// </summary>
 /// <remarks>
-/// Reference requests use zero-based line and column indices to match the editor's internal
-/// coordinate system. When converting to or from LSP positions, the provider boundary is
-/// responsible for the zero-based to one-based translation.
+/// Reference requests use zero-based line and column indices. Returned <see cref="TextReferenceLocation"/> values
+/// use one-based coordinates for this editor-facing contract. Negative line and column values are normalized to zero.
 /// </remarks>
 public sealed class TextReferenceRequest
 {

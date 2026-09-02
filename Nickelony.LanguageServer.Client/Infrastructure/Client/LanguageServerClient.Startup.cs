@@ -9,6 +9,7 @@ public sealed partial class LanguageServerClient
 	/// </summary>
 	/// <param name="cancellationToken">A token that can cancel startup.</param>
 	/// <returns><see langword="true"/> when startup succeeded; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before startup completes.</exception>
 	public async Task<bool> StartAsync(CancellationToken cancellationToken)
 	{
 		ThrowIfDisposed(allowDisposed: false);

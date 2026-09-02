@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Signatures;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
@@ -46,6 +46,32 @@ public partial class LuaLanguageServerResponseParserTests
 		Assert.AreEqual(2, signatureInfo.Parameters.Count);
 		Assert.AreEqual("objectName", signatureInfo.Parameters[1].Label);
 		Assert.AreEqual("Object name.", signatureInfo.Parameters[1].Documentation);
+	}
+
+	[TestMethod]
+	public void ParseSignatureHelp_PreservesMarkupForConsumerFormatting()
+	{
+		const string documentation = "Summary\n```lua\nlocal value = 1\n```";
+
+		TextSignatureHelpInfo? signatureInfo = LuaLanguageServerResponseParser.ParseSignatureHelp(
+			DeserializeSignatureHelpResponse(new
+			{
+				signatures = new[]
+				{
+					new
+					{
+						label = "spawn()",
+						documentation = new
+						{
+							kind = "markdown",
+							value = documentation
+						}
+					}
+				}
+			}));
+
+		Assert.IsNotNull(signatureInfo);
+		Assert.AreEqual(documentation, signatureInfo.Documentation);
 	}
 
 	[TestMethod]

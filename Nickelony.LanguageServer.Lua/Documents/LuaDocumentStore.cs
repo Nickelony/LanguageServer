@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -61,17 +61,18 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 	}
 
 	/// <summary>
-	/// Returns the cached semantic tokens delta state for <paramref name="filePath"/>, if any.
-	/// Used by the provider to send <c>semanticTokens/full/delta</c> requests with the previous result id.
+	/// Returns the cached semantic-token delta state for <paramref name="filePath"/>, if any.
+	/// The provider uses the state to send <c>semanticTokens/full/delta</c> requests with the previous result ID.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>The cached delta state, if available.</returns>
+	/// <returns>The cached delta state, or an empty state when the document is not tracked or has no usable delta state.</returns>
 	internal SemanticTokensDeltaState GetSemanticTokensDeltaState(string filePath)
 		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.GetDeltaState(), new(null, null));
 
 	/// <summary>
 	/// Stores the raw <c>data</c> payload returned by <c>semanticTokens/full(/delta)</c> along with the
-	/// associated <c>resultId</c>, so subsequent requests can ask LuaLS for incremental edits.
+	/// associated <c>resultId</c>. The values are copied so subsequent requests can ask LuaLS for incremental edits
+	/// without exposing the cached array to mutation.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="resultId">The server-provided semantic token result id.</param>
@@ -83,7 +84,7 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 	/// Clears the cached semantic tokens for the specified file path.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>The cleared semantic token list, or an empty list when the document is not tracked.</returns>
+	/// <returns>The empty semantic-token list after clearing, or an empty list when the document is not tracked.</returns>
 	internal IReadOnlyList<LuaSemanticToken> ClearSemanticTokens(string filePath)
 	{
 		return WithTrackedDocument(

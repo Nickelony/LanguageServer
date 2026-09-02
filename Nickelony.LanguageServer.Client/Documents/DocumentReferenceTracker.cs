@@ -2,8 +2,10 @@ namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
 /// Tracks editor-owned and request-owned references for a mirrored document.
-/// This type is safe for concurrent callers.
 /// </summary>
+/// <remarks>
+/// This type is safe for concurrent callers.
+/// </remarks>
 public sealed class DocumentReferenceTracker
 {
 	private int _openReferenceCount;
@@ -12,8 +14,8 @@ public sealed class DocumentReferenceTracker
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DocumentReferenceTracker"/> class.
 	/// </summary>
-	/// <param name="openReferenceCount">The initial number of open-editor references.</param>
-	/// <param name="requestReferenceCount">The initial number of request-owned references.</param>
+	/// <param name="openReferenceCount">The initial number of open-editor references. Negative values are treated as zero.</param>
+	/// <param name="requestReferenceCount">The initial number of request-owned references. Negative values are treated as zero.</param>
 	public DocumentReferenceTracker(int openReferenceCount = 0, int requestReferenceCount = 0)
 	{
 		_openReferenceCount = Math.Max(0, openReferenceCount);

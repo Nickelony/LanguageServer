@@ -11,9 +11,11 @@ public sealed partial class WorkspaceFileWatcher
 
 	/// <summary>
 	/// Starts watching the configured workspace for external file changes and reports why startup failed.
-	/// A startup failure disposes this watcher instance, so later retries should use a replacement watcher.
 	/// </summary>
-	/// <param name="startupException">Receives the startup exception when watcher creation failed.</param>
+	/// <remarks>
+	/// A startup failure disposes this watcher instance, so later retries should use a replacement watcher.
+	/// </remarks>
+	/// <param name="startupException">Receives the startup exception when workspace validation, watcher creation, or watcher activation failed.</param>
 	/// <returns>The watcher startup status.</returns>
 	public WorkspaceWatcherStartStatus Start(out Exception? startupException)
 	{

@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Navigation;
+using Nickelony.IDEKit.IntelliSense.Navigation;
 
 namespace Nickelony.LanguageServer.Lua;
 

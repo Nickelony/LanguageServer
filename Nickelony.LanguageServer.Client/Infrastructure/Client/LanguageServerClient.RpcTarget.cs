@@ -1,5 +1,5 @@
-using StreamJsonRpc;
 using System.Text.Json;
+using StreamJsonRpc;
 
 namespace Nickelony.LanguageServer.Client;
 

@@ -1,6 +1,5 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
-using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
 using System.Collections.Concurrent;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -76,11 +75,16 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 
 	/// <inheritdoc/>
 	public bool IsAvailable
-		=> State == LanguageServerProviderState.Ready
-			&& !_isDisposed
-			&& _client is not null
-			&& _client.IsReady
-			&& GetStartupSucceeded();
+	{
+		get
+		{
+			return State == LanguageServerProviderState.Ready
+				&& !_isDisposed
+				&& _client is not null
+				&& _client.IsReady
+				&& GetStartupSucceeded();
+		}
+	}
 
 	/// <inheritdoc/>
 	public LanguageServerProviderState State
@@ -150,12 +154,15 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	}
 
 	/// <summary>
-	/// Occurs when repeated language-server startup failures should be surfaced to the user.
+	/// Occurs when a Lua language-server startup failure should be surfaced to the user.
 	/// </summary>
 	/// <remarks>
 	/// Startup-failure notifications may be delivered from background work. Consumers that touch UI controls must marshal
 	/// to the UI thread. Handlers for one event invocation run serially on the raising thread and a failing handler is
-	/// isolated from later handlers. Once disposal begins, this event will not be raised again.
+	/// isolated from later handlers. The event is raised at most once per transient startup-failure period and once per
+	/// terminal failure period; a successful restart resets the transient notification state. Disposal closes callback
+	/// admission. A callback that passed admission before disposal began may still start or finish after disposal begins;
+	/// callbacks are not admitted once admission is closed.
 	/// </remarks>
 	public event Action<LanguageServerStartupFailure>? StartupFailed
 	{
@@ -175,12 +182,16 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	}
 
 	/// <summary>
-	/// Occurs when the external workspace watcher becomes unavailable for the rest of the session.
+	/// Occurs when the external workspace watcher fails to start for an existing workspace or cannot be automatically
+	/// recovered, leaving external workspace changes unforwarded.
 	/// </summary>
 	/// <remarks>
 	/// Workspace-watcher notifications may be delivered from background work. Consumers that touch UI controls must
 	/// marshal to the UI thread. Handlers for one event invocation run serially on the raising thread and a failing handler
-	/// is isolated from later handlers. Once disposal begins, this event will not be raised again.
+	/// is isolated from later handlers. Automatic watcher recovery is attempted first; a successful recovery does not
+	/// raise this event. The event is raised once per unresolved startup or recovery failure until a later successful
+	/// recovery resets the notification state. Disposal closes callback admission. A callback that passed admission before
+	/// disposal began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
 	/// </remarks>
 	public event Action<WorkspaceWatcherFailure>? WorkspaceWatcherFailed
 	{
@@ -214,8 +225,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	{ }
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class.
-	/// for testing and dependency injection.
+	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class for testing and dependency injection.
 	/// </summary>
 	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua script workspace.</param>
 	/// <param name="client">The language server client, or <see langword="null"/> when unavailable.</param>

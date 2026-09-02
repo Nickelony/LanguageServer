@@ -9,7 +9,8 @@ namespace Nickelony.LanguageServer.Lua;
 /// contracts are defined on the base interface.
 ///
 /// Implementations may raise callbacks from background threads. Consumers that access UI controls must marshal those
-/// callbacks to the UI thread. Once disposal begins, no further provider callbacks are raised.
+/// callbacks to the UI thread. Disposal closes callback admission. A callback that passed admission before disposal
+/// began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
 /// </remarks>
 public interface ILuaIntelliSenseProvider : ILanguageServerIntelliSenseProvider
 {
@@ -20,7 +21,8 @@ public interface ILuaIntelliSenseProvider : ILanguageServerIntelliSenseProvider
 	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
 	/// controls. Handlers for one event invocation run serially on the raising thread; a failing handler is isolated from
 	/// later handlers. The semantic-token list and each token's modifier list are owned immutable snapshots that remain
-	/// valid after the callback returns. Once disposal begins, this event will not be raised again.
+	/// valid after the callback returns. Disposal closes callback admission. A callback that passed admission before
+	/// disposal began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
 	/// </remarks>
 	event Action<string, IReadOnlyList<LuaSemanticToken>>? SemanticTokensUpdated;
 

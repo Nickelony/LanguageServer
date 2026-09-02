@@ -1,9 +1,9 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
+using Nickelony.IDEKit.IntelliSense.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Captures the scope and icon hints inferred from LuaLS completion detail and description text.
+/// Captures scope hints inferred from LuaLS completion detail and description text and icon hints inferred from detail text.
 /// </summary>
 internal readonly struct LuaCompletionTextAnalysis
 {

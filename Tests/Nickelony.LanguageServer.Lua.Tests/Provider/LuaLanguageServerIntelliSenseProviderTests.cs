@@ -1,7 +1,5 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
+using Nickelony.IDEKit.IntelliSense.Completion;
+using Nickelony.IDEKit.IntelliSense.Hover;
 using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
@@ -10,7 +8,7 @@ namespace Nickelony.LanguageServer.Lua.Tests;
 public partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
-	public async Task Provider_ReadinessAndCapabilitiesAreUnavailableBeforeLazyStartup()
+	public async Task Provider_IsUnavailableAndReportsNoCapabilitiesBeforeLazyStartup()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
@@ -38,7 +36,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task MissingServerExecutable_RaisesPersistentStartupFailureAndStopsRetrying()
+	public async Task MissingServerExecutable_RaisesOnePersistentStartupFailure()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
@@ -59,7 +57,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task OpenDocument_SendsDidOpenPayloadWithLuaLanguageAndVersion()
+	public async Task OpenDocument_SendsDidOpenPayloadWithLuaLanguageIdAndInitialDocumentVersion()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
@@ -626,7 +624,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task FormatDocumentAsync_ReturnsEmptyWhenFormattingIsUnsupported()
+	public async Task FormatDocumentAsync_ReturnsNullWhenFormattingIsUnsupported()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\test.lua";

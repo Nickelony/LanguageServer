@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Navigation;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Resolves symbol reference locations from the current document context.

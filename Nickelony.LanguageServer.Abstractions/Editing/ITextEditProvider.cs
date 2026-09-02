@@ -1,7 +1,7 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Produces text edits or workspace edits for editor commands such as formatting and rename.
+/// Produces workspace edits for editor operations such as formatting and symbol rename.
 /// </summary>
 public interface ITextEditProvider : ITextFormattingProvider
 {

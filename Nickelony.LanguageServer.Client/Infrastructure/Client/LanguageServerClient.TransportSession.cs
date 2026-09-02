@@ -1,5 +1,5 @@
-using StreamJsonRpc;
 using System.Diagnostics;
+using StreamJsonRpc;
 
 namespace Nickelony.LanguageServer.Client;
 

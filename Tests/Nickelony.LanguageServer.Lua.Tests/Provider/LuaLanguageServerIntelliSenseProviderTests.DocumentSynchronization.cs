@@ -1,5 +1,5 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
-using Nickelony.LanguageServer.Abstractions.Hover;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Hover;
 using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
@@ -128,7 +128,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task RenameDocument_DisposeDuringBlockedRenameReopen_DoesNotRaiseMovedDiagnosticsUpdated()
+	public async Task RenameDocument_DisposeDuringBlockedRenameReopen_DoesNotRaiseDiagnosticsUpdatedForNewPath()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string oldFilePath = @"C:\Workspace\Scripts\test.lua";

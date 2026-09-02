@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Infrastructure;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Normalizes one-based document range coordinates for stable cross-boundary use.
@@ -6,7 +6,7 @@ namespace Nickelony.LanguageServer.Abstractions.Infrastructure;
 internal static class TextDocumentRangeNormalizer
 {
 	/// <summary>
-	/// Clamps coordinates to one and ensures that the end coordinate does not precede the start coordinate.
+	/// Clamps coordinates to <c>1</c> or greater and ensures that the end coordinate does not precede the start coordinate.
 	/// </summary>
 	/// <param name="startLineNumber">The one-based start line number.</param>
 	/// <param name="startColumnNumber">The one-based start column number.</param>

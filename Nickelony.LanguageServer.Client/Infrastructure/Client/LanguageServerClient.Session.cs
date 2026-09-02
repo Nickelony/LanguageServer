@@ -1,6 +1,6 @@
-using StreamJsonRpc;
 using System.Diagnostics;
 using System.Text.Json;
+using StreamJsonRpc;
 
 namespace Nickelony.LanguageServer.Client;
 
@@ -151,17 +151,12 @@ public sealed partial class LanguageServerClient
 	/// </summary>
 	/// <param name="allowDisposed">Whether disposed-state checks should be skipped.</param>
 	/// <returns>The active transport session.</returns>
-	/// <remarks>This method is used by <c>LanguageServerClientTests</c> via reflection. Do not remove without updating the tests.</remarks>
 	private LanguageServerTransportSession GetRequiredActiveSession(bool allowDisposed)
 	{
 		ThrowIfDisposed(allowDisposed);
 
-		LanguageServerTransportSession? session = Volatile.Read(ref _activeSession);
-
-		if (session is null)
-			throw new IOException("The language server transport is not available.");
-
-		return session;
+		return Volatile.Read(ref _activeSession)
+			?? throw new IOException("The language server transport is not available.");
 	}
 
 	/// <summary>

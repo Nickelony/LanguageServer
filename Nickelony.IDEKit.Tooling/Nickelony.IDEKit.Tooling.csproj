@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Nickelony.IDEKit.Tooling</RootNamespace>
+    <AssemblyName>Nickelony.IDEKit.Tooling</AssemblyName>
+    <PackageId>Nickelony.IDEKit.Tooling</PackageId>
+    <Description>External-process execution for compiler, formatter, linter, and generator integration.</Description>
+    <PackageTags>process;runner;tooling;text-editor;nickelony</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nickelony.IDEKit.Tooling.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Icon\LanguageServer.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

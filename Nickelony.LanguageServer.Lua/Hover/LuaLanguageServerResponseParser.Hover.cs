@@ -1,5 +1,5 @@
-using Nickelony.LanguageServer.Abstractions.Hover;
 using System.Text.Json;
+using Nickelony.IDEKit.IntelliSense.Hover;
 
 namespace Nickelony.LanguageServer.Lua;
 

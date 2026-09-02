@@ -3,7 +3,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public partial class LanguageServerClientTests
 {
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_RaisesEventAndReturnsNull()
+	public async Task RefreshSemanticTokensAsync_RaisesEventAndReturnsNull()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -23,7 +23,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_ReturnsBeforeSlowHandlerCompletes()
+	public async Task RefreshSemanticTokensAsync_ReturnsBeforeSlowSubscriberCompletes()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -52,7 +52,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_SlowSubscriberDoesNotBlockLaterSubscriber()
+	public async Task RefreshSemanticTokensAsync_SlowSubscriberDoesNotBlockLaterSubscriber()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -130,7 +130,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_CoalescesRepeatedRequestsWhileHandlerIsBusy()
+	public async Task RefreshSemanticTokensAsync_CoalescesRepeatedRequestsWhileSubscriberIsBusy()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -232,7 +232,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_IgnoresStaleTransportGeneration()
+	public async Task RefreshSemanticTokensAsync_IgnoresStaleTransportGeneration()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object oldSession = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -252,7 +252,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_WhenTransportIsAttachedButNotReady_DeliversRefreshCallback()
+	public async Task RefreshSemanticTokensAsync_WhenTransportIsAttachedButNotReady_DeliversRefreshCallback()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);
@@ -271,7 +271,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleSemanticTokensRefreshRequestAsync_IgnoresUnhealthyTransportGeneration()
+	public async Task RefreshSemanticTokensAsync_IgnoresUnhealthyTransportGeneration()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 1, process: null, Stream.Null, Stream.Null);

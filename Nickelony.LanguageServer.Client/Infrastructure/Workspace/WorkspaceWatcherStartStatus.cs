@@ -26,7 +26,7 @@ public enum WorkspaceWatcherStartStatus
 	WorkspaceRootMissing,
 
 	/// <summary>
-	/// The watcher failed to start because watcher creation or activation threw.
+	/// The watcher failed to start because workspace validation, watcher creation, or activation threw.
 	/// </summary>
 	StartupFailed
 }

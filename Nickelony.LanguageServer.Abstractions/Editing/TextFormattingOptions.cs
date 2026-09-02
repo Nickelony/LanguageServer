@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Represents editor formatting preferences used for a document formatting request.
@@ -10,6 +10,7 @@ public sealed class TextFormattingOptions
 	/// </summary>
 	/// <param name="tabSize">The preferred indentation width.</param>
 	/// <param name="insertSpaces"><see langword="true"/> to indent with spaces; otherwise, tabs.</param>
+	/// <remarks>A non-positive <paramref name="tabSize"/> falls back to the default of <c>4</c>.</remarks>
 	public TextFormattingOptions(int tabSize, bool insertSpaces)
 	{
 		TabSize = tabSize > 0 ? tabSize : 4;

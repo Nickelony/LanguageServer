@@ -61,7 +61,7 @@ public class WorkspaceChangeAccumulatorTests
 	}
 
 	[TestMethod]
-	public void Add_TreatsPathsCaseInsensitively()
+	public void Add_CasingVariants_PreservesBothChanges()
 	{
 		var accumulator = new WorkspaceChangeAccumulator();
 		accumulator.Add(@"C:\Workspace\Scripts\Test.lua", FileChangeKind.Deleted);

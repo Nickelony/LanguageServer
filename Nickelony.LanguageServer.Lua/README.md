@@ -1,9 +1,9 @@
 # Nickelony.LanguageServer.Lua
 
-**A lightweight Lua language-server provider** for the [Nickelony Language Server](https://github.com/Nickelony/LanguageServer) family, backed by the real [LuaLS](https://github.com/LuaLS/lua-language-server) (`lua-language-server` executable).
+**A lightweight Lua language-server provider** for the [Nickelony Language Server](https://github.com/Nickelony/IDEKit) family, backed by the real [LuaLS](https://github.com/LuaLS/lua-language-server) (`lua-language-server` executable).
 
 [![NuGet](https://img.shields.io/nuget/v/Nickelony.LanguageServer.Lua.svg)](https://www.nuget.org/packages/Nickelony.LanguageServer.Lua)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickelony/LanguageServer/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Nickelony/IDEKit/blob/main/LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 This package turns [LuaLS](https://github.com/LuaLS/lua-language-server) into a drop-in

@@ -13,6 +13,10 @@ public sealed class LuaSemanticToken
 	/// <param name="length">The token length in characters.</param>
 	/// <param name="type">The semantic token type.</param>
 	/// <param name="modifiers">The semantic token modifiers.</param>
+	/// <remarks>
+	/// Negative position and length values are normalized to zero. The modifier sequence is copied and exposed as a
+	/// read-only snapshot.
+	/// </remarks>
 	public LuaSemanticToken(int line, int character, int length, string type, IReadOnlyList<string> modifiers)
 	{
 		Line = Math.Max(0, line);
@@ -51,7 +55,7 @@ public sealed class LuaSemanticToken
 	public IReadOnlyList<string> Modifiers { get; }
 
 	/// <summary>
-	/// Determines whether the token has the specified modifier.
+	/// Determines whether the token has the specified modifier using an ordinal, case-sensitive comparison.
 	/// </summary>
 	/// <param name="modifier">The modifier name to check.</param>
 	/// <returns><see langword="true"/> if the modifier is present; otherwise, <see langword="false"/>.</returns>

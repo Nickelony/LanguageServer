@@ -12,6 +12,7 @@ public interface ILanguageServerClient : IDisposable, IAsyncDisposable
 
 	/// <summary>
 	/// Gets the current transport generation for the active language-server session.
+	/// Returns <c>0</c> when no transport session is active.
 	/// </summary>
 	long TransportGeneration { get; }
 
@@ -120,6 +121,7 @@ public interface ILanguageServerClient : IDisposable, IAsyncDisposable
 	/// <param name="method">The LSP method name.</param>
 	/// <param name="parameters">The notification payload.</param>
 	/// <param name="cancellationToken">A token that can cancel the local dispatch attempt while the JSON-RPC notification task is still incomplete.</param>
+	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before local dispatch completes.</exception>
 	Task SendNotificationAsync(string method, object parameters, CancellationToken cancellationToken);
 
 	/// <summary>
@@ -132,5 +134,6 @@ public interface ILanguageServerClient : IDisposable, IAsyncDisposable
 	/// <param name="parameters">The request payload.</param>
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
 	/// <returns>The typed response payload.</returns>
+	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before the request completes.</exception>
 	Task<TResult> SendRequestAsync<TResult>(string method, object parameters, CancellationToken cancellationToken);
 }

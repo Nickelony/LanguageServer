@@ -5,7 +5,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public partial class LanguageServerClientTests
 {
 	[TestMethod]
-	public async Task HandleDiagnosticsPublished_WhenTransportIsAttachedButNotReady_QueuesDiagnostics()
+	public async Task PublishDiagnostics_WhenTransportIsAttachedButNotReady_QueuesDiagnostics()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);
@@ -26,7 +26,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task HandleDiagnosticsPublished_IgnoresUnhealthyTransportGeneration()
+	public async Task PublishDiagnostics_IgnoresUnhealthyTransportGeneration()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);
@@ -157,7 +157,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task PumpDiagnosticsAsync_WhenHandlerThrows_LogsWarningAndContinuesProcessing()
+	public async Task PumpDiagnosticsAsync_WhenSubscriberThrows_LogsWarningAndContinuesProcessing()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());

@@ -4,7 +4,7 @@ public sealed partial class WorkspaceFileChangeForwarder
 {
 	/// <summary>
 	/// Attempts to forward a new change set immediately.
-	/// The change set is buffered only after forwarding was allowed and a transient startup or live transport failure occurred while the owner remained active.
+	/// The change set is buffered after forwarding was allowed when a transient startup or live transport failure occurs.
 	/// When forwarding is not currently allowed, the change set is either buffered or ignored based on construction options.
 	/// </summary>
 	/// <param name="changes">The file changes to forward.</param>

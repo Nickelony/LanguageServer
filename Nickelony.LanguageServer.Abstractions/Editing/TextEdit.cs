@@ -1,11 +1,11 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Represents a single text replacement inside a document.
 /// </summary>
 /// <remarks>
-/// Text edits intentionally use <see cref="TextDocumentRange"/> rather than editor-specific segment
-/// types so they can describe cross-file or protocol-derived edits without carrying UI dependencies.
+/// Text edits intentionally use <see cref="TextDocumentRange"/> rather than editor-specific segment types.
+/// They can be grouped by file in a <see cref="TextWorkspaceEdit"/> without carrying UI dependencies.
 /// </remarks>
 public sealed class TextEdit
 {

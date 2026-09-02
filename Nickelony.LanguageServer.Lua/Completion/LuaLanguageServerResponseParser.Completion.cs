@@ -1,6 +1,8 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
 using System.Text;
 using System.Text.Json;
+using Nickelony.IDEKit.Core.Editing;
+using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -14,9 +16,11 @@ internal static partial class LuaLanguageServerResponseParser
 	/// Parses a sequence of typed completion-item payloads into editor completion entries.
 	/// </summary>
 	/// <param name="itemPayloads">The typed completion-item payloads.</param>
-	/// <param name="resolveFactory">Builds an optional lazy-resolve callback for each item.</param>
-	/// <returns>The parsed completion items.</returns>
+	/// <param name="content">The document content used to resolve text-edit offsets.</param>
+	/// <param name="resolveFactory">Builds an optional lazy-resolve callback for items with incomplete detail or documentation.</param>
+	/// <returns>The valid, distinct parsed completion items in response order.</returns>
 	internal static IReadOnlyList<TextCompletionItem> ParseCompletionItems(IEnumerable<CompletionItemPayload> itemPayloads,
+		string content,
 		Func<TextCompletionItem, CompletionItemPayload, int, Func<CancellationToken, Task<TextCompletionItem>>?>? resolveFactory = null)
 	{
 		var items = new List<TextCompletionItem>();
@@ -25,7 +29,7 @@ internal static partial class LuaLanguageServerResponseParser
 
 		foreach (CompletionItemPayload itemPayload in itemPayloads)
 		{
-			TextCompletionItem? item = ParseCompletionItem(itemPayload, itemIndex);
+			TextCompletionItem? item = ParseCompletionItem(itemPayload, itemIndex, content);
 			itemIndex++;
 
 			if (item is null)
@@ -51,9 +55,11 @@ internal static partial class LuaLanguageServerResponseParser
 	/// </summary>
 	/// <param name="itemPayload">The typed completion-item payload.</param>
 	/// <param name="itemIndex">The zero-based response index used for priority weighting.</param>
+	/// <param name="content">The document content used to resolve text-edit offsets.</param>
 	/// <param name="resolveAsync">An optional lazy-resolve callback.</param>
-	/// <returns>The parsed completion item, or <see langword="null"/> when the payload is invalid.</returns>
+	/// <returns>The parsed completion item, or <see langword="null"/> when the payload has no usable label.</returns>
 	internal static TextCompletionItem? ParseCompletionItem(CompletionItemPayload itemPayload, int itemIndex,
+		string content,
 		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = null)
 	{
 		string? label = itemPayload.Label;
@@ -61,7 +67,8 @@ internal static partial class LuaLanguageServerResponseParser
 		if (string.IsNullOrWhiteSpace(label))
 			return null;
 
-		TextCompletionTextEdit? textEdit = ExtractCompletionTextEdit(itemPayload, out string? textEditText);
+		TextLineMap lineMap = TextLineMap.Build(content);
+		TextCompletionTextEdit? textEdit = ExtractCompletionTextEdit(itemPayload, lineMap, out string? textEditText);
 
 		string insertText = textEditText ?? string.Empty;
 
@@ -85,8 +92,7 @@ internal static partial class LuaLanguageServerResponseParser
 
 		string? detail = BuildCompletionDetail(itemPayload);
 		MarkupContent description = BuildCompletionDescription(itemPayload);
-		string? searchableDescription = LuaMarkupTextHelper.NormalizeMarkupText(description.Text);
-		var textAnalysis = new LuaCompletionTextAnalysis(detail, searchableDescription);
+		var textAnalysis = new LuaCompletionTextAnalysis(detail, description.Text);
 
 		return new(
 			label,
@@ -102,7 +108,7 @@ internal static partial class LuaLanguageServerResponseParser
 			insertCaretOffset: insertCaretOffset);
 	}
 
-	private static TextCompletionTextEdit? ExtractCompletionTextEdit(CompletionItemPayload itemPayload, out string? textEditText)
+	private static TextCompletionTextEdit? ExtractCompletionTextEdit(CompletionItemPayload itemPayload, TextLineMap lineMap, out string? textEditText)
 	{
 		textEditText = null;
 
@@ -111,16 +117,16 @@ internal static partial class LuaLanguageServerResponseParser
 
 		textEditText = textEditElement.NewText;
 
-		return ParseCompletionTextEdit(textEditElement);
+		return ParseCompletionTextEdit(textEditElement, lineMap);
 	}
 
-	private static TextCompletionTextEdit? ParseCompletionTextEdit(CompletionTextEditPayload textEditElement)
+	private static TextCompletionTextEdit? ParseCompletionTextEdit(CompletionTextEditPayload textEditElement, TextLineMap lineMap)
 	{
-		if (TryParseCompletionRange(textEditElement.Range, out TextCompletionRange range))
+		if (TryParseCompletionRange(textEditElement.Range, lineMap, out TextRange range))
 			return new(range);
 
-		if (TryParseCompletionRange(textEditElement.Insert, out TextCompletionRange insertRange)
-			&& TryParseCompletionRange(textEditElement.Replace, out TextCompletionRange replaceRange))
+		if (TryParseCompletionRange(textEditElement.Insert, lineMap, out TextRange insertRange)
+			&& TryParseCompletionRange(textEditElement.Replace, lineMap, out TextRange replaceRange))
 		{
 			return new(insertRange, replaceRange);
 		}
@@ -128,31 +134,32 @@ internal static partial class LuaLanguageServerResponseParser
 		return null;
 	}
 
-	private static bool TryParseCompletionRange(ProtocolRangePayload? rangeElement, out TextCompletionRange range)
+	private static bool TryParseCompletionRange(ProtocolRangePayload? rangeElement, TextLineMap lineMap, out TextRange range)
 	{
 		range = default;
 
-		if (!TryParseCompletionPosition(rangeElement?.Start, out TextCompletionPosition start)
-			|| !TryParseCompletionPosition(rangeElement?.End, out TextCompletionPosition end))
+		if (!TryResolveCompletionOffset(rangeElement?.Start, lineMap, out int startOffset)
+			|| !TryResolveCompletionOffset(rangeElement?.End, lineMap, out int endOffset)
+			|| endOffset < startOffset)
 		{
 			return false;
 		}
 
-		range = new TextCompletionRange(start, end);
+		range = new TextRange(startOffset, endOffset - startOffset);
 		return true;
 	}
 
-	private static bool TryParseCompletionPosition(ProtocolNullablePosition? positionElement, out TextCompletionPosition position)
+	private static bool TryResolveCompletionOffset(ProtocolNullablePosition? positionElement, TextLineMap lineMap, out int offset)
 	{
-		position = default;
+		offset = 0;
 
-		if (positionElement is not { Line: int line, Character: int character })
+		if (positionElement is not { Line: int lineIndex, Character: int character })
 			return false;
 
-		if (line < 0 || character < 0)
+		if (lineIndex < 0 || character < 0 || lineIndex >= lineMap.LineCount)
 			return false;
 
-		position = new TextCompletionPosition(line, character);
+		offset = lineMap.GetOffset(lineIndex, character);
 		return true;
 	}
 
@@ -257,7 +264,7 @@ internal static partial class LuaLanguageServerResponseParser
 
 		string? normalizedText = documentation.IsMarkdown
 			? MarkupContentReader.NormalizeMarkdownText(documentation.Text)
-			: LuaMarkupTextHelper.NormalizeMarkupText(documentation.Text);
+			: documentation.Text.Trim();
 
 		return string.IsNullOrWhiteSpace(normalizedText)
 			? default
@@ -278,7 +285,7 @@ internal static partial class LuaLanguageServerResponseParser
 
 		while (index < snippet.Length)
 		{
-			// Parse placeholder markers like ${1:name} or $0 and copy only the visible text.
+			// Parse LuaLS placeholder markers and copy only the visible text.
 			if (snippet[index] == '$')
 			{
 				if (index + 1 < snippet.Length && snippet[index + 1] == '{')

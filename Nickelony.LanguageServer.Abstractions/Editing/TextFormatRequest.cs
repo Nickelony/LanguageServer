@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Describes a formatting request against the current document.

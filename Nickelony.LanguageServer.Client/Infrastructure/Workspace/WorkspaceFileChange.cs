@@ -1,8 +1,8 @@
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Represents a normalized workspace file change ready for forwarding.
+/// Represents a workspace file change ready for forwarding.
 /// </summary>
-/// <param name="Path">The normalized file path.</param>
+/// <param name="Path">The affected file path.</param>
 /// <param name="Kind">The effective file change kind.</param>
 public readonly record struct WorkspaceFileChange(string Path, FileChangeKind Kind);

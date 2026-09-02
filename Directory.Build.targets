@@ -5,4 +5,20 @@
     <AnalysisLevel Condition="'$(AnalysisLevel)' == ''">8.0-recommended</AnalysisLevel>
   </PropertyGroup>
 
+  <!--
+    Package-boundary guard: no Nickelony.IDEKit.* package may reference
+    Nickelony.IDEKit.Workspace. The AvalonEdit-to-Workspace bridge is host-owned
+    code, so a package that needs workspace integration must not reintroduce
+    the dependency. Test projects are exempt because they legitimately
+    reference the packages they test.
+  -->
+  <Target Name="GuardNoWorkspacePackageReferences"
+          AfterTargets="ResolveProjectReferences"
+          Condition="$(MSBuildProjectName.StartsWith('Nickelony.IDEKit.')) and !$(MSBuildProjectName.EndsWith('.Tests'))">
+    <Error Condition="'%(ProjectReference.Filename)' == 'Nickelony.IDEKit.Workspace'"
+           Text="'$(MSBuildProjectName)' must not reference Nickelony.IDEKit.Workspace. The AvalonEdit-to-Workspace bridge is host-owned code, not a package dependency." />
+    <Error Condition="'%(PackageReference.Identity)' == 'Nickelony.IDEKit.Workspace'"
+           Text="'$(MSBuildProjectName)' must not reference Nickelony.IDEKit.Workspace. The AvalonEdit-to-Workspace bridge is host-owned code, not a package dependency." />
+  </Target>
+
 </Project>

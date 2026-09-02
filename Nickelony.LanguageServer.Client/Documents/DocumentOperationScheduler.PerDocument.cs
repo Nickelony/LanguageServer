@@ -88,7 +88,7 @@ public sealed partial class DocumentOperationScheduler
 	}
 
 	/// <summary>
-	/// Waits for the currently queued per-document and latest-update operations for one or two document paths to complete.
+	/// Waits for the per-document and latest-update operations queued for one or two document paths when this method is called.
 	/// </summary>
 	/// <param name="firstFilePath">The first document path to await.</param>
 	/// <param name="secondFilePath">The second document path to await.</param>

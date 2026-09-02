@@ -196,7 +196,10 @@ public class WorkspaceFileChangeForwarderTests
 				if (!startupSucceeds)
 					return false;
 
-				await forwarder!.ReplayDeferredAsync(
+				WorkspaceFileChangeForwarder currentForwarder = forwarder
+					?? throw new InvalidOperationException("The forwarder was not initialized before startup.");
+
+				await currentForwarder.ReplayDeferredAsync(
 					(items, _) =>
 					{
 						forwardedBatches.Add([.. items]);
@@ -408,7 +411,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task ReplayDeferredAsync_WhenReplayIsInFlight_DoesNotLetNewDispatchPassIt()
+	public async Task ReplayDeferredAsync_WhenReplayIsInFlight_WaitsBeforeForwardingNewDispatch()
 	{
 		bool startResult = false;
 

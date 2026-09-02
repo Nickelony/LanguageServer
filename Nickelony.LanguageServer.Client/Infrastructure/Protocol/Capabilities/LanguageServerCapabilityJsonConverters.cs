@@ -6,6 +6,9 @@ namespace Nickelony.LanguageServer.Client;
 /// <summary>
 /// Deserializes LSP capability fields that may be advertised as either booleans or objects.
 /// </summary>
+/// <remarks>
+/// This converter is intended for reading server capability responses; serializing a <see cref="SupportedCapability"/> is not supported.
+/// </remarks>
 public sealed class SupportedCapabilityJsonConverter : JsonConverter<SupportedCapability>
 {
 	/// <inheritdoc/>
@@ -41,6 +44,9 @@ public sealed class SupportedCapabilityJsonConverter : JsonConverter<SupportedCa
 /// <summary>
 /// Deserializes the LSP text-document sync capability from either numeric or object form.
 /// </summary>
+/// <remarks>
+/// This converter is intended for reading server capability responses; serializing a <see cref="TextDocumentSyncCapability"/> is not supported.
+/// </remarks>
 public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<TextDocumentSyncCapability>
 {
 	private readonly record struct TextDocumentSyncCapabilityObject(
@@ -99,6 +105,9 @@ public sealed class TextDocumentSyncCapabilityJsonConverter : JsonConverter<Text
 /// <summary>
 /// Deserializes the semantic token full capability and whether delta refresh is supported.
 /// </summary>
+/// <remarks>
+/// This converter is intended for reading server capability responses; serializing a <see cref="SemanticTokensFullCapability"/> is not supported.
+/// </remarks>
 public sealed class SemanticTokensFullCapabilityJsonConverter : JsonConverter<SemanticTokensFullCapability>
 {
 	private readonly record struct SemanticTokensFullCapabilityObject(

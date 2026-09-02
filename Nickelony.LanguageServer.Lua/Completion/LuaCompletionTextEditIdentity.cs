@@ -1,19 +1,14 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
+using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
 /// Normalizes the visible insert and replace ranges that participate in completion-item duplicate detection.
 /// </summary>
-/// <param name="InsertStart">The start position of the insert range.</param>
-/// <param name="InsertEnd">The end position of the insert range.</param>
-/// <param name="ReplaceStart">The start position of the replace range, when present.</param>
-/// <param name="ReplaceEnd">The end position of the replace range, when present.</param>
-internal readonly record struct LuaCompletionTextEditIdentity(
-	TextCompletionPosition? InsertStart,
-	TextCompletionPosition? InsertEnd,
-	TextCompletionPosition? ReplaceStart,
-	TextCompletionPosition? ReplaceEnd)
+/// <param name="InsertRange">The insert range, when present.</param>
+/// <param name="ReplaceRange">The replace range, when present.</param>
+internal readonly record struct LuaCompletionTextEditIdentity(TextRange? InsertRange, TextRange? ReplaceRange)
 {
 	/// <summary>
 	/// Creates a normalized text-edit identity from a parsed completion text edit.
@@ -24,10 +19,6 @@ internal readonly record struct LuaCompletionTextEditIdentity(
 	{
 		return textEdit is not { } value
 			? default
-			: new(
-				value.InsertRange.Start,
-				value.InsertRange.End,
-				value.ReplaceRange?.Start,
-				value.ReplaceRange?.End);
+			: new(value.InsertRange, value.ReplaceRange);
 	}
 }

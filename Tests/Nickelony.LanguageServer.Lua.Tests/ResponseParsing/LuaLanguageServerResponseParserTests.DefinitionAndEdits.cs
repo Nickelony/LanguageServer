@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Navigation;
+using Nickelony.IDEKit.IntelliSense.Navigation;
 using Nickelony.LanguageServer.Testing;
 using System.Text.Json;
 
@@ -334,7 +333,7 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
-	public void ParseWorkspaceEdit_GroupsPathsUsingLocalPathIdentity()
+	public void ParseWorkspaceEdit_UsesLocalPathCaseSensitivity()
 	{
 		string firstPath = Path.Combine(Path.GetTempPath(), "Scripts", "case.lua");
 		string secondPath = Path.Combine(Path.GetTempPath(), "Scripts", "CASE.lua");

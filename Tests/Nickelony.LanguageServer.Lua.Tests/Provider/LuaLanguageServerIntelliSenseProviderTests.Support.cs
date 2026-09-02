@@ -57,6 +57,11 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		throw new InvalidOperationException($"Private method '{methodName}' returned '{result?.GetType().FullName ?? "null"}' instead of '{typeof(T).FullName}'.");
 	}
 
-	private static Task DispatchWorkspaceFileChangesAsync(LuaLanguageServerIntelliSenseProvider provider, FileChangeBatch batch, CancellationToken cancellationToken)
-		=> LuaLanguageServerIntelliSenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken);
+    private static Task DispatchWorkspaceFileChangesAsync(
+        LuaLanguageServerIntelliSenseProvider provider,
+        FileChangeBatch batch,
+        CancellationToken cancellationToken)
+    {
+        return LuaLanguageServerIntelliSenseProviderTestAccess.DispatchWorkspaceFileChangesAsync(provider, batch, cancellationToken);
+    }
 }

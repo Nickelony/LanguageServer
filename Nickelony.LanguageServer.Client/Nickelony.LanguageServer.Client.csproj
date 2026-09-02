@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Nickelony.LanguageServer.Abstractions\Nickelony.LanguageServer.Abstractions.csproj" />
+    <ProjectReference Include="..\Nickelony.IDEKit.Core\Nickelony.IDEKit.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

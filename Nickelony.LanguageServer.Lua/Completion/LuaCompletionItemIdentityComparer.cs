@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Compares parsed completion items using the case-sensitive identity rules required by Lua identifiers.
+/// Compares parsed completion-item identities using ordinal string comparison for duplicate detection.
 /// </summary>
 internal sealed class LuaCompletionItemIdentityComparer : IEqualityComparer<LuaCompletionItemIdentity>
 {
@@ -11,13 +11,15 @@ internal sealed class LuaCompletionItemIdentityComparer : IEqualityComparer<LuaC
 	internal static LuaCompletionItemIdentityComparer Instance { get; } = new();
 
 	public bool Equals(LuaCompletionItemIdentity x, LuaCompletionItemIdentity y)
-		=> StringComparer.Ordinal.Equals(x.Label, y.Label)
-		&& StringComparer.Ordinal.Equals(x.InsertText, y.InsertText)
-		&& StringComparer.Ordinal.Equals(x.FilterText, y.FilterText)
-		&& StringComparer.Ordinal.Equals(x.Detail, y.Detail)
-		&& StringComparer.Ordinal.Equals(x.Description, y.Description)
-		&& x.Kind == y.Kind
-		&& x.TextEdit.Equals(y.TextEdit);
+	{
+		return StringComparer.Ordinal.Equals(x.Label, y.Label)
+			&& StringComparer.Ordinal.Equals(x.InsertText, y.InsertText)
+			&& StringComparer.Ordinal.Equals(x.FilterText, y.FilterText)
+			&& StringComparer.Ordinal.Equals(x.Detail, y.Detail)
+			&& StringComparer.Ordinal.Equals(x.Description, y.Description)
+			&& x.Kind == y.Kind
+			&& x.TextEdit.Equals(y.TextEdit);
+	}
 
 	public int GetHashCode(LuaCompletionItemIdentity value)
 	{

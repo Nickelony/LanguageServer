@@ -1,5 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Signatures;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 

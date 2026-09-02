@@ -1,5 +1,3 @@
-using Nickelony.LanguageServer.Abstractions.Navigation;
-
 namespace Nickelony.LanguageServer.Lua;
 
 internal static partial class LuaLanguageServerResponseParser

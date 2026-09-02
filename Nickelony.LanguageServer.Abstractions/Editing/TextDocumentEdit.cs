@@ -1,4 +1,4 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Represents the text edits that should be applied to a single document.

@@ -13,7 +13,7 @@ public sealed partial class WorkspaceFileChangeForwarder
 	}
 
 	/// <summary>
-	/// Releases the owned synchronization gate once no forwarding operations remain active.
+	/// Requests disposal and releases the owned synchronization gate once no forwarding operations remain active.
 	/// </summary>
 	public void Dispose()
 	{

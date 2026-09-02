@@ -107,7 +107,6 @@ public sealed partial class LanguageServerClient
 	/// Captures the server capabilities relevant to the host provider.
 	/// </summary>
 	/// <param name="initializeResponse">The initialize response received from the server.</param>
-	/// <remarks>This method is used by <c>LanguageServerClientTests</c> via reflection. Do not remove without updating the tests.</remarks>
 	private void CaptureServerCapabilities(InitializeResponse initializeResponse)
 		=> CaptureServerCapabilitiesForGeneration(TransportGeneration, initializeResponse);
 
@@ -302,7 +301,6 @@ public sealed partial class LanguageServerClient
 	/// Updates only the readiness flag while keeping the rest of the published capability snapshot aligned.
 	/// </summary>
 	/// <param name="isReady">Whether the active transport is ready.</param>
-	/// <remarks>This method is used by <c>LanguageServerClientTests</c> via reflection. Do not remove without updating the tests.</remarks>
 	private void SetCapabilityReadiness(bool isReady)
 	{
 		PublishedCapabilitySnapshot snapshot = Volatile.Read(ref _publishedCapabilitySnapshot);

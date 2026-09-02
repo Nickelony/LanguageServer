@@ -1,5 +1,3 @@
-using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
-
 namespace Nickelony.LanguageServer.Lua;
 
 public sealed partial class LuaLanguageServerIntelliSenseProvider
@@ -188,8 +186,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	/// <remarks>
 	/// Disposal is idempotent. It first closes callback admission and detaches provider subscribers, then cancels
 	/// provider-owned work, disposes the workspace watcher/coordinator, and finally disposes the Lua language-server
-	/// client owned by this provider. A callback already admitted before disposal began may finish; no later callback
-	/// starts. The provider must not be used after disposal.
+	/// client owned by this provider. A callback that passed admission before disposal began may still start or finish
+	/// after disposal begins; callbacks are not admitted once admission is closed. The provider must not be used after
+	/// disposal.
 	/// </remarks>
 	public void Dispose()
 	{

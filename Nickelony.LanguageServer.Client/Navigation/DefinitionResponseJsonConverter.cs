@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Deserializes definition responses from LSP location and location-link payloads.
+/// Converts definition responses between LSP location or location-link payloads and typed definition targets.
 /// </summary>
 public sealed class DefinitionResponseJsonConverter : JsonConverter<DefinitionResponse>
 {

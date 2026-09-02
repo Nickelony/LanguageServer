@@ -12,6 +12,9 @@ public static class MarkupContentReader
 	/// </summary>
 	/// <param name="element">The protocol markup payload to interpret.</param>
 	/// <returns>The extracted markup content.</returns>
+	/// <remarks>
+	/// Unsupported or empty payloads return a <see cref="MarkupContent"/> whose <see cref="MarkupContent.Text"/> is empty.
+	/// </remarks>
 	public static MarkupContent ExtractContent(JsonElement element) => element.ValueKind switch
 	{
 		JsonValueKind.String => new MarkupContent(element.GetString(), true),

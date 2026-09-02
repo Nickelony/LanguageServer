@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Defines the completion-item kind values emitted by LuaLS for parsed completion payloads.
+/// Defines the LSP completion-item kind values recognized when parsing LuaLS completion payloads.
 /// </summary>
 internal enum LuaLanguageServerCompletionKind
 {

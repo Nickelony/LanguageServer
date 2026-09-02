@@ -1,4 +1,3 @@
-using Nickelony.LanguageServer.Abstractions.Editing;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Nickelony.LanguageServer.Lua;
@@ -10,7 +9,10 @@ internal static partial class LuaLanguageServerResponseParser
 	/// </summary>
 	/// <param name="response">The workspace edit response payload, or <see langword="null"/> when unavailable.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for no logging.</param>
-	/// <returns>The parsed workspace edit, or <see langword="null"/> when no edits are present.</returns>
+	/// <returns>
+	/// The parsed workspace edit, or <see langword="null"/> when no valid edits are present or the response contains an
+	/// unsupported resource operation.
+	/// </returns>
 	internal static TextWorkspaceEdit? ParseWorkspaceEdit(WorkspaceEditResponse? response, ILogger? logger = null)
 	{
 		if (response is null)

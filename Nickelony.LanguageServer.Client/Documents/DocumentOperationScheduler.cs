@@ -43,5 +43,4 @@ public sealed partial class DocumentOperationScheduler
 
 		await WaitForQueuedOperationAsync(secondOperation).ConfigureAwait(false);
 	}
-
 }

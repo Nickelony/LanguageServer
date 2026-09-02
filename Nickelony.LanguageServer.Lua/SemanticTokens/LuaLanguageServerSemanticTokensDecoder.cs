@@ -1,7 +1,9 @@
+using Nickelony.IDEKit.Core.Editing;
+
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Decodes a raw LuaLS semantic token integer stream (already cached on the client) into the typed
+/// Decodes a raw LuaLS semantic token integer stream from a server response into the typed
 /// <see cref="LuaSemanticToken"/> list expected by the editor's colorizer.
 /// </summary>
 internal static class LuaLanguageServerSemanticTokensDecoder
@@ -15,14 +17,14 @@ internal static class LuaLanguageServerSemanticTokensDecoder
 	/// <param name="document">The document snapshot associated with the token stream.</param>
 	/// <param name="tokenTypes">The semantic token types advertised by the server.</param>
 	/// <param name="tokenModifiers">The semantic token modifiers advertised by the server.</param>
-	/// <returns>The decoded semantic tokens.</returns>
+	/// <returns>The decoded tokens; malformed tuples and tokens outside the document are ignored or clamped.</returns>
 	internal static IReadOnlyList<LuaSemanticToken> Decode(int[] data, DocumentSnapshot? document,
 		IReadOnlyList<string>? tokenTypes, IReadOnlyList<string>? tokenModifiers)
 	{
 		if (data.Length == 0 || document is null || tokenTypes is null || tokenTypes.Count == 0)
 			return [];
 
-		DocumentLineOffsets lineOffsets = DocumentLineOffsets.Build(document.Content);
+		TextLineMap lineMap = TextLineMap.Build(document.Content);
 		var semanticTokens = new List<LuaSemanticToken>(data.Length / 5);
 		Dictionary<int, IReadOnlyList<string>>? modifierCache = null;
 
@@ -40,10 +42,10 @@ internal static class LuaLanguageServerSemanticTokensDecoder
 			line += deltaLine;
 			character = deltaLine == 0 ? character + deltaCharacter : deltaCharacter;
 
-			if (line < 0 || line >= lineOffsets.LineCount || tokenTypeIndex < 0 || tokenTypeIndex >= tokenTypes.Count)
+			if (line < 0 || line >= lineMap.LineCount || tokenTypeIndex < 0 || tokenTypeIndex >= tokenTypes.Count)
 				continue;
 
-			int lineLength = lineOffsets.GetLineLength(line);
+			int lineLength = lineMap.GetLineLength(line);
 			int safeCharacter = Math.Max(0, Math.Min(character, lineLength));
 			int safeLength = Math.Max(0, Math.Min(length, lineLength - safeCharacter));
 

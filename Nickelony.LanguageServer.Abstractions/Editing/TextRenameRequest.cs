@@ -1,12 +1,12 @@
-namespace Nickelony.LanguageServer.Abstractions.Editing;
+namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Describes a rename request against the current document.
 /// </summary>
 /// <remarks>
-/// Rename requests use zero-based line and column indices to match the editor's internal
-/// coordinate system. When converting to or from LSP positions, the provider boundary is
-/// responsible for the zero-based to one-based translation.
+/// Rename requests use zero-based line and column indices for the editor-facing contract. Providers are responsible
+/// for translating these coordinates when they use a different coordinate system internally. Negative line and
+/// column values are normalized to zero.
 /// </remarks>
 public sealed class TextRenameRequest
 {

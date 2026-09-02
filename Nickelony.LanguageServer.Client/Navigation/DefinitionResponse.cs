@@ -4,8 +4,10 @@ namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
 /// Represents one or more usable definition targets returned by a language server.
-/// Compatibility accessors expose the first target so existing host parsers can stay unchanged.
 /// </summary>
+/// <remarks>
+/// Compatibility accessors expose the first target so existing host parsers can stay unchanged.
+/// </remarks>
 [JsonConverter(typeof(DefinitionResponseJsonConverter))]
 public sealed record DefinitionResponse
 {

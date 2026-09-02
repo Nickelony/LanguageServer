@@ -12,6 +12,10 @@ internal static class LuaDocumentVersionHelper
 	/// <param name="incomingVersion">The incoming version to evaluate.</param>
 	/// <param name="acceptedVersion">The version that should remain cached after evaluation.</param>
 	/// <returns><see langword="true"/> when the incoming version is acceptable; otherwise, <see langword="false"/>.</returns>
+	/// <remarks>
+	/// Version <c>0</c> means that the producer did not provide a comparable version and therefore does not advance the
+	/// cached version. A positive incoming version equal to or newer than the positive cached version is accepted.
+	/// </remarks>
 	internal static bool TryAccept(int currentVersion, int incomingVersion, out int acceptedVersion)
 	{
 		acceptedVersion = currentVersion;

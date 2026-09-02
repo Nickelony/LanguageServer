@@ -95,7 +95,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void CapabilityUnregistrationParams_Serialize_WritesCurrentSpecPropertyName()
+	public void CapabilityUnregistrationParams_Serialize_WritesHistoricalWirePropertyName()
 	{
 		string json = JsonSerializer.Serialize(
 			new CapabilityUnregistrationParams(
@@ -368,7 +368,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void JsonRpc_Disconnected_UnexpectedActiveTransportPublishesLostGenerationAfterReset()
+	public void JsonRpc_Disconnected_UnexpectedActiveTransportPublishesUnavailableGenerationAfterReset()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
@@ -715,7 +715,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void Hello_ArrayPayload_LogsReceiptAtDebugLevel()
+	public void Hello_ArrayPayload_LogsUnsupportedCallbackAtDebugLevel()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
@@ -1190,7 +1190,8 @@ public partial class LanguageServerClientTests
 		FieldInfo field = typeof(LanguageServerClient).GetField("_lifetimeCts", BindingFlags.Instance | BindingFlags.NonPublic)
 			?? throw new InvalidOperationException("Private field '_lifetimeCts' was not found.");
 
-		((CancellationTokenSource)field.GetValue(client)!).Cancel();
+		((CancellationTokenSource)(field.GetValue(client)
+			?? throw new InvalidOperationException("Client lifetime cancellation source was null."))).Cancel();
 	}
 
 	private static async Task WaitForStartupCancellationAsync(TaskCompletionSource<bool> sessionActivated, CancellationToken cancellationToken)

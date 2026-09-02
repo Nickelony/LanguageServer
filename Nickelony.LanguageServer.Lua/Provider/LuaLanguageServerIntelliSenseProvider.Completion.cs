@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
+using Nickelony.IDEKit.IntelliSense.Completion;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -24,10 +24,10 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 				Func<TextCompletionItem, CompletionItemPayload, int, Func<CancellationToken, Task<TextCompletionItem>>?>? resolveFactory =
 					_client is not null && _client.SupportsCompletionResolve
 						? (unresolvedItem, itemPayload, itemIndex) =>
-							cancellationToken => ResolveCompletionItemAsync(unresolvedItem, itemPayload, itemIndex, cancellationToken)
+							cancellationToken => ResolveCompletionItemAsync(unresolvedItem, itemPayload, itemIndex, content, cancellationToken)
 						: null;
 
-				return LuaLanguageServerResponseParser.ParseCompletionItems(itemPayloads, resolveFactory);
+				return LuaLanguageServerResponseParser.ParseCompletionItems(itemPayloads, content, resolveFactory);
 			},
 			timeoutValue: null,
 			defaultValue: [],
@@ -41,7 +41,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 			: new CompletionContextPayload(TriggerKind: CompletionTriggerKindTriggerCharacter, triggerCharacter.ToString());
 	}
 
-	private async Task<TextCompletionItem> ResolveCompletionItemAsync(TextCompletionItem unresolvedItem, CompletionItemPayload itemPayload, int itemIndex, CancellationToken cancellationToken)
+	private async Task<TextCompletionItem> ResolveCompletionItemAsync(TextCompletionItem unresolvedItem, CompletionItemPayload itemPayload, int itemIndex, string content, CancellationToken cancellationToken)
 	{
 		ILanguageServerClient? client = _client;
 
@@ -61,7 +61,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 
 			if (resolvedItem is not null)
 			{
-				TextCompletionItem? parsedItem = LuaLanguageServerResponseParser.ParseCompletionItem(resolvedItem, itemIndex);
+				TextCompletionItem? parsedItem = LuaLanguageServerResponseParser.ParseCompletionItem(resolvedItem, itemIndex, content);
 
 				if (parsedItem is not null)
 					return unresolvedItem.WithResolvedContent(parsedItem);

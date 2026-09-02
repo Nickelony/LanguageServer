@@ -1,26 +1,24 @@
-using Nickelony.LanguageServer.Abstractions.Completion;
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
-using Nickelony.LanguageServer.Abstractions.Editing;
-using Nickelony.LanguageServer.Abstractions.Hover;
-using Nickelony.LanguageServer.Abstractions.Infrastructure.Provider;
-using Nickelony.LanguageServer.Abstractions.Navigation;
-using Nickelony.LanguageServer.Abstractions.Signatures;
+using Nickelony.IDEKit.IntelliSense.Completion;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Hover;
+using Nickelony.IDEKit.IntelliSense.Navigation;
+using Nickelony.IDEKit.IntelliSense.Signatures;
 
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Defines the generic language-service contract used by text editors to provide IntelliSense features.
+/// Defines the language-neutral provider contract used by text editors to obtain IntelliSense features.
 /// </summary>
 /// <remarks>
-/// This interface contains the parts of the IntelliSense provider contract that are not specific to any
-/// single language. Language-specific concerns such as semantic tokens are layered on top through
-/// narrower interfaces like <c>ILuaIntelliSenseProvider</c>.
+/// This interface contains document lifecycle operations and IntelliSense features that are not specific to any
+/// single language. Language-specific concerns such as semantic tokens can be layered on top through narrower
+/// interfaces such as <c>ILuaIntelliSenseProvider</c>.
 ///
 /// Implementations may raise callbacks from background threads. Consumers that access UI controls must marshal
 /// those callbacks to the UI thread. Once disposal begins, no further provider callbacks are raised.
 /// Implementations must make <see cref="IDisposable.Dispose"/> idempotent. A callback that was already admitted before
 /// disposal began may finish, but disposal closes callback admission before releasing provider-owned resources.
-/// <see cref="StartupFailed"/> reports startup attempts that returned an unusable server session, including a
+/// <see cref="StartupFailed"/> reports when the provider cannot establish a usable server session, including a
 /// terminal missing-executable configuration; caller cancellation and provider disposal are not startup failures.
 /// <see cref="WorkspaceWatcherFailed"/> reports only watcher startup or recovery failures that leave external
 /// workspace forwarding unavailable. Transient watcher failures that recover automatically are intentionally silent.
@@ -38,8 +36,8 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// </summary>
 	/// <remarks>
 	/// This value is <see langword="false"/> before lazy startup, while the provider is starting or restarting,
-	/// after a transient transport failure, after terminal startup failure, and after disposal. A request may
-	/// transition the provider from an unavailable state to a ready state.
+	/// when no usable language-server session is available, and after disposal. A request may transition the provider
+	/// from an unavailable state to a ready state when startup succeeds.
 	/// </remarks>
 	bool IsAvailable { get; }
 
@@ -71,19 +69,19 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	event Action? CapabilitiesChanged;
 
 	/// <summary>
-	/// Occurs when the underlying language server fails to start.
+	/// Occurs when the provider reports a language-server startup failure.
 	/// </summary>
 	/// <remarks>
 	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
 	/// controls. Handlers for one event invocation run serially on the raising thread and a failing handler is isolated
 	/// from later handlers. Once disposal begins, this event will not be raised again.
-	/// The event is raised at most once for a transient startup-failure period and once for a terminal failure period;
-	/// a successful restart resets the transient notification state.
+	/// The event is raised at most once for each transient failure period and once for a terminal failure period. A
+	/// successful start clears the failure-notification suppression state.
 	/// </remarks>
 	event Action<LanguageServerStartupFailure>? StartupFailed;
 
 	/// <summary>
-	/// Occurs when the workspace file watcher fails.
+	/// Occurs when the workspace file watcher cannot be started or recovered and external changes may no longer be forwarded.
 	/// </summary>
 	/// <remarks>
 	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
@@ -99,7 +97,7 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// Gets the latest diagnostics known for a document.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>An owned immutable snapshot of the diagnostics currently cached for the document.</returns>
+	/// <returns>An owned immutable snapshot of the cached diagnostics, or an empty list when no diagnostics are cached.</returns>
 	IReadOnlyList<TextEditorDiagnostic> GetDiagnostics(string filePath);
 
 	/// <summary>
@@ -108,13 +106,13 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="content">The initial document content.</param>
 	/// <remarks>
-	/// Each call acquires one editor-open reference; repeated calls for the same path require matching calls to
+	/// Each valid call acquires one editor-open reference; repeated calls for the same path require matching calls to
 	/// <see cref="CloseDocument"/>. The provider normalizes the path and serializes operations for that document.
 	/// </remarks>
 	void OpenDocument(string filePath, string content);
 
 	/// <summary>
-	/// Pushes updated content for a document that is already open in the provider so the underlying language service can stay synchronized.
+	/// Synchronizes updated content for a document so the underlying language service can stay synchronized.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="content">The updated document content.</param>
@@ -127,12 +125,12 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	void UpdateDocument(string filePath, string content);
 
 	/// <summary>
-	/// Closes a tracked document and releases any provider-side state associated with it.
+	/// Releases an editor-open reference for a tracked document and cleans up provider-side state when no references remain.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <remarks>
 	/// Each call releases one editor-open reference when one exists. A repeated call after the state has already been
-	/// removed is a no-op; an explicitly idle, server-open record created by an update may be cleaned up by close.
+	/// removed is a no-op; an explicitly idle, server-open record created by an update may also be cleaned up by close.
 	/// The document remains tracked while a request reference is active; otherwise the final cleanup removes the local
 	/// state, cached results, pending document work, and mirrored server document when it is safe to send the close.
 	/// </remarks>
@@ -160,7 +158,7 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="column">The zero-based column index.</param>
 	/// <param name="triggerCharacter">The optional character that triggered completion.</param>
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
-	/// <returns>The available completion items for the requested position.</returns>
+	/// <returns>The available completion items, or an empty list when completion is unavailable or no items are available.</returns>
 	Task<IReadOnlyList<TextCompletionItem>> GetCompletionItemsAsync(string filePath, string content,
 		int line, int column, char? triggerCharacter = null, CancellationToken cancellationToken = default);
 

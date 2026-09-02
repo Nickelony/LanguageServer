@@ -1,3 +1,5 @@
+using Nickelony.IDEKit.Core.Editing;
+
 namespace Nickelony.LanguageServer.Client;
 
 public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
@@ -7,7 +9,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// Synchronizes the tracked state for a document and returns the LSP action required to mirror it to the server.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <param name="content">The latest document content.</param>
+	/// <param name="content">The latest document content. <see langword="null"/> is treated as an empty document.</param>
 	/// <param name="acquireOpenReference">Whether an additional open-editor reference should be recorded.</param>
 	/// <param name="acquireRequestReference">Whether a temporary request-driven reference should be recorded.</param>
 	/// <returns>A synchronization request when the server copy must be updated; otherwise, <see langword="null"/>.</returns>
@@ -59,8 +61,16 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 			if (!string.Equals(state.Content, safeContent, StringComparison.Ordinal))
 			{
 				string previousContent = ReplaceTrackedDocumentContent(state, safeContent);
-				DocumentLineOffsets previousOffsets = DocumentLineOffsets.Build(previousContent);
-				DocumentChangeRange changeRange = DocumentIncrementalEditCalculator.Compute(previousContent, safeContent, previousOffsets);
+				TextLineMap previousLineMap = TextLineMap.Build(previousContent);
+				TextIncrementalChange change = TextIncrementalEditCalculator.Compute(previousContent, safeContent);
+				(int startLine, int startCharacter) = previousLineMap.GetPosition(change.Range.Offset);
+				(int endLine, int endCharacter) = previousLineMap.GetPosition(change.Range.EndOffset);
+				DocumentChangeRange changeRange = new(
+					startLine,
+					startCharacter,
+					endLine,
+					endCharacter,
+					change.NewText);
 
 				return new(DocumentSynchronizationKind.Change, state.CreateSnapshot(), changeRange);
 			}

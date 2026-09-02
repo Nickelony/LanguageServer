@@ -1,4 +1,4 @@
-using Nickelony.LanguageServer.Abstractions.Diagnostics;
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
@@ -33,6 +33,9 @@ internal sealed class LuaDiagnosticsCache
 	/// </summary>
 	/// <param name="publishedDiagnostics">The diagnostics payload to cache.</param>
 	/// <returns><see langword="true"/> when the payload was stored; otherwise, <see langword="false"/>.</returns>
+	/// <remarks>
+	/// A payload with an unknown version (<c>0</c>) is accepted but does not advance the cached version.
+	/// </remarks>
 	internal bool TryStore(LuaPublishedDiagnostics publishedDiagnostics)
 	{
 		if (!LuaDocumentVersionHelper.TryAccept(Version, publishedDiagnostics.Version, out int acceptedVersion))
