@@ -36,15 +36,14 @@ public sealed class TextEditorFormattingServiceTests
 
 				Assert.AreEqual(TrimTrailingWhitespace(original), editor.Text);
 
-				// The caret remains on the same line after the full-document replacement.
+				// The caret remains on line 2 after the full-document replacement.
 				Assert.AreEqual(2, editor.Document.GetLineByOffset(editor.CaretOffset).LineNumber);
 
-				// The scroll position is preserved, not only the content.
+				// Both scroll offsets are preserved.
 				Assert.AreEqual(scrollBefore.X, editor.TextArea.TextView.ScrollOffset.X, 1.0);
 				Assert.AreEqual(scrollBefore.Y, editor.TextArea.TextView.ScrollOffset.Y, 1.0);
 
-				// The whole replacement is a single undo step: one Undo reverts the full document
-				// and one Redo restores it, confirming the undo/redo boundary covers everything.
+				// Undo restores the original text, and redo restores the formatted text.
 				editor.Undo();
 				Assert.AreEqual(original, editor.Text);
 
@@ -81,7 +80,7 @@ public sealed class TextEditorFormattingServiceTests
 				Assert.AreEqual("No changes here", editor.Text);
 				Assert.AreEqual(3, editor.CaretOffset);
 
-				// No changes means no undo entry: undoing must not alter the content.
+				// Undo leaves the unchanged content intact when formatting produces no edits.
 				editor.Undo();
 				Assert.AreEqual("No changes here", editor.Text);
 			}
@@ -109,7 +108,7 @@ public sealed class TextEditorFormattingServiceTests
 				var service = new TextEditorFormattingService();
 				service.FormatDocument(editor, new EqualsSpacingFormatter(), trimOnly: true);
 
-				// Trim-only skips the formatter's spacing rules and only removes trailing whitespace.
+				// Trim-only removes trailing whitespace without applying the formatter's spacing changes.
 				Assert.AreEqual("Customize= CUST_BAR,foo" + Environment.NewLine + "Legend =1", editor.Text);
 			}
 			finally

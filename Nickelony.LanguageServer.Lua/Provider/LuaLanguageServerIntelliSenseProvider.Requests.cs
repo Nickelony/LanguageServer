@@ -9,6 +9,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	/// <inheritdoc/>
 	public async Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(TextReferenceRequest request, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(request);
+
 		return await GetReferencesAsync(
 			request.FilePath,
 			request.DocumentText,
@@ -21,6 +23,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	public Task<TextHoverInfo?> GetHoverAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		return SendPositionRequestAsync<HoverResponse?, TextHoverInfo?>(
 			filePath, content, line, column, "textDocument/hover",
 			static (textDocument, position) => new TextDocumentPositionParams(textDocument, position),
@@ -34,6 +39,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	public Task<TextDefinitionLocation?> GetDefinitionAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		return SendPositionRequestAsync<DefinitionResponse?, TextDefinitionLocation?>(
 			filePath, content, line, column, "textDocument/definition",
 			static (textDocument, position) => new TextDocumentPositionParams(textDocument, position),
@@ -55,6 +63,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	public async Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		cancellationToken.ThrowIfCancellationRequested();
 
 		ILanguageServerClient? client = _client;
@@ -98,6 +109,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> RenameSymbolAsync(TextRenameRequest request, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(request);
+
 		cancellationToken.ThrowIfCancellationRequested();
 
 		if (string.IsNullOrWhiteSpace(request.NewName))
@@ -144,6 +157,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	/// <inheritdoc/>
 	public async Task<TextWorkspaceEdit?> FormatDocumentAsync(TextFormatRequest request, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(request);
+
 		cancellationToken.ThrowIfCancellationRequested();
 
 		ILanguageServerClient? client = _client;
@@ -193,6 +208,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	public Task<TextSignatureHelpInfo?> GetSignatureHelpAsync(string filePath, string content,
 		int line, int column, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		return SendPositionRequestAsync<SignatureHelpResponse?, TextSignatureHelpInfo?>(
 			filePath, content, line, column, "textDocument/signatureHelp",
 			static (textDocument, position) => new TextDocumentPositionParams(textDocument, position),
@@ -232,11 +250,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 		{
 			// Synchronize the document without triggering post-edit semantic token refresh.
 			if (
-				// All request-driven sync paths intentionally
-				// skip the semantic token refresh: typing a single identifier character can otherwise turn
-				// into didChange + completion + semanticTokens/full per keystroke, which is the dominant
-				// performance regression observed during normal editing. UpdateDocument (TextChangedDelayed)
-				// remains the single owner of post-edit semantic token refresh.
+				// Keep post-edit semantic-token refresh owned by UpdateDocument so request-driven synchronization
+				// does not issue an additional token request for every IntelliSense request.
 				!await SynchronizeDocumentAsync(normalizedFilePath, content,
 					acquireOpenReference: false, acquireRequestReference: true, refreshSemanticTokens: false, cancellationToken).ConfigureAwait(false))
 			{

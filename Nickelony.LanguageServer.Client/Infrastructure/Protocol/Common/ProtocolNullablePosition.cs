@@ -6,7 +6,7 @@ namespace Nickelony.LanguageServer.Client;
 /// Represents a nullable zero-based protocol position.
 /// </summary>
 /// <param name="Line">The zero-based line index.</param>
-/// <param name="Character">The zero-based character index.</param>
+/// <param name="Character">The zero-based character index measured in UTF-16 code units.</param>
 public readonly record struct ProtocolNullablePosition(
 	[property: JsonPropertyName("line")] int? Line,
 	[property: JsonPropertyName("character")] int? Character);

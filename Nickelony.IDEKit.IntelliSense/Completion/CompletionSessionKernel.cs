@@ -7,9 +7,9 @@ namespace Nickelony.IDEKit.IntelliSense.Completion;
 /// being typed at the caret.
 /// </summary>
 /// <remarks>
-/// The kernel owns the generic completion-session pipeline - provider invocation (synchronous or
-/// off-thread), current-word filtering, word and replacement-range handling, and the open / close /
-/// no-op decision - so language coordinators stay thin and do not duplicate session logic. Languages
+/// The kernel owns the generic completion-session pipeline - provider invocation, current-word filtering,
+/// word and replacement-range handling, and the open / close / no-op decision - so language coordinators stay
+/// thin and do not duplicate session logic. Languages
 /// with custom word or replacement-range rules supply their own <see cref="CompletionWordLocator"/> to
 /// the constructor or a per-call <see cref="CompletionWordInfo"/>, and may inject a language-specific
 /// item filter. The kernel does not retain per-request state; callers own any supersession or cancellation
@@ -54,8 +54,15 @@ public sealed class CompletionSessionKernel
 	/// </param>
 	/// <returns>
 	/// An opening decision with the filtered items and replacement range, or
-	/// <see cref="TextCompletionSessionDecision.None"/> when no item matches.
+	/// <see cref="TextCompletionSessionDecision.None"/> when the provider returns no items or filtering removes
+	/// every item.
 	/// </returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="snapshot"/> or <paramref name="provider"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="caretOffset"/> is negative or greater than the snapshot text length.
+	/// </exception>
 	public TextCompletionSessionDecision GetDecision(
 		ITextSnapshot snapshot,
 		int caretOffset,
@@ -92,11 +99,18 @@ public sealed class CompletionSessionKernel
 	/// <see cref="CompletionWordLocator"/> computes them from <paramref name="snapshot"/> and
 	/// <paramref name="caretOffset"/>.
 	/// </param>
-	/// <param name="cancellationToken">The cancellation token observed while the provider executes.</param>
+	/// <param name="cancellationToken">The cancellation token used to cancel queued provider work before it starts.</param>
 	/// <returns>
 	/// An opening decision with the filtered items and replacement range, or
-	/// <see cref="TextCompletionSessionDecision.None"/> when no item matches.
+	/// <see cref="TextCompletionSessionDecision.None"/> when the provider returns no items or filtering removes
+	/// every item.
 	/// </returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="snapshot"/> or <paramref name="provider"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="caretOffset"/> is negative or greater than the snapshot text length.
+	/// </exception>
 	public async Task<TextCompletionSessionDecision> GetDecisionAsync(
 		ITextSnapshot snapshot,
 		int caretOffset,

@@ -18,8 +18,9 @@ public sealed record WorkspaceDocumentBatchEntry(
 /// </summary>
 /// <remarks>
 /// <see cref="Documents"/> is an optimistic batch: every entry is validated by document key, version,
-/// and location before the directory is moved. Only the listed tracked documents are rekeyed in the
-/// store; the directory move itself applies to the complete directory on disk.
+/// location, and expected on-disk stamp before the directory is moved. Only the listed tracked
+/// documents are rekeyed in the store; the directory move itself applies to the complete directory
+/// on disk.
 /// </remarks>
 public sealed record WorkspaceDocumentDirectoryRenameRequest(
 	string SourceDirectoryPath,
@@ -64,7 +65,7 @@ public enum WorkspaceDocumentDirectoryRenameStatus
 	/// <summary>The move failed.</summary>
 	MoveFailed,
 
-	/// <summary>The directory moved, but one or more attached views could not be updated.</summary>
+	/// <summary>View synchronization prevented the move or failed after the directory moved.</summary>
 	ViewUpdateFailed,
 
 	/// <summary>The operation was cancelled.</summary>
@@ -76,8 +77,8 @@ public enum WorkspaceDocumentDirectoryRenameStatus
 /// </summary>
 /// <remarks>
 /// <c>Snapshots</c> contains the current snapshots of the listed documents when available.
-/// A result produced by the view manager may also contain <c>FailedViewIds</c> when the
-/// directory moved but one or more attached views could not be updated.
+/// A result produced by the view manager may also contain <c>FailedViewIds</c> when view
+/// synchronization prevented the operation or failed after the directory operation completed.
 /// </remarks>
 public sealed record WorkspaceDocumentDirectoryRenameResult(
 	WorkspaceDocumentDirectoryRenameStatus Status,
@@ -91,7 +92,7 @@ public sealed record WorkspaceDocumentDirectoryRenameResult(
 /// Requests deletion of a directory and the documents it contains.
 /// </summary>
 /// <param name="DirectoryPath">The directory path to delete.</param>
-/// <param name="Documents">The tracked documents whose identities must still match before deletion.</param>
+/// <param name="Documents">The tracked documents whose keys, versions, paths, and on-disk stamps must still match before deletion.</param>
 /// <param name="UseRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; <see langword="false"/> to delete permanently.</param>
 /// <remarks>
 /// The directory operation itself can remove unlisted files as part of the recursive delete.
@@ -130,10 +131,10 @@ public enum WorkspaceDocumentDirectoryDeleteStatus
 	/// <summary>The delete failed.</summary>
 	DeleteFailed,
 
-	/// <summary>An attached view had edits or a conflict and blocked deletion.</summary>
+	/// <summary>An attached view was not synchronized and blocked deletion.</summary>
 	ViewNotSynchronized,
 
-	/// <summary>The directory was deleted, but one or more attached views could not be closed or unregistered.</summary>
+	/// <summary>View synchronization prevented deletion or one or more attached views could not be closed after deletion.</summary>
 	ViewUpdateFailed,
 
 	/// <summary>The operation was cancelled.</summary>
@@ -145,8 +146,8 @@ public enum WorkspaceDocumentDirectoryDeleteStatus
 /// </summary>
 /// <remarks>
 /// <c>Snapshots</c> contains snapshots of the listed documents captured before successful
-/// removal from tracking. <c>FailedViewIds</c> identifies attached views that the view manager
-/// could not close or unregister cleanly.
+/// removal from tracking. <c>FailedViewIds</c> identifies views that prevented deletion or could
+/// not be closed after deletion.
 /// </remarks>
 public sealed record WorkspaceDocumentDirectoryDeleteResult(
 	WorkspaceDocumentDirectoryDeleteStatus Status,

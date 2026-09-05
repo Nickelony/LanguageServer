@@ -72,7 +72,7 @@ public class DocumentOperationSchedulerTests
 	}
 
 	[TestMethod]
-	public async Task EnqueuePerDocumentAsync_LaterWorkStillRunsAfterCanceledPredecessor()
+	public async Task EnqueuePerDocumentAsync_LaterWorkStillRunsAfterCanceledOperation()
 	{
 		var scheduler = new DocumentOperationScheduler();
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -317,7 +317,7 @@ public class DocumentOperationSchedulerTests
 	}
 
 	[TestMethod]
-	public async Task WaitForPerDocumentOperationsAsync_WaitsForActiveExclusiveBarrier()
+	public async Task WaitForPerDocumentOperationsAsync_WaitsForActiveExclusiveOperation()
 	{
 		var scheduler = new DocumentOperationScheduler();
 		var exclusiveStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

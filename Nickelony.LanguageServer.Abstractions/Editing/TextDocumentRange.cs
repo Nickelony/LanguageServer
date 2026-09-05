@@ -1,12 +1,10 @@
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Identifies a one-based text range inside a document.
+/// Represents a text range using one-based line and column numbers.
 /// </summary>
 /// <remarks>
-/// This DTO is used for document edits and other cross-boundary locations where line and column
-/// coordinates need to remain stable without depending on a concrete editor segment instance. Coordinates
-/// are normalized to at least one, and the end coordinate is never placed before the start coordinate.
+/// Values less than one are changed to one. If the end is before the start, it is changed to the start.
 /// </remarks>
 public sealed class TextDocumentRange
 {

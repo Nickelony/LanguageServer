@@ -27,7 +27,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	private const int MaxTrackedRequestOnlyDocuments = 16;
 
 	/// <summary>
-	/// Gets the workspace file patterns mirrored to the Lua language server for external-change watching.
+	/// Gets the workspace paths and file patterns mirrored to the Lua language server for external-change watching.
 	/// </summary>
 	internal static IReadOnlyList<WorkspaceWatchSpecification> WorkspaceWatchSpecifications { get; } = Array.AsReadOnly(
 	[
@@ -154,15 +154,14 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	}
 
 	/// <summary>
-	/// Occurs when a Lua language-server startup failure should be surfaced to the user.
+	/// Occurs when a Lua language-server startup failure is reported to the host.
 	/// </summary>
 	/// <remarks>
-	/// Startup-failure notifications may be delivered from background work. Consumers that touch UI controls must marshal
-	/// to the UI thread. Handlers for one event invocation run serially on the raising thread and a failing handler is
-	/// isolated from later handlers. The event is raised at most once per transient startup-failure period and once per
-	/// terminal failure period; a successful restart resets the transient notification state. Disposal closes callback
-	/// admission. A callback that passed admission before disposal began may still start or finish after disposal begins;
-	/// callbacks are not admitted once admission is closed.
+	/// Notifications may be delivered from background work. Consumers that touch UI controls must marshal to the UI thread.
+	/// Handlers for one event invocation run serially on the raising thread, and a failing handler does not prevent later
+	/// handlers from running. The event is raised once for a transient failure period and once when repeated failures
+	/// become persistent. A successful start clears the failure notification state. Disposal prevents new callbacks, but a
+	/// callback already in progress may finish.
 	/// </remarks>
 	public event Action<LanguageServerStartupFailure>? StartupFailed
 	{
@@ -182,16 +181,13 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	}
 
 	/// <summary>
-	/// Occurs when the external workspace watcher fails to start for an existing workspace or cannot be automatically
-	/// recovered, leaving external workspace changes unforwarded.
+	/// Occurs when the external workspace watcher cannot start for an existing workspace or automatic recovery fails.
 	/// </summary>
 	/// <remarks>
-	/// Workspace-watcher notifications may be delivered from background work. Consumers that touch UI controls must
-	/// marshal to the UI thread. Handlers for one event invocation run serially on the raising thread and a failing handler
-	/// is isolated from later handlers. Automatic watcher recovery is attempted first; a successful recovery does not
-	/// raise this event. The event is raised once per unresolved startup or recovery failure until a later successful
-	/// recovery resets the notification state. Disposal closes callback admission. A callback that passed admission before
-	/// disposal began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
+	/// Notifications may be delivered from background work. Consumers that touch UI controls must marshal to the UI thread.
+	/// Automatic recovery is attempted first; a successful recovery does not raise this event. The event is raised once
+	/// until the watcher starts successfully again. External workspace changes may not be forwarded while the watcher is
+	/// unavailable. Disposal prevents new callbacks, but a callback already in progress may finish.
 	/// </remarks>
 	public event Action<WorkspaceWatcherFailure>? WorkspaceWatcherFailed
 	{
@@ -222,7 +218,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 			s_defaultRequestTimeout,
 			DefaultRequestTimeoutRestartThreshold,
 			logger: logger)
-	{ }
+	{
+		ArgumentNullException.ThrowIfNull(workspaceRootDirectoryPath);
+	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class for testing and dependency injection.
@@ -230,7 +228,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua script workspace.</param>
 	/// <param name="client">The language server client, or <see langword="null"/> when unavailable.</param>
 	/// <param name="requestTimeout">The per-request timeout, or <see langword="null"/> for the default.</param>
-	/// <param name="requestTimeoutRestartThreshold">The consecutive timeout count that triggers an automatic restart.</param>
+	/// <param name="requestTimeoutRestartThreshold">The number of consecutive request timeouts before the current transport is marked unhealthy and the next request triggers a restart.</param>
 	/// <param name="workspaceFileWatcherFactory">A factory for creating workspace file watchers, used for testing.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
 	/// <remarks>
@@ -294,6 +292,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <inheritdoc/>
 	public IReadOnlyList<TextEditorDiagnostic> GetDiagnostics(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		if (_isDisposed)
 			return [];
 
@@ -306,6 +306,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <inheritdoc/>
 	public IReadOnlyList<LuaSemanticToken> GetSemanticTokens(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		if (_isDisposed)
 			return [];
 
@@ -318,6 +320,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <inheritdoc/>
 	public void OpenDocument(string filePath, string content)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
 			return;
 
@@ -333,6 +338,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <inheritdoc/>
 	public void UpdateDocument(string filePath, string content)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
 			return;
 
@@ -342,6 +350,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	/// <inheritdoc/>
 	public void CloseDocument(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		if (_isDisposed || _client is null || !LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
 			return;
 

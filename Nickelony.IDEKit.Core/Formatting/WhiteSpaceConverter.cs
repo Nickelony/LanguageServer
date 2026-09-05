@@ -4,7 +4,7 @@ namespace Nickelony.IDEKit.Core.Formatting;
 
 /// <summary>
 /// Converts between spaces and tabs in text while preserving the original line-ending
-/// convention. Space-to-tab conversion changes leading indentation; tab-to-space conversion
+/// sequences. Space-to-tab conversion changes leading indentation; tab-to-space conversion
 /// expands tabs wherever they occur.
 /// </summary>
 public static class WhiteSpaceConverter
@@ -20,7 +20,9 @@ public static class WhiteSpaceConverter
 	/// <exception cref="ArgumentOutOfRangeException"><paramref name="tabSize"/> is less than or equal to zero.</exception>
 	public static string ConvertSpacesToTabs(string input, int tabSize)
 	{
+		ArgumentNullException.ThrowIfNull(input);
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tabSize);
+
 		return TransformLines(input, line => ConvertLineIndentationToTabs(line, tabSize));
 	}
 
@@ -33,7 +35,9 @@ public static class WhiteSpaceConverter
 	/// <exception cref="ArgumentOutOfRangeException"><paramref name="tabSize"/> is less than or equal to zero.</exception>
 	public static string ConvertTabsToSpaces(string input, int tabSize)
 	{
+		ArgumentNullException.ThrowIfNull(input);
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tabSize);
+
 		return TransformLines(input, line => ExpandTabs(line, tabSize));
 	}
 
@@ -47,7 +51,7 @@ public static class WhiteSpaceConverter
 
 		while (lineStart < input.Length)
 		{
-			// Find the next line terminator without treating a standalone CR as content.
+			// Treat CR as a line terminator even when it is not followed by LF.
 			int lineEndingOffset = input.AsSpan(lineStart).IndexOfAny('\r', '\n');
 			int lineEndingIndex = lineEndingOffset < 0 ? -1 : lineStart + lineEndingOffset;
 

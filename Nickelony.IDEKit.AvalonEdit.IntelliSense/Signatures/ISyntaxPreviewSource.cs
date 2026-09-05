@@ -3,7 +3,7 @@ using Nickelony.IDEKit.IntelliSense.Signatures;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Signatures;
 
 /// <summary>
-/// Provides the syntax preview text used by an editor status presentation.
+/// Provides the current signature syntax preview for an editor presentation.
 /// </summary>
 public interface ISyntaxPreviewSource
 {

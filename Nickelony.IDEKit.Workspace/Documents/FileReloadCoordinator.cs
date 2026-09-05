@@ -7,8 +7,9 @@ namespace Nickelony.IDEKit.Workspace.Documents;
 /// <typeparam name="TPromptResult">The host-neutral reload prompt result type.</typeparam>
 /// <remarks>
 /// This coordinator does not normalize paths or provide synchronization. Callers should serialize
-/// access to an instance. A processing call made while another processing call is running is ignored;
-/// files queued during a pass are cleared when that pass completes.
+/// access to an instance. A processing call that observes another pass already running returns
+/// without processing.
+/// On normal completion, queued entries are cleared, including entries added during the pass.
 /// </remarks>
 public sealed class FileReloadCoordinator<TPromptResult>
 {
@@ -21,11 +22,13 @@ public sealed class FileReloadCoordinator<TPromptResult>
 	public bool IsRunning { get; private set; }
 
 	/// <summary>
-	/// Queues a file for reload. Blank paths and exact duplicate strings are ignored.
+	/// Queues a file for reload. Blank paths and case-sensitive exact duplicate strings are ignored.
 	/// </summary>
 	/// <param name="filePath">The file path to reload.</param>
 	public void QueueFile(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		if (string.IsNullOrWhiteSpace(filePath) || _pendingFileReloads.Contains(filePath))
 			return;
 
@@ -44,6 +47,16 @@ public sealed class FileReloadCoordinator<TPromptResult>
 	/// only when the resolver returns <see cref="WorkspaceDocumentConflictResolutionStatus.ResolvedWithDisk"/>
 	/// or <see cref="WorkspaceDocumentConflictResolutionStatus.ResolvedWithLogical"/>.
 	/// </remarks>
+	/// <example>
+	/// <code>
+	/// coordinator.QueueFile(filePath);
+	/// coordinator.ProcessQueuedFiles(
+	/// 	promptReload,
+	/// 	reloadDocument,
+	/// 	reportReloadFailure,
+	/// 	resolveConflict);
+	/// </code>
+	/// </example>
 	public void ProcessQueuedFiles(
 		Func<string, TPromptResult> promptReload,
 		Func<string, WorkspaceDocumentReloadResult> reloadDocument,

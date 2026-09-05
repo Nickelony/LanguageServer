@@ -13,6 +13,10 @@ public sealed class TextFormatRequest
 	/// <param name="options">The formatting options to apply.</param>
 	public TextFormatRequest(string filePath, string documentText, TextFormattingOptions options)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(documentText);
+		ArgumentNullException.ThrowIfNull(options);
+
 		FilePath = filePath;
 		DocumentText = documentText;
 		Options = options;

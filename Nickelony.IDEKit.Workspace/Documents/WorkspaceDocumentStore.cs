@@ -152,6 +152,8 @@ public sealed class WorkspaceDocumentStore : IWorkspaceDocumentStore
 	/// <inheritdoc />
 	public IReadOnlyList<WorkspaceDocumentSnapshot> GetSnapshotsUnderDirectory(string directoryPath)
 	{
+		ArgumentNullException.ThrowIfNull(directoryPath);
+
 		if (!TryNormalizePath(directoryPath, out string normalizedDirectoryPath))
 			return [];
 
@@ -1503,11 +1505,11 @@ public sealed class WorkspaceDocumentStore : IWorkspaceDocumentStore
 		PreGateCheckFailed,
 	}
 
-	// Outcome of a TryBeginOperation attempt. On success the document, captured
-	// snapshot, and registered operation are populated. On failure the failure
-	// kind and a snapshot of the state that failed validation are populated; the
-	// failure snapshot is always captured under _stateLock so it matches the
-	// state that was validated.
+	// Outcome of a TryBeginOperation attempt. On success the document and, when
+	// requested, captured snapshot are populated; a gated operation also has an
+	// operation registration. On failure the failure
+	// kind and, when available, a snapshot of the state that failed validation are populated;
+	// the failure snapshot is captured under _stateLock so it matches the state that was validated.
 	private readonly struct OperationBegin
 	{
 		public LogicalDocument? Document { get; init; }

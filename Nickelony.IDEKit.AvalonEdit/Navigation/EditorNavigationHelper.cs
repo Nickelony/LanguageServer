@@ -1,27 +1,28 @@
-using System.Text.RegularExpressions;
-using System.Windows;
-using System.Windows.Documents;
-using System.Windows.Input;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Documents;
 using Nickelony.IDEKit.Core.FindReplace;
 using Nickelony.IDEKit.Core.Navigation;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Documents;
+using System.Windows.Input;
 
 namespace Nickelony.IDEKit.AvalonEdit.Navigation;
 
 /// <summary>
-/// Creates and applies clamped caret, selection, and scroll locations for AvalonEdit editors.
+/// Provides AvalonEdit helpers for resolving document positions and applying navigation locations.
 /// </summary>
 public static class EditorNavigationHelper
 {
 	/// <summary>
-	/// Gets the document offset corresponding to the given point in the editor's view.
+	/// Maps a point in the editor to a zero-based document offset.
 	/// </summary>
 	/// <param name="textEditor">The editor to inspect.</param>
-	/// <param name="point">The point in the editor's coordinate space.</param>
-	/// <returns>The document offset, or <c>-1</c> when the point does not map to a position in the document.</returns>
-	public static int GetOffsetFromPoint(this ICSharpCode.AvalonEdit.TextEditor textEditor, Point point)
+	/// <param name="point">The point in the editor's coordinate space to map.</param>
+	/// <returns>The document offset, or <c>-1</c> when the point does not map to the document.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
+	public static int GetOffsetFromPoint(this TextEditor textEditor, Point point)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 
@@ -37,12 +38,15 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Gets the word surrounding the given document offset, using AvalonEdit's word-border rules.
+	/// Gets the text between the nearest AvalonEdit word borders around a document offset.
 	/// </summary>
 	/// <param name="textEditor">The editor to inspect.</param>
-	/// <param name="offset">The document offset to inspect.</param>
-	/// <returns>The word text, or <see langword="null"/> when no word surrounds the offset.</returns>
-	public static string? GetWordFromOffset(this ICSharpCode.AvalonEdit.TextEditor textEditor, int offset)
+	/// <param name="offset">The zero-based document offset to inspect.</param>
+	/// <returns>
+	/// The text between the surrounding word borders, or <see langword="null"/> when either border is unavailable.
+	/// </returns>
+	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
+	public static string? GetWordFromOffset(this TextEditor textEditor, int offset)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 
@@ -51,6 +55,7 @@ public static class EditorNavigationHelper
 			offset,
 			LogicalDirection.Backward,
 			CaretPositioningMode.WordBorder);
+
 		int wordEnd = TextUtilities.GetNextCaretPosition(
 			textEditor.Document,
 			offset,
@@ -63,11 +68,14 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Moves the caret to the mouse position when the editor has no selected text.
+	/// Moves the caret to the current mouse position when no text is selected.
 	/// </summary>
 	/// <param name="textEditor">The editor to update.</param>
-	/// <returns><see langword="true"/> when the caret was moved; otherwise, <see langword="false"/>.</returns>
-	public static bool TryMoveCaretToMousePosition(this ICSharpCode.AvalonEdit.TextEditor textEditor)
+	/// <returns>
+	/// <see langword="true"/> when a document position is found and applied; otherwise, <see langword="false"/>.
+	/// </returns>
+	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
+	public static bool TryMoveCaretToMousePosition(this TextEditor textEditor)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 
@@ -81,10 +89,11 @@ public static class EditorNavigationHelper
 
 		int offset = textEditor.Document.GetOffset(new TextLocation(position.Value.Line, position.Value.Column));
 		textEditor.Select(offset, 0);
+
 		return true;
 	}
 
-	private static TextViewPosition? GetTextViewPosition(ICSharpCode.AvalonEdit.TextEditor textEditor, Point point)
+	private static TextViewPosition? GetTextViewPosition(TextEditor textEditor, Point point)
 	{
 		if (textEditor.TextArea?.TextView is null)
 			return null;
@@ -94,11 +103,12 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Captures the editor's current caret, selection, and preferred display line as a location.
+	/// Captures the editor's current caret, selection, and caret line in a navigation location.
 	/// </summary>
-	/// <param name="textEditor">The editor to capture.</param>
+	/// <param name="textEditor">The editor to capture from.</param>
 	/// <returns>The captured location.</returns>
-	public static NavigationLocation CreateLocation(ICSharpCode.AvalonEdit.TextEditor textEditor)
+	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
+	public static NavigationLocation CreateLocation(TextEditor textEditor)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 
@@ -111,36 +121,42 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Creates a location for a one-based line and column in the editor's document.
+	/// Creates a zero-length location at a one-based line and column in the editor's document.
 	/// </summary>
 	/// <remarks>
-	/// The line number is clamped to the document's lines, and the column is clamped to the range from
-	/// the first character through one position past the line's final character.
+	/// The line and column are clamped when the offset is calculated.
+	/// The original line number is stored as the preferred scroll line and
+	/// clamped to the editor's line count when the location is applied.
 	/// </remarks>
 	/// <param name="textEditor">The editor whose document provides the offset mapping.</param>
 	/// <param name="filePath">The logical path of the target document.</param>
 	/// <param name="lineNumber">The one-based target line number.</param>
 	/// <param name="columnNumber">The one-based target column number.</param>
 	/// <returns>The created location.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="filePath"/> is <see langword="null"/>.
+	/// </exception>
 	public static NavigationLocation CreateDefinitionLocation(
-		ICSharpCode.AvalonEdit.TextEditor textEditor,
+		TextEditor textEditor,
 		string filePath,
 		int lineNumber,
 		int columnNumber)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
+		ArgumentNullException.ThrowIfNull(filePath);
 
 		int offset = GetOffset(textEditor, lineNumber, columnNumber);
-
 		return new NavigationLocation(filePath, offset, offset, 0, lineNumber);
 	}
 
 	/// <summary>
-	/// Creates a location that selects the given one-based line and column range.
+	/// Creates a location that selects a one-based line and column range.
 	/// </summary>
 	/// <remarks>
-	/// Both endpoints are clamped as they are converted to offsets. If the resulting end offset is
-	/// before the start offset, the selection length is zero.
+	/// Both endpoints are clamped to the document.
+	/// If the end offset precedes the start offset, the selection is empty.
+	/// The original start line number is stored as the preferred scroll line and
+	/// clamped to the editor's line count when the location is applied.
 	/// </remarks>
 	/// <param name="textEditor">The editor whose document provides the offset mapping.</param>
 	/// <param name="filePath">The logical path of the target document.</param>
@@ -149,8 +165,11 @@ public static class EditorNavigationHelper
 	/// <param name="endLineNumber">The one-based end line number.</param>
 	/// <param name="endColumnNumber">The one-based end column number.</param>
 	/// <returns>The created location.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="filePath"/> is <see langword="null"/>.
+	/// </exception>
 	public static NavigationLocation CreateRangeLocation(
-		ICSharpCode.AvalonEdit.TextEditor textEditor,
+		TextEditor textEditor,
 		string filePath,
 		int startLineNumber,
 		int startColumnNumber,
@@ -158,6 +177,7 @@ public static class EditorNavigationHelper
 		int endColumnNumber)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
+		ArgumentNullException.ThrowIfNull(filePath);
 
 		int startOffset = GetOffset(textEditor, startLineNumber, startColumnNumber);
 		int endOffset = GetOffset(textEditor, endLineNumber, endColumnNumber);
@@ -167,16 +187,18 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Applies a location to the editor: focuses it, clamps and restores the caret and selection,
-	/// and scrolls to the preferred line.
+	/// Applies a navigation location to the editor and scrolls to the target line.
 	/// </summary>
 	/// <remarks>
-	/// The selection is clamped to the document length independently of the caret offset. When no
-	/// preferred line is supplied, the line containing the selection start or caret is used.
+	/// The supplied caret and selection offsets are clamped before they are applied.
+	/// The selection operation determines the final caret position.
+	/// Without a preferred line, the selection start is used when it is after <c>0</c> or
+	/// the selection length is positive; otherwise, the caret line is used.
 	/// </remarks>
 	/// <param name="textEditor">The editor to update.</param>
 	/// <param name="location">The location to apply.</param>
-	public static void ApplyLocation(ICSharpCode.AvalonEdit.TextEditor textEditor, NavigationLocation location)
+	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
+	public static void ApplyLocation(TextEditor textEditor, NavigationLocation location)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 
@@ -192,19 +214,23 @@ public static class EditorNavigationHelper
 	}
 
 	/// <summary>
-	/// Attempts to re-select the search result at <paramref name="item"/>'s line in the document.
-	/// When the stored match index is out of range, the caret is placed at the start of the line
-	/// and the location still reports success so hosts can navigate to the containing line.
+	/// Tries to create a location for a search result.
 	/// </summary>
 	/// <remarks>
-	/// <paramref name="item"/>.MatchSegmentText is interpreted as a regular expression when matches
-	/// are reconstructed, consistent with the find-and-replace layer.
+	/// The stored match text is treated as an unescaped regular-expression pattern.
+	/// If the match index is invalid, a zero-length location at the line start is returned.
 	/// </remarks>
 	/// <param name="document">The document that contains the search result.</param>
 	/// <param name="filePath">The logical path of the document.</param>
 	/// <param name="item">The search result to re-select.</param>
-	/// <param name="location">The created location, when the result could be mapped.</param>
-	/// <returns><see langword="true"/> when a location was created; otherwise, <see langword="false"/>.</returns>
+	/// <param name="location">The mapped location, or <see langword="null"/> when the line is invalid.</param>
+	/// <returns><see langword="true"/> when the line is valid; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="document"/>, <paramref name="filePath"/>, or <paramref name="item"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException">
+	/// Thrown when the stored match text is not a valid regular-expression pattern.
+	/// </exception>
 	public static bool TryCreateSearchResultLocation(
 		this TextDocument document,
 		string filePath,
@@ -212,6 +238,7 @@ public static class EditorNavigationHelper
 		out NavigationLocation? location)
 	{
 		ArgumentNullException.ThrowIfNull(document);
+		ArgumentNullException.ThrowIfNull(filePath);
 		ArgumentNullException.ThrowIfNull(item);
 
 		location = null;
@@ -237,7 +264,7 @@ public static class EditorNavigationHelper
 	}
 
 	private static int GetPreferredLine(
-		ICSharpCode.AvalonEdit.TextEditor textEditor,
+		TextEditor textEditor,
 		NavigationLocation location,
 		int selectionStart,
 		int caretOffset)
@@ -252,11 +279,12 @@ public static class EditorNavigationHelper
 		return textEditor.Document.GetLineByOffset(offset).LineNumber;
 	}
 
-	private static int GetOffset(ICSharpCode.AvalonEdit.TextEditor textEditor, int lineNumber, int columnNumber)
+	private static int GetOffset(TextEditor textEditor, int lineNumber, int columnNumber)
 	{
 		int safeLineNumber = Math.Max(1, Math.Min(lineNumber, textEditor.Document.LineCount));
 		DocumentLine documentLine = textEditor.Document.GetLineByNumber(safeLineNumber);
 		int safeColumnNumber = Math.Max(1, Math.Min(columnNumber, documentLine.Length + 1));
+
 		return documentLine.Offset + safeColumnNumber - 1;
 	}
 }

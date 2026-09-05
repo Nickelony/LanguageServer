@@ -6,14 +6,15 @@ namespace Nickelony.IDEKit.Core.Identifiers;
 public enum IdentifierAffinity
 {
 	/// <summary>
-	/// Locates the token that contains the offset. When the offset falls on a non-token character,
-	/// the token immediately before the boundary is preferred.
+	/// Locates the token at the clamped offset. A preceding token-start character is preferred only
+	/// when the offset itself is a non-token character and the policy identifies that preceding
+	/// character as a token start.
 	/// </summary>
 	Containing,
 
 	/// <summary>
-	/// Locates the token that ends exactly at the offset (the word being typed). The span never
-	/// extends past the offset.
+	/// Locates a token ending at the offset (the word being typed). The character immediately before
+	/// the offset must be accepted as a token-start character, and the span never extends past it.
 	/// </summary>
 	BeforeCaret,
 }

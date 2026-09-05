@@ -7,10 +7,10 @@ namespace Nickelony.IDEKit.Workspace.Views;
 /// Coordinates view attachment and publication around workspace document authority.
 /// </summary>
 /// <remarks>
-/// The manager serializes its operation lifetime and dispatches all view access through the host
-/// callback supplied to the constructor. It tracks views by normalized document id and treats a
-/// failed refresh or identity update as an unsynchronized view until a later successful update or
-/// unregister.
+/// The manager tracks its active operations and uses the host callback supplied to the constructor
+/// for host-affine view operations. It tracks views by normalized document id and records failed
+/// view synchronization as unsynchronized; a successful refresh can clear that state, while
+/// unregistering the view always removes it.
 /// </remarks>
 public sealed class WorkspaceDocumentManager : IWorkspaceDocumentManager
 {
@@ -47,7 +47,10 @@ public sealed class WorkspaceDocumentManager : IWorkspaceDocumentManager
 
 	/// <inheritdoc />
 	public IReadOnlyList<WorkspaceDocumentSnapshot> GetSnapshotsUnderDirectory(string directoryPath)
-		=> RunOperation(() => _store.GetSnapshotsUnderDirectory(directoryPath));
+	{
+		ArgumentNullException.ThrowIfNull(directoryPath);
+		return RunOperation(() => _store.GetSnapshotsUnderDirectory(directoryPath));
+	}
 
 	private static WorkspaceDocumentViewIdentityResult AcknowledgeIdentity(
 		IWorkspaceDocumentView view,
@@ -956,7 +959,7 @@ public sealed class WorkspaceDocumentManager : IWorkspaceDocumentManager
 	}
 
 	// Returns the ids of peer views that block a store operation because they
-	// still have unsynchronized edits or conflicts, or null when none block. The
+	// still have unsynchronized state, pending edits, or conflicts, or null when none block. The
 	// check runs on the host.
 	private IReadOnlyList<string>? GetBlockingViews(string documentId)
 	{

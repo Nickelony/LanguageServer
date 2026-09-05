@@ -6,13 +6,10 @@ using Nickelony.IDEKit.Core.Indentation;
 namespace Nickelony.IDEKit.AvalonEdit.Indentation;
 
 /// <summary>
-/// An <see cref="IIndentationStrategy"/> that computes indentation by delegating to an
-/// <see cref="IIndentationPolicy"/>, with an optional document-aware smart-indent predicate.
+/// Applies indentation computed by an <see cref="IIndentationPolicy"/> to AvalonEdit lines.
 /// </summary>
 /// <remarks>
-/// The first line retains its existing leading whitespace because no previous line is available.
-/// For a range, line numbers outside the document are clamped and all replacements are grouped in
-/// one document update.
+/// The first line keeps its existing leading whitespace because it has no previous line.
 /// </remarks>
 public sealed class PolicyIndentationStrategy : IIndentationStrategy
 {
@@ -23,14 +20,16 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 	/// <summary>
 	/// Initializes a new instance of the <see cref="PolicyIndentationStrategy"/> class.
 	/// </summary>
-	/// <param name="options">The editor options that determine the indentation unit.</param>
-	/// <param name="policy">The policy that computes the desired indentation.</param>
+	/// <param name="options">The editor options used to create the indentation unit.</param>
+	/// <param name="policy">The policy used to compute each line's desired indentation.</param>
 	/// <param name="shouldUseSmartIndent">
-	/// An optional predicate that decides whether smart indent applies for a previous line.
-	/// When omitted, smart indent always applies.
+	/// An optional predicate that determines whether smart indentation should be used for the line being indented.
+	/// It receives the document and the line immediately before it.
+	/// Return <see langword="false"/> to disable smart indentation for that line.
+	/// If omitted, smart indentation is enabled.
 	/// </param>
 	/// <exception cref="ArgumentNullException">
-	/// <paramref name="options"/> or <paramref name="policy"/> is null.
+	/// <paramref name="options"/> or <paramref name="policy"/> is <see langword="null"/>.
 	/// </exception>
 	public PolicyIndentationStrategy(
 		TextEditorOptions options,
@@ -50,10 +49,14 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 	{
 		string lineText = document.GetText(line);
 		string desiredIndentation = GetDesiredIndentation(document, line, lineText);
+
 		ReplaceLeadingWhitespace(document, line, lineText, desiredIndentation);
 	}
 
 	/// <inheritdoc/>
+	/// <remarks>
+	/// Clamps requested line numbers to the document and groups replacements in a single document update.
+	/// </remarks>
 	public void IndentLines(TextDocument document, int beginLine, int endLine)
 	{
 		if (document.LineCount == 0)
@@ -84,15 +87,19 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 		string previousLineText = document.GetText(previousLine);
 		string previousLineIndentation = IndentationTextHelper.GetLeadingWhitespace(previousLineText);
 
+		string indentationUnit = IndentationTextHelper.CreateIndentationUnit(
+			_options.ConvertTabsToSpaces,
+			_options.IndentationSize,
+			_options.IndentationSize);
+
+		bool useSmartIndent = ShouldUseSmartIndent(document, previousLine);
+
 		return _policy.GetDesiredIndentation(new IndentationContext(
 			previousLineText,
 			lineText,
 			previousLineIndentation,
-			IndentationTextHelper.CreateIndentationUnit(
-				_options.ConvertTabsToSpaces,
-				_options.IndentationSize,
-				_options.IndentationSize),
-			ShouldUseSmartIndent(document, previousLine)));
+			indentationUnit,
+			useSmartIndent));
 	}
 
 	private bool ShouldUseSmartIndent(TextDocument document, DocumentLine previousLine)

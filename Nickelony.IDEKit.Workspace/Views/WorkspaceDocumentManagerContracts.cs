@@ -53,11 +53,11 @@ public interface IWorkspaceDocumentManager : IAsyncDisposable
 	/// Synchronously opens a document and attaches a view.
 	/// </summary>
 	/// <remarks>
-	/// This member blocks the calling thread while the underlying asynchronous store
-	/// operation runs. It exists for host callers that cannot await. Do not call it
-	/// from a thread with a captured synchronization context that the caller must pump
-	/// (for example the UI thread), because blocking can deadlock. Prefer
+	/// This member blocks the calling thread while the underlying asynchronous store operation runs.
+	/// It exists for host callers that cannot await; callers that can await should prefer
 	/// <see cref="OpenWithViewAsync(string?, WorkspaceDocumentOpenOptions, IWorkspaceDocumentView, CancellationToken)"/>.
+	/// The supplied host callback still runs synchronously, so it must not wait for work that depends
+	/// on the blocked caller.
 	/// </remarks>
 	WorkspaceDocumentManagerOpenResult OpenWithView(
 		string? filePath,
@@ -72,15 +72,18 @@ public interface IWorkspaceDocumentManager : IAsyncDisposable
 	WorkspaceDocumentMutationResult Replace(WorkspaceDocumentReplaceRequest request);
 
 	/// <summary>
-	/// Discards unsaved changes and refreshes attached views.
+	/// Discards unsaved logical changes and asks attached views to acknowledge the restored snapshot.
 	/// </summary>
-	/// <remarks>View refresh failures are retained as unsynchronized state and can block later disk operations.</remarks>
+	/// <remarks>The manager asks attached views to acknowledge the restored snapshot. Failures are retained as unsynchronized state and can block later disk operations.</remarks>
 	WorkspaceDocumentMutationResult Discard(WorkspaceDocumentDiscardRequest request);
 
 	/// <summary>
 	/// Renames a tracked document and updates attached views.
 	/// </summary>
-	/// <remarks>The document operation is performed first; a view update failure is reported as <see cref="WorkspaceDocumentRenameStatus.ViewUpdateFailed"/>.</remarks>
+	/// <remarks>
+	/// Blocking view state is reported before the document operation. Otherwise, the document operation
+	/// is performed first and a later view update failure is reported as <see cref="WorkspaceDocumentRenameStatus.ViewUpdateFailed"/>.
+	/// </remarks>
 	Task<WorkspaceDocumentRenameResult> RenameAsync(
 		WorkspaceDocumentRenameRequest request,
 		CancellationToken cancellationToken = default);
@@ -104,7 +107,10 @@ public interface IWorkspaceDocumentManager : IAsyncDisposable
 	/// <summary>
 	/// Renames a directory and updates the identities of tracked documents below it.
 	/// </summary>
-	/// <remarks>Attached views are guarded before the move and acknowledge their new identities afterward.</remarks>
+	/// <remarks>
+	/// The manager derives the document batch from the currently tracked descendants before calling
+	/// the store. Attached views are guarded before the move and acknowledge their new identities afterward.
+	/// </remarks>
 	Task<WorkspaceDocumentDirectoryRenameResult> RenameDirectoryAsync(
 		WorkspaceDocumentDirectoryRenameRequest request,
 		CancellationToken cancellationToken = default);
@@ -112,7 +118,10 @@ public interface IWorkspaceDocumentManager : IAsyncDisposable
 	/// <summary>
 	/// Deletes a directory and its tracked documents.
 	/// </summary>
-	/// <remarks>Attached views are guarded before recursive deletion and closed afterward.</remarks>
+	/// <remarks>
+	/// The manager derives the document batch from the currently tracked descendants before calling
+	/// the store. Attached views are guarded before recursive deletion and closed afterward.
+	/// </remarks>
 	Task<WorkspaceDocumentDirectoryDeleteResult> DeleteDirectoryAsync(
 		WorkspaceDocumentDirectoryDeleteRequest request,
 		CancellationToken cancellationToken = default);
@@ -186,7 +195,7 @@ public enum WorkspaceDocumentManagerOpenStatus
 	/// <summary>The view was already registered or attached, so no new binding was created.</summary>
 	AlreadyOpen,
 
-	/// <summary>The supplied view was already bound, dirty, or conflicted and could not be attached.</summary>
+	/// <summary>The supplied view already has a document, unpublished edits, or a conflict and could not be attached.</summary>
 	ViewInConflictState,
 
 	/// <summary>The requested path is invalid.</summary>

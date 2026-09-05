@@ -3,7 +3,7 @@ using System.Text;
 namespace Nickelony.IDEKit.Tooling;
 
 /// <summary>
-/// Immutable description of an external process to launch.
+/// Describes an external process to launch.
 /// </summary>
 public sealed record ProcessRunRequest
 {
@@ -43,12 +43,12 @@ public sealed record ProcessRunRequest
 	public bool UseShellExecute { get; init; }
 
 	/// <summary>
-	/// Gets whether standard output is captured into the run result.
+	/// Gets whether standard output is redirected so it can be read from the process handle or included in a run result.
 	/// </summary>
 	public bool RedirectStandardOutput { get; init; }
 
 	/// <summary>
-	/// Gets whether standard error is captured into the run result.
+	/// Gets whether standard error is redirected so it can be read from the process handle or included in a run result.
 	/// </summary>
 	public bool RedirectStandardError { get; init; }
 
@@ -63,7 +63,8 @@ public sealed record ProcessRunRequest
 	public Encoding? StandardErrorEncoding { get; init; }
 
 	/// <summary>
-	/// Gets the maximum time to wait for the process before termination is attempted, or <see langword="null"/> to wait indefinitely.
+	/// Gets the maximum time <see cref="IProcessRunner.Run"/> waits for the process before termination is attempted, or
+	/// <see langword="null"/> to wait indefinitely.
 	/// </summary>
 	public TimeSpan? Timeout { get; init; }
 }

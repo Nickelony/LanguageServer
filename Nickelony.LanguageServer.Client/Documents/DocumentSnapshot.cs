@@ -12,11 +12,15 @@ public sealed class DocumentSnapshot
 	/// <param name="uri">The corresponding file URI sent to the language server.</param>
 	/// <param name="content">The current document text.</param>
 	/// <param name="version">The local synchronization version.</param>
-	public DocumentSnapshot(string filePath, string uri, string? content, int version)
+	public DocumentSnapshot(string filePath, string uri, string content, int version)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(uri);
+		ArgumentNullException.ThrowIfNull(content);
+
 		FilePath = filePath;
 		Uri = uri;
-		Content = content ?? string.Empty;
+		Content = content;
 		Version = version;
 	}
 

@@ -9,8 +9,8 @@ using System.Windows.Media;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests;
 
 /// <summary>
-/// Tests for <see cref="SemanticTokensColorizer"/> token replacement and clearing, style changes,
-/// range handling, modifier handling, document changes, and large token sets.
+/// Tests <see cref="SemanticTokensColorizer"/> token updates and clearing, style-cache rebuilds,
+/// range and modifier handling, document changes, and performance bounds for large token sets.
 /// </summary>
 [TestClass]
 public class SemanticTokensColorizerTests
@@ -36,7 +36,7 @@ public class SemanticTokensColorizerTests
 	}
 
 	[TestMethod]
-	public void SetTokens_AcceptsTokens_WithoutThrowing()
+	public void SetTokens_WithTokens_DoesNotThrow()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -132,7 +132,7 @@ public class SemanticTokensColorizerTests
 	}
 
 	[TestMethod]
-	public void OverlappingTokens_AreAccepted_WithoutThrowing()
+	public void SetTokens_WithOverlappingTokens_PreservesText()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -159,7 +159,7 @@ public class SemanticTokensColorizerTests
 	}
 
 	[TestMethod]
-	public void Modifiers_AreAccepted_WithoutThrowing()
+	public void SetTokens_WithModifiers_PreservesText()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -189,7 +189,7 @@ public class SemanticTokensColorizerTests
 	}
 
 	[TestMethod]
-	public void DocumentChange_AfterSetTokens_DoesNotThrow()
+	public void DocumentChange_AfterSetTokens_RedrawPreservesText()
 	{
 		STATestHelper.RunInSTA(() =>
 		{

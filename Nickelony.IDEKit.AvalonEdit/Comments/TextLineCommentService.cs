@@ -1,19 +1,17 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Documents;
 using Nickelony.IDEKit.Core.Comments;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace Nickelony.IDEKit.AvalonEdit.Comments;
 
 /// <summary>
-/// Applies line-comment transformations (comment, uncomment, toggle) to the selected lines of an
-/// AvalonEdit document, using the line-comment delimiter from an explicit <see cref="CommentSyntax"/>.
+/// Provides functionality to create and apply line-comment edits for selected lines in an AvalonEdit <see cref="TextDocument"/>.
 /// </summary>
 /// <remarks>
-/// The service preserves each line's leading whitespace and leaves whitespace-only lines unchanged.
-/// A selection is expanded to every line it touches, and the replacement appends the platform line
-/// terminator after every selected line, including a final line that had no terminator.
+/// The service preserves leading whitespace and leaves whitespace-only lines unchanged.
 /// </remarks>
 [SuppressMessage(
 	"Performance",
@@ -22,18 +20,21 @@ namespace Nickelony.IDEKit.AvalonEdit.Comments;
 public sealed class TextLineCommentService
 {
 	/// <summary>
-	/// Creates an edit that comments, uncomments, or toggles commenting on the selected lines.
+	/// Creates an edit for the requested line-comment transformation on the selected lines.
 	/// </summary>
-	/// <param name="document">The document the selection belongs to.</param>
+	/// <param name="document">The AvalonEdit <see cref="TextDocument"/> containing the selection.</param>
 	/// <param name="selectionStart">The zero-based start offset of the selection.</param>
 	/// <param name="selectionLength">The length of the selection.</param>
 	/// <param name="commentSyntax">The comment syntax whose line-comment delimiter is applied.</param>
-	/// <param name="action">The transformation to apply.</param>
-	/// <param name="edit">The created edit, when a transformation applies.</param>
+	/// <param name="action">The line-comment transformation to apply.</param>
+	/// <param name="edit">
+	/// The created edit when the method returns <see langword="true"/>; otherwise, <see langword="default"/>.
+	/// </param>
 	/// <returns>
-	/// <see langword="true"/> when the document is non-empty and has a line-comment delimiter;
+	/// <see langword="true"/> when the document contains text and its line-comment delimiter is non-blank;
 	/// otherwise, <see langword="false"/>.
 	/// </returns>
+	/// <exception cref="ArgumentNullException"><paramref name="document"/> is <see langword="null"/>.</exception>
 	public bool TryCreateEdit(
 		TextDocument document,
 		int selectionStart,
@@ -42,6 +43,8 @@ public sealed class TextLineCommentService
 		TextLineCommentAction action,
 		out TextLineCommentEdit edit)
 	{
+		ArgumentNullException.ThrowIfNull(document);
+
 		edit = default;
 
 		string? commentPrefix = commentSyntax.LineCommentDelimiter;
@@ -77,6 +80,7 @@ public sealed class TextLineCommentService
 		}
 
 		string replacementText = builder.ToString();
+
 		edit = new TextLineCommentEdit(
 			startLine.Offset,
 			totalLineLength,
@@ -88,16 +92,19 @@ public sealed class TextLineCommentService
 	}
 
 	/// <summary>
-	/// Applies a line-comment transformation to the editor's current selection.
+	/// Applies the requested line-comment transformation to the editor's current selection.
 	/// </summary>
-	/// <param name="editor">The editor whose selection is transformed.</param>
-	/// <param name="commentSyntax">The comment syntax whose line-comment delimiter is applied.</param>
+	/// <param name="editor">The editor whose current selection is transformed.</param>
+	/// <param name="commentSyntax">The syntax providing the line-comment delimiter.</param>
 	/// <param name="action">The transformation to apply.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="editor"/> is <see langword="null"/>.</exception>
 	public void ApplyEdit(
-		ICSharpCode.AvalonEdit.TextEditor editor,
+		TextEditor editor,
 		CommentSyntax commentSyntax,
 		TextLineCommentAction action)
 	{
+		ArgumentNullException.ThrowIfNull(editor);
+
 		if (!TryCreateEdit(
 			editor.Document,
 			editor.SelectionStart,
@@ -141,9 +148,11 @@ public sealed class TextLineCommentService
 	}
 
 	private static string TransformLine(string currentLineText, string commentPrefix, TextLineCommentAction action)
-		=> action == TextLineCommentAction.Uncomment
+	{
+		return action == TextLineCommentAction.Uncomment
 			? UncommentLine(currentLineText, commentPrefix)
 			: CommentLine(currentLineText, commentPrefix);
+	}
 
 	private static string CommentLine(string currentLineText, string commentPrefix)
 	{

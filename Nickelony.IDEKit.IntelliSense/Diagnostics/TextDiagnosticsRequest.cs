@@ -12,6 +12,9 @@ public sealed record TextDiagnosticsRequest
 	/// <param name="engineVersion">The engine version that should be used when evaluating diagnostics.</param>
 	public TextDiagnosticsRequest(string documentText, Version engineVersion)
 	{
+		ArgumentNullException.ThrowIfNull(documentText);
+		ArgumentNullException.ThrowIfNull(engineVersion);
+
 		DocumentText = documentText;
 		EngineVersion = engineVersion;
 	}

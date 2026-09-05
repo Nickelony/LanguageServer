@@ -50,6 +50,9 @@ public static class SemanticTokensDeltaParser
 	/// <returns>The updated semantic token integer stream, or <see langword="null"/> when the edits are invalid.</returns>
 	public static int[]? ApplyEdits(int[] previousData, IReadOnlyList<SemanticTokensEdit> edits)
 	{
+		ArgumentNullException.ThrowIfNull(previousData);
+		ArgumentNullException.ThrowIfNull(edits);
+
 		int newLength = previousData.Length;
 		int minimumStart = 0;
 

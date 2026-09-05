@@ -16,8 +16,7 @@ public enum TextCompletionTrigger
 	EmptyLine,
 
 	/// <summary>
-	/// Completion was raised from a context-sensitive trigger such as a <c>`= `</c> after a <c>Customize=</c> command,
-	/// or a <c>`, `</c> after an argument.
+	/// Completion was raised by a syntax-aware, context-specific trigger.
 	/// </summary>
 	Contextual,
 

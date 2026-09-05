@@ -2,18 +2,14 @@ namespace Nickelony.IDEKit.JsonSchema;
 
 /// <summary>
 /// Immutable vocabulary extracted from a JSON Schema for completion, hover, and highlighting.
-/// It collects property descriptors and string values from the root schema and from schemas
-/// reached through properties, array items, combinators, resolved references, and the root
-/// schema's <c>definitions</c> and <c>$defs</c> sections. Duplicate names and values are
-/// removed; the first occurrence in traversal order wins. Instances are produced by
-/// <see cref="JsonSchemaVocabularyIndexBuilder"/>, and the constructor copies its input lists.
+/// It contains property descriptors and distinct string values collected from the root schema and
+/// supported nested schemas; the first occurrence of each name or value is retained.
 /// </summary>
 public sealed class JsonSchemaVocabularyIndex
 {
 	/// <summary>
-	/// Gets the property names collected from the root schema and the supported nested schema
-	/// locations. Duplicate names are removed, and each descriptor retains the first occurrence's
-	/// declared types and description.
+	/// Gets the property descriptors collected from the root and supported nested schemas. Duplicate
+	/// names are removed; each descriptor retains the first occurrence's types and description.
 	/// </summary>
 	public IReadOnlyList<JsonSchemaVocabularyPropertyDescriptor> Properties { get; }
 
@@ -36,7 +32,7 @@ public sealed class JsonSchemaVocabularyIndex
 		ArgumentNullException.ThrowIfNull(properties);
 		ArgumentNullException.ThrowIfNull(constants);
 
-		// Keep private read-only copies of the supplied lists.
+		// Keep read-only copies of the supplied lists.
 		Properties = Array.AsReadOnly([.. properties]);
 		Constants = Array.AsReadOnly([.. constants]);
 	}

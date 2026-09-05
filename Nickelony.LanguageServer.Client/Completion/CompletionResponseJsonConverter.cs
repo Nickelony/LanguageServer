@@ -5,7 +5,8 @@ using System.Text.Json.Serialization;
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Deserializes completion responses from either LSP array or completion-list form.
+/// Accepts completion responses in either LSP wire form when reading and serializes the typed response using the
+/// completion-list form.
 /// </summary>
 public sealed class CompletionResponseJsonConverter : JsonConverter<CompletionResponse>
 {

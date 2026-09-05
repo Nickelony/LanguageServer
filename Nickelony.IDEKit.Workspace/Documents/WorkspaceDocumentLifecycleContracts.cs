@@ -31,7 +31,7 @@ public interface IWorkspaceDocumentStore : IAsyncDisposable
 	bool TryGetSnapshot(string? filePath, out WorkspaceDocumentSnapshot? snapshot);
 
 	/// <summary>Replaces the logical content and format of a tracked document without writing to disk.</summary>
-	/// <remarks>The request is accepted only when its document key and version match the current snapshot.</remarks>
+	/// <remarks>The request is accepted only when its document key and version match the current snapshot and no delete operation is active.</remarks>
 	WorkspaceDocumentMutationResult TryReplace(
 		WorkspaceDocumentReplaceRequest request);
 
@@ -49,15 +49,22 @@ public interface IWorkspaceDocumentStore : IAsyncDisposable
 	/// <summary>Reloads a tracked document from disk when its logical content is clean.</summary>
 	/// <remarks>
 	/// A dirty document is not overwritten: the method captures the current disk stamp and returns
-	/// <see cref="WorkspaceDocumentReloadStatus.ExternalFileConflict"/>. A clean document is updated
-	/// only after the request's version and expected disk stamp checks succeed.
+	/// <see cref="WorkspaceDocumentReloadStatus.ExternalFileConflict"/>. For a clean document, the
+	/// expected disk stamp determines whether the result is <see cref="WorkspaceDocumentReloadStatus.Unchanged"/>
+	/// or <see cref="WorkspaceDocumentReloadStatus.Reloaded"/>; the request's version must still match
+	/// before the snapshot is updated.
 	/// </remarks>
 	Task<WorkspaceDocumentReloadResult> ReloadAsync(
 		WorkspaceDocumentReloadRequest request,
 		CancellationToken cancellationToken = default);
 
 	/// <summary>Resolves an external change conflict by choosing disk content or logical content.</summary>
-	/// <remarks><see cref="WorkspaceDocumentConflictResolutionChoice.UseLogical"/> force-writes the logical snapshot using the observed conflict stamp.</remarks>
+	/// <remarks>
+	/// <see cref="WorkspaceDocumentConflictResolutionChoice.UseLogical"/> writes the logical snapshot
+	/// after capturing the current disk stamp. <see cref="WorkspaceDocumentConflictResolutionChoice.UseDisk"/>
+	/// reads and adopts the current disk content. The supplied observed stamp identifies the conflict
+	/// being resolved; it is not reused as the write precondition.
+	/// </remarks>
 	Task<WorkspaceDocumentConflictResolutionResult> ResolveExternalConflictAsync(
 		WorkspaceDocumentConflictResolutionRequest request,
 		CancellationToken cancellationToken = default);
@@ -85,13 +92,13 @@ public interface IWorkspaceDocumentStore : IAsyncDisposable
 		CancellationToken cancellationToken = default);
 
 	/// <summary>Moves a directory and updates the paths of the listed tracked documents below it.</summary>
-	/// <remarks>The listed documents are validated by key, version, and path before the directory move.</remarks>
+	/// <remarks>The listed documents are validated by key, version, path, and expected disk stamp before the directory move.</remarks>
 	Task<WorkspaceDocumentDirectoryRenameResult> RenameDirectoryAsync(
 		WorkspaceDocumentDirectoryRenameRequest request,
 		CancellationToken cancellationToken = default);
 
 	/// <summary>Recursively deletes a directory and removes the listed tracked documents after success.</summary>
-	/// <remarks>The listed documents are validated by key, version, and path before deletion.</remarks>
+	/// <remarks>The listed documents are validated by key, version, path, and expected disk stamp before deletion.</remarks>
 	Task<WorkspaceDocumentDirectoryDeleteResult> DeleteDirectoryAsync(
 		WorkspaceDocumentDirectoryDeleteRequest request,
 		CancellationToken cancellationToken = default);

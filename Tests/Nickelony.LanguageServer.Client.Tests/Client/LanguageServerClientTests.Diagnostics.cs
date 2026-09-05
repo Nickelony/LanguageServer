@@ -5,7 +5,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public partial class LanguageServerClientTests
 {
 	[TestMethod]
-	public async Task PublishDiagnostics_WhenTransportIsAttachedButNotReady_QueuesDiagnostics()
+	public async Task PublishDiagnostics_WhenTransportIsAttachedButNotReady_DeliversDiagnostics()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 6, process: null, Stream.Null, Stream.Null);

@@ -19,12 +19,15 @@ public sealed class LuaSemanticToken
 	/// </remarks>
 	public LuaSemanticToken(int line, int character, int length, string type, IReadOnlyList<string> modifiers)
 	{
+		ArgumentNullException.ThrowIfNull(type);
+		ArgumentNullException.ThrowIfNull(modifiers);
+
 		Line = Math.Max(0, line);
 		Character = Math.Max(0, character);
 		Length = Math.Max(0, length);
 		Type = type;
 
-		Modifiers = modifiers is { Count: > 0 }
+		Modifiers = modifiers.Count > 0
 			? Array.AsReadOnly([.. modifiers])
 			: [];
 	}
@@ -50,7 +53,7 @@ public sealed class LuaSemanticToken
 	public string Type { get; }
 
 	/// <summary>
-	/// Gets the owned immutable snapshot of semantic token modifiers.
+	/// Gets a read-only snapshot of the semantic token modifiers.
 	/// </summary>
 	public IReadOnlyList<string> Modifiers { get; }
 
@@ -61,6 +64,8 @@ public sealed class LuaSemanticToken
 	/// <returns><see langword="true"/> if the modifier is present; otherwise, <see langword="false"/>.</returns>
 	public bool HasModifier(string modifier)
 	{
+		ArgumentNullException.ThrowIfNull(modifier);
+
 		if (string.IsNullOrWhiteSpace(modifier) || Modifiers.Count == 0)
 			return false;
 

@@ -21,6 +21,8 @@ public sealed class TextSignatureHelpInfo
 		string? documentation = null,
 		IReadOnlyList<TextSignatureParameterInfo>? parameters = null)
 	{
+		ArgumentNullException.ThrowIfNull(label);
+
 		Label = label;
 		Documentation = documentation;
 

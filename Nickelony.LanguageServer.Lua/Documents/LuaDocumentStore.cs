@@ -3,7 +3,7 @@ using Nickelony.IDEKit.IntelliSense.Diagnostics;
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Stores the local document state mirrored to LuaLS, including versions, diagnostics, and semantic token caches.
+/// Tracks local document state for LuaLS synchronization, including versions, diagnostics, and semantic token caches.
 /// </summary>
 internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 {

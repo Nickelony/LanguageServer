@@ -11,7 +11,7 @@ namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests;
 public class TextHoverControllerTests
 {
 	[TestMethod]
-	public void HandleMouseHoverAsync_ThrowingProvider_FallsBackToDiagnosticWithoutEscaping()
+	public void HandleMouseHoverAsync_ThrowingProvider_FallsBackToDiagnosticWithoutThrowing()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -44,7 +44,7 @@ public class TextHoverControllerTests
 
 				controller.HandleMouseHoverAsync(eventArgs).GetAwaiter().GetResult();
 
-				// A provider failure must not escape; available diagnostic content is shown instead.
+				// A provider failure must not propagate; available diagnostic content is shown instead.
 				Assert.IsTrue(diagnosticShown);
 			}
 			finally
@@ -145,7 +145,7 @@ public class TextHoverControllerTests
 
 				hoverTask.GetAwaiter().GetResult();
 
-				// A cancelled in-flight request must not publish its result or show a tooltip.
+				// A cancelled in-flight request must not show a tooltip.
 				Assert.IsFalse(tooltipShown);
 			}
 			finally

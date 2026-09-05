@@ -51,8 +51,8 @@ public sealed class TextCompletionItemKindTests
 	[TestMethod]
 	public void InvalidIdentifiersRejectNullAndWhitespace()
 	{
-		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.CreateCustom(null!));
-		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.FromIdentifier(null!));
+		Assert.ThrowsExactly<ArgumentNullException>(() => TextCompletionItemKind.CreateCustom(null!));
+		Assert.ThrowsExactly<ArgumentNullException>(() => TextCompletionItemKind.FromIdentifier(null!));
 		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.CreateCustom(" \t\r\n "));
 		Assert.ThrowsExactly<ArgumentException>(() => TextCompletionItemKind.FromIdentifier(" \t\r\n "));
 	}

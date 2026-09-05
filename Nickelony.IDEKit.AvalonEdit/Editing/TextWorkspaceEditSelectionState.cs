@@ -1,11 +1,13 @@
+using ICSharpCode.AvalonEdit;
+
 namespace Nickelony.IDEKit.AvalonEdit.Editing;
 
 /// <summary>
-/// Captures the selection and caret state for a text editor before applying workspace edits.
+/// Stores editor selection and caret offsets captured before a workspace edit.
 /// </summary>
 /// <remarks>
-/// Selection offsets use AvalonEdit's zero-based UTF-16 document offsets. <see cref="SelectionEnd"/>
-/// is exclusive and equals <see cref="SelectionStart"/> plus the original selection length.
+/// Offsets use AvalonEdit's zero-based UTF-16 document offsets.
+/// <see cref="SelectionEnd"/> is exclusive and is calculated from the selection start and length at capture time.
 /// </remarks>
 public sealed class TextWorkspaceEditSelectionState
 {
@@ -18,38 +20,42 @@ public sealed class TextWorkspaceEditSelectionState
 	}
 
 	/// <summary>
-	/// Gets the file path associated with the captured editor.
+	/// Gets the file path of the document associated with the captured editor state.
 	/// </summary>
 	public string FilePath { get; }
 
 	/// <summary>
-	/// Gets the selection start offset.
+	/// Gets the zero-based selection start offset captured from the editor.
 	/// </summary>
 	public int SelectionStart { get; }
 
 	/// <summary>
-	/// Gets the selection end offset.
+	/// Gets the zero-based exclusive end offset of the selection captured from the editor.
 	/// </summary>
 	public int SelectionEnd { get; }
 
 	/// <summary>
-	/// Gets the caret offset.
+	/// Gets the zero-based caret offset captured from the editor.
 	/// </summary>
 	public int CaretOffset { get; }
 
 	/// <summary>
-	/// Captures the current selection state from an editor.
+	/// Captures the current selection and caret offsets from an editor.
 	/// </summary>
-	/// <param name="editor">The editor whose state should be captured.</param>
-	/// <param name="filePath">The file path associated with the editor; <see langword="null"/> is stored as an empty string.</param>
+	/// <param name="editor">The editor whose selection and caret offsets are captured.</param>
+	/// <param name="filePath">The file path of the document associated with the editor.</param>
 	/// <returns>The captured selection state.</returns>
-	public static TextWorkspaceEditSelectionState Capture(ICSharpCode.AvalonEdit.TextEditor editor, string filePath)
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="editor"/> or <paramref name="filePath"/> is <see langword="null"/>.
+	/// </exception>
+	public static TextWorkspaceEditSelectionState Capture(TextEditor editor, string filePath)
 	{
 		ArgumentNullException.ThrowIfNull(editor);
+		ArgumentNullException.ThrowIfNull(filePath);
 
 		int selectionStart = editor.SelectionStart;
 		int selectionEnd = selectionStart + editor.SelectionLength;
 
-		return new TextWorkspaceEditSelectionState(filePath ?? string.Empty, selectionStart, selectionEnd, editor.CaretOffset);
+		return new TextWorkspaceEditSelectionState(filePath, selectionStart, selectionEnd, editor.CaretOffset);
 	}
 }

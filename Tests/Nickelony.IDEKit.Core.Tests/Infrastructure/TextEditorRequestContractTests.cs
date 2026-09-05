@@ -26,7 +26,7 @@ public sealed class TextEditorRequestContractTests
 	[TestMethod]
 	public void TextEditorRequestOutcome_HasExpectedNumericValues()
 	{
-		// Keep the numeric values explicit so accidental changes are detected.
+		// Keep these enum values stable.
 #pragma warning disable MSTEST0032
 		Assert.AreEqual(0, (int)TextEditorRequestOutcome.Completed);
 		Assert.AreEqual(1, (int)TextEditorRequestOutcome.Cancelled);

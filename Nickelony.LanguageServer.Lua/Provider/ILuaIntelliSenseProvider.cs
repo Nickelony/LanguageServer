@@ -9,8 +9,7 @@ namespace Nickelony.LanguageServer.Lua;
 /// contracts are defined on the base interface.
 ///
 /// Implementations may raise callbacks from background threads. Consumers that access UI controls must marshal those
-/// callbacks to the UI thread. Disposal closes callback admission. A callback that passed admission before disposal
-/// began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
+/// callbacks to the UI thread. Disposal prevents new callbacks, but a callback already in progress may finish.
 /// </remarks>
 public interface ILuaIntelliSenseProvider : ILanguageServerIntelliSenseProvider
 {
@@ -19,10 +18,10 @@ public interface ILuaIntelliSenseProvider : ILanguageServerIntelliSenseProvider
 	/// </summary>
 	/// <remarks>
 	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
-	/// controls. Handlers for one event invocation run serially on the raising thread; a failing handler is isolated from
-	/// later handlers. The semantic-token list and each token's modifier list are owned immutable snapshots that remain
-	/// valid after the callback returns. Disposal closes callback admission. A callback that passed admission before
-	/// disposal began may still start or finish after disposal begins; callbacks are not admitted once admission is closed.
+	/// controls. Handlers for one event invocation run serially on the raising thread, and a failing handler does not
+	/// prevent later handlers from running. The semantic-token list contains the decoded result for that notification,
+	/// and each token's modifier list is a read-only snapshot. Disposal prevents new callbacks, but a callback already in progress
+	/// may finish.
 	/// </remarks>
 	event Action<string, IReadOnlyList<LuaSemanticToken>>? SemanticTokensUpdated;
 
@@ -30,6 +29,6 @@ public interface ILuaIntelliSenseProvider : ILanguageServerIntelliSenseProvider
 	/// Gets the latest semantic tokens known for a document.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>An owned immutable snapshot of the semantic tokens currently cached for the document.</returns>
+	/// <returns>A read-only snapshot of the semantic tokens currently cached for the document.</returns>
 	IReadOnlyList<LuaSemanticToken> GetSemanticTokens(string filePath);
 }

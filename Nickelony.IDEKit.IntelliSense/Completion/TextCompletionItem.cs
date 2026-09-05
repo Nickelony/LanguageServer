@@ -1,11 +1,10 @@
 namespace Nickelony.IDEKit.IntelliSense.Completion;
 
 /// <summary>
-/// Represents one shared completion entry that can be rendered by any scripting editor.
+/// Represents one shared completion entry for an editor completion list.
 /// </summary>
 /// <remarks>
-/// Optional fields drive optional UI regions. Missing detail, description, resolve callbacks,
-/// or protocol text-edit metadata should suppress those behaviors rather than requiring a
+/// Optional fields let hosts omit the corresponding UI or commit behavior without requiring a
 /// language-specific completion DTO. The built-in completion filter matches <see cref="InsertText"/>;
 /// hosts or custom filters may use <see cref="FilterText"/> instead.
 /// </remarks>
@@ -26,10 +25,10 @@ public sealed class TextCompletionItem
 	/// </param>
 	/// <param name="priority">The sort priority used by the completion UI.</param>
 	/// <param name="kind">The semantic category used for icons and styling.</param>
-	/// <param name="detail">Optional short detail text shown beside the label.</param>
+	/// <param name="detail">Optional short detail text for host rendering.</param>
 	/// <param name="filterText">Optional alternate text that a host or custom filter can use to match the item.</param>
 	/// <param name="isDescriptionMarkdown">Whether <paramref name="description"/> should be rendered as Markdown.</param>
-	/// <param name="resolveAsync">An optional asynchronous resolver for lazily loading richer content.</param>
+	/// <param name="resolveAsync">An optional asynchronous resolver for retrieving additional item details.</param>
 	/// <param name="textEdit">Optional protocol-style insert and replace ranges for custom commit behavior.</param>
 	/// <param name="requestDocumentVersion">
 	/// The originating document version associated with the item for staleness checks.
@@ -53,6 +52,8 @@ public sealed class TextCompletionItem
 		int? requestGeneration = null,
 		int? insertCaretOffset = null)
 	{
+		ArgumentNullException.ThrowIfNull(label);
+
 		Label = label;
 		InsertText = string.IsNullOrWhiteSpace(insertText) ? label : insertText;
 		Description = string.IsNullOrWhiteSpace(description)
@@ -99,7 +100,7 @@ public sealed class TextCompletionItem
 	public TextCompletionItemKind Kind { get; }
 
 	/// <summary>
-	/// Gets optional short detail text shown beside or above the label.
+	/// Gets optional short detail text for host rendering.
 	/// </summary>
 	public string? Detail { get; }
 
@@ -139,7 +140,7 @@ public sealed class TextCompletionItem
 	public bool CanResolve => _resolveAsync is not null;
 
 	/// <summary>
-	/// Resolves the item to richer content when a resolve callback is available.
+	/// Resolves the item to additional content when a resolve callback is available; otherwise returns this item.
 	/// </summary>
 	/// <param name="cancellationToken">The cancellation token for the resolve request.</param>
 	/// <returns>The resolved completion item.</returns>
@@ -157,6 +158,8 @@ public sealed class TextCompletionItem
 	/// <returns>A completion item with resolve support.</returns>
 	public TextCompletionItem WithResolveCallback(Func<CancellationToken, Task<TextCompletionItem>> resolveAsync)
 	{
+		ArgumentNullException.ThrowIfNull(resolveAsync);
+
 		return new(Label, InsertText, Description, Priority, Kind, Detail, FilterText, IsDescriptionMarkdown,
 			resolveAsync, TextEdit, RequestDocumentVersion, RequestGeneration, InsertCaretOffset);
 	}
@@ -221,10 +224,12 @@ public sealed class TextCompletionItem
 	/// <summary>
 	/// Creates a copy that merges richer resolved content onto the current item.
 	/// </summary>
-	/// <param name="resolvedItem">The resolved completion item carrying richer detail and description.</param>
+	/// <param name="resolvedItem">The resolved item carrying richer detail, description, or kind.</param>
 	/// <returns>A merged completion item that preserves the original commit metadata.</returns>
 	public TextCompletionItem WithResolvedContent(TextCompletionItem resolvedItem)
 	{
+		ArgumentNullException.ThrowIfNull(resolvedItem);
+
 		string? detail = string.IsNullOrWhiteSpace(resolvedItem.Detail) ? Detail : resolvedItem.Detail;
 		string? description = string.IsNullOrWhiteSpace(resolvedItem.Description) ? Description : resolvedItem.Description;
 

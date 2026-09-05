@@ -27,7 +27,7 @@ public sealed class NavigationHistoryTests
 		=> new(filePath, caretOffset, caretOffset, 0, null);
 
 	[TestMethod]
-	public void Observe_FirstLocationBecomesCurrentWithoutBackEntry()
+	public void Observe_FirstLocation_CreatesNoNavigationEntries()
 	{
 		var history = CreateHistory();
 

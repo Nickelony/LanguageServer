@@ -11,6 +11,8 @@ public sealed partial class DocumentOperationScheduler
 	/// <returns>A task that completes with the queued operation result.</returns>
 	public Task<TResult> EnqueueGlobalAsync<TResult>(Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(operation);
+
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		lock (_syncRoot)

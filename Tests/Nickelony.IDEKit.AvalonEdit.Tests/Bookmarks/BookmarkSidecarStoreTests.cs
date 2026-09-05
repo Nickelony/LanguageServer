@@ -5,8 +5,8 @@ using System.IO;
 namespace Nickelony.IDEKit.AvalonEdit.Tests;
 
 /// <summary>
-/// Tests for the <see cref="BookmarkSidecarStore"/> and the
-/// <see cref="BookmarkStoreExtensions"/> coordinator round-trip.
+/// Tests bookmark sidecar persistence and the <see cref="BookmarkStoreExtensions"/>
+/// methods that save and restore coordinator bookmarks.
 /// </summary>
 [TestClass]
 public sealed class BookmarkSidecarStoreTests

@@ -5,11 +5,6 @@ namespace Nickelony.IDEKit.Core.Comments;
 /// or multi-character continuation marker at the end of a line (e.g. <c>_</c> in
 /// Visual Basic or <c>...</c> in MATLAB).
 /// </summary>
-/// <remarks>
-/// The checks ignore trailing comments, so continuation is evaluated on the code
-/// portion of the line. This type is implemented in terms of <see cref="CommentHelper"/>
-/// and <see cref="CommentSyntax"/>, which is why it lives alongside the comment utilities.
-/// </remarks>
 public static class ContinuationHelper
 {
 	/// <summary>

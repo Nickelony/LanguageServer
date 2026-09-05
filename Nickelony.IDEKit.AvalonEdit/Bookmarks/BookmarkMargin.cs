@@ -1,70 +1,78 @@
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Editing;
 using ICSharpCode.AvalonEdit.Rendering;
 using Nickelony.IDEKit.Infrastructure;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Nickelony.IDEKit.AvalonEdit.Bookmarks;
 
 /// <summary>
-/// A left margin that renders a bookmark icon beside each visible bookmarked line.
-/// Clicking the margin toggles the bookmark on the clicked line.
+/// Renders icons for visible bookmarked lines and toggles bookmarks with a left-click.
 /// </summary>
 /// <remarks>
-/// The margin observes text-view layout and scrolling, but not external changes to the coordinator.
-/// Hosts that change bookmarks programmatically must request a redraw for the margin to reflect them.
+/// The margin invalidates itself when its text view, visual lines, or scroll offset changes, and after
+/// it toggles a bookmark. It does not subscribe to <see cref="BookmarkCoordinator"/> changes, so call
+/// <see cref="UIElement.InvalidateVisual"/> after changing bookmarks programmatically.
 /// </remarks>
 public sealed class BookmarkMargin : AbstractMargin
 {
 	private const double IconWidth = 10.0;
 	private const double IconHeight = 9.0;
 
-	private static double s_marginWidth = 16.0;
-
 	private static Geometry s_iconGeometry = CreateIconGeometry();
-
 	private static SolidColorBrush s_iconBrush = BrushHelpers.CreateFrozenBrush(Color.FromRgb(0xE6, 0xA2, 0x3C));
 
 	private readonly BookmarkCoordinator _bookmarkCoordinator;
 
 	/// <summary>
-	/// Gets or sets the width of the margin reserved for bookmark icons. The value is read during
-	/// measure, so assign it before the margin is shown for it to take effect.
+	/// Gets or sets the width reserved for bookmark icons.
+	/// The value is read during measurement. Changing it does not invalidate the margin's layout.
 	/// </summary>
-	public static double MarginWidth
-	{
-		get => s_marginWidth;
-		set => s_marginWidth = value;
-	}
+	public static double MarginWidth { get; set; } = 16.0;
 
 	/// <summary>
-	/// Gets or sets the brush used to draw bookmark icons. Reassigning the brush applies to subsequent drawing.
+	/// Gets or sets the brush used to draw bookmark icons.
+	/// The assigned brush is used by subsequent renders.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static SolidColorBrush IconBrush
 	{
 		get => s_iconBrush;
-		set => s_iconBrush = value;
+		set
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			s_iconBrush = value;
+		}
 	}
 
 	/// <summary>
-	/// Gets or sets the geometry used to draw bookmark icons. The geometry is drawn at its natural
-	/// size, centered horizontally in the margin and vertically on the bookmarked line. Reassigning
-	/// the geometry applies to subsequent drawing.
+	/// Gets or sets the geometry used to draw bookmark icons.
+	/// The geometry is not scaled and is centered when its bounds start at (0,0).
+	/// The assigned geometry is used by subsequent renders.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static Geometry IconGeometry
 	{
 		get => s_iconGeometry;
-		set => s_iconGeometry = value;
+		set
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			s_iconGeometry = value;
+		}
 	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookmarkMargin"/> class.
 	/// </summary>
-	/// <param name="bookmarkCoordinator">The coordinator whose bookmarked lines are rendered.</param>
+	/// <param name="bookmarkCoordinator">The coordinator used to query and toggle bookmarks.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="bookmarkCoordinator"/> is <see langword="null"/>.</exception>
 	public BookmarkMargin(BookmarkCoordinator bookmarkCoordinator)
-		=> _bookmarkCoordinator = bookmarkCoordinator;
+	{
+		ArgumentNullException.ThrowIfNull(bookmarkCoordinator);
+		_bookmarkCoordinator = bookmarkCoordinator;
+	}
 
 	/// <inheritdoc/>
 	protected override void OnTextViewChanged(TextView oldTextView, TextView newTextView)
@@ -105,9 +113,6 @@ public sealed class BookmarkMargin : AbstractMargin
 
 		Geometry iconGeometry = IconGeometry;
 
-		if (iconGeometry is null)
-			return;
-
 		double iconWidth = iconGeometry.Bounds.Width;
 		double iconHeight = iconGeometry.Bounds.Height;
 		double iconLeft = (MarginWidth - iconWidth) / 2.0;
@@ -119,7 +124,7 @@ public sealed class BookmarkMargin : AbstractMargin
 
 			double top = line.GetTextLineVisualYPosition(line.TextLines[0], VisualYPosition.TextTop)
 				- textView.VerticalOffset
-				+ (line.Height - iconHeight) / 2.0;
+				+ ((line.Height - iconHeight) / 2.0);
 
 			drawingContext.PushTransform(new TranslateTransform(iconLeft, top));
 			drawingContext.DrawGeometry(s_iconBrush, null, iconGeometry);

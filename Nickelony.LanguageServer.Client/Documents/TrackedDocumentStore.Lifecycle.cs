@@ -10,6 +10,8 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="filePath">The local file path of the document.</param>
 	public void ReleaseRequest(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
@@ -31,6 +33,8 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <returns><see langword="true"/> when the document was removed locally; otherwise, <see langword="false"/>.</returns>
 	public bool TryReleaseRequest(string filePath, out DocumentSnapshot? document)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
@@ -57,10 +61,9 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	}
 
 	/// <summary>
-	/// Evicts the oldest fully idle request-only documents until at most <paramref name="maxCount"/>
-	/// idle request-only documents remain tracked.
+	/// Evicts the oldest fully idle documents until at most <paramref name="maxCount"/> idle documents remain tracked.
 	/// </summary>
-	/// <param name="maxCount">The maximum number of idle request-only documents to keep tracked.</param>
+	/// <param name="maxCount">The maximum number of idle documents to keep tracked.</param>
 	public IReadOnlyList<DocumentSnapshot> TrimRequestOnlyDocuments(int maxCount)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegative(maxCount);
@@ -108,6 +111,8 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// </remarks>
 	public bool TryClose(string filePath, out DocumentSnapshot? document)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)

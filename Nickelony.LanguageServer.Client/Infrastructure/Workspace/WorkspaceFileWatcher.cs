@@ -4,7 +4,7 @@ namespace Nickelony.LanguageServer.Client;
 /// Watches the workspace root for configured file patterns and forwards coalesced changes to the owner.
 /// </summary>
 /// <remarks>
-/// A startup failure disposes the instance, so recovery requires creating a replacement watcher.
+/// If watcher creation or activation fails, this instance is disposed and recovery requires a replacement watcher.
 /// </remarks>
 public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 {
@@ -77,7 +77,7 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 	/// <param name="workspaceRootDirectoryPath">The workspace root directory to watch.</param>
 	/// <param name="dispatchAsync">The callback that forwards coalesced changes to the owner.</param>
 	/// <param name="watchSpecifications">The explicit file patterns that should be watched under the workspace root.</param>
-	/// <param name="watcherFailed">The callback that reports an unrecoverable watcher failure to the owner.</param>
+	/// <param name="watcherFailed">The callback that reports a watcher failure to the owner.</param>
 	/// <param name="fileSystemWatcherFactory">Creates one file-system watcher for a watch specification.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
 	public WorkspaceFileWatcher(
@@ -89,6 +89,8 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 		ILogger<WorkspaceFileWatcher>? logger = null)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRootDirectoryPath);
+		ArgumentNullException.ThrowIfNull(dispatchAsync);
+		ArgumentNullException.ThrowIfNull(watchSpecifications);
 
 		if (watchSpecifications.Count == 0)
 			throw new ArgumentException("At least one watch specification is required.", nameof(watchSpecifications));

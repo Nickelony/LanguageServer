@@ -11,6 +11,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	public async Task<IReadOnlyList<TextCompletionItem>> GetCompletionItemsAsync(string filePath, string content,
 		int line, int column, char? triggerCharacter = null, CancellationToken cancellationToken = default)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		return await SendPositionRequestAsync<CompletionResponse?, IReadOnlyList<TextCompletionItem>>(
 			filePath, content, line, column, "textDocument/completion",
 			(textDocument, position) => new CompletionParams(textDocument, position, BuildCompletionContext(triggerCharacter)),

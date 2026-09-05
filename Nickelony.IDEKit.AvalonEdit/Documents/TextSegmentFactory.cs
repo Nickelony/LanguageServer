@@ -1,27 +1,30 @@
-using System.Diagnostics.CodeAnalysis;
 using ICSharpCode.AvalonEdit.Document;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nickelony.IDEKit.AvalonEdit.Documents;
 
 /// <summary>
-/// Creates non-empty <see cref="TextSegment"/> values from offset ranges clamped to a document's bounds.
+/// Provides helpers for converting document offset ranges into non-empty AvalonEdit <see cref="TextSegment"/> instances.
 /// </summary>
-/// <remarks>
-/// To keep returned segments non-empty, an empty or reversed range is expanded to one character at
-/// the clamped start offset.
-/// </remarks>
 public static class TextSegmentFactory
 {
 	/// <summary>
-	/// Creates a segment for the supplied range, clamped to the document bounds.
+	/// Tries to create a non-empty <see cref="TextSegment"/> from the specified offsets,
+	/// clamping them to the document's character range.
 	/// </summary>
-	/// <param name="document">The document the segment is created for, or <see langword="null"/> for none.</param>
-	/// <param name="startOffset">The zero-based inclusive start offset.</param>
-	/// <param name="endOffset">The zero-based exclusive end offset.</param>
-	/// <param name="segment">The created segment, when the range is non-empty.</param>
+	/// <remarks>
+	/// For a non-empty document, empty or reversed ranges become a segment of length <c>1</c> at the
+	/// nearest valid character offset. A <see langword="null"/> or empty document produces no segment.
+	/// </remarks>
+	/// <param name="document">The document whose character range constrains the offsets, or <see langword="null"/>.</param>
+	/// <param name="startOffset">The zero-based inclusive start offset before clamping.</param>
+	/// <param name="endOffset">The zero-based exclusive end offset before clamping.</param>
+	/// <param name="segment">
+	/// The created segment when the method returns <see langword="true"/>; otherwise, <see langword="null"/>.
+	/// </param>
 	/// <returns>
-	/// <see langword="true"/> when <paramref name="document"/> is non-empty and a segment was created;
-	/// otherwise, <see langword="false"/>.
+	/// <see langword="true"/> when a segment is created;
+	/// <see langword="false"/> for a <see langword="null"/> or empty document.
 	/// </returns>
 	public static bool TryCreate(
 		TextDocument? document,

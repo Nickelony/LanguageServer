@@ -16,8 +16,9 @@ public sealed record WorkspaceDocumentKey(Guid Value);
 /// </summary>
 /// <remarks>
 /// <see cref="DocumentId"/> is the normalized path used by the store to identify the document;
-/// <see cref="DisplayPath"/> is the path retained for display and persistence operations. The
-/// logical content is in <see cref="Text"/>. <see cref="PersistedVersion"/> identifies the version
+/// <see cref="DisplayPath"/> is the supplied path retained for display and for choosing the
+/// temporary-file directory during commits. The logical content is in <see cref="Text"/>.
+/// <see cref="PersistedVersion"/> identifies the version
 /// represented by the persisted content, so <see cref="IsDirty"/> can remain <see langword="true"/>
 /// after a later logical edit occurs while an earlier snapshot is being committed.
 /// </remarks>

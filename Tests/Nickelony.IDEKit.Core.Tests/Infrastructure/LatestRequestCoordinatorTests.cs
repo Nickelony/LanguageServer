@@ -94,7 +94,7 @@ public sealed class LatestRequestCoordinatorTests
 	}
 
 	[TestMethod]
-	public async Task RunAsync_HonorsCallerCancellationToken()
+	public async Task RunAsync_CallerCancellationDiscardsResult()
 	{
 		var coordinator = new LatestRequestCoordinator();
 		var start = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);

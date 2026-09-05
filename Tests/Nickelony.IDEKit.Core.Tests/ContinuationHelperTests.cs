@@ -1,8 +1,7 @@
 namespace Nickelony.IDEKit.Core.Comments.Tests;
 
 /// <summary>
-/// Tests for <see cref="ContinuationHelper"/> with configured comments,
-/// trailing whitespace, and continuation markers.
+/// Tests continuation markers with whitespace, comments, and string content.
 /// </summary>
 [TestClass]
 public sealed class ContinuationHelperTests
@@ -35,7 +34,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_WithMarkerAndComment_ReturnsTrue()
 	{
-		// The comment is stripped before checking the marker.
+		// The marker remains after the comment is removed.
 		bool result = ContinuationHelper.IsValidContinuation("Legend= 42 > ; comment", s_semicolonSyntax, ContinuationMarker);
 
 		Assert.IsTrue(result);
@@ -52,7 +51,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_DuplicateMarker_ReturnsTrue()
 	{
-		// A marker at the end is sufficient, so >> also ends with >.
+		// The final marker position determines the result.
 		bool result = ContinuationHelper.IsValidContinuation("Legend= 42 >>", s_semicolonSyntax, ContinuationMarker);
 
 		Assert.IsTrue(result);
@@ -69,7 +68,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MarkerInComment_ReturnsFalse()
 	{
-		// The > is inside the comment, so it should not count.
+		// A marker inside a comment does not count.
 		bool result = ContinuationHelper.IsValidContinuation("Legend= 42 ; > not a marker", s_semicolonSyntax, ContinuationMarker);
 
 		Assert.IsFalse(result);
@@ -102,7 +101,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MarkerNotAtEndOfCode_ReturnsFalse()
 	{
-		// The marker is in the middle of the code, not at the end.
+		// A marker in the middle of the code does not count.
 		bool result = ContinuationHelper.IsValidContinuation("Legend= > 42", s_semicolonSyntax, ContinuationMarker);
 
 		Assert.IsFalse(result);
@@ -139,7 +138,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MultiCharMarkerWithComment_ReturnsTrue()
 	{
-		// The comment is stripped before checking the marker.
+		// The marker remains after the comment is removed.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + ... ; comment", s_semicolonSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -148,8 +147,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MultiCharMarkerDuplicated_ReturnsTrue()
 	{
-		// A line ending in ... followed by another . still ends with ...,
-		// so it continues.
+		// The line still ends with the marker despite the extra period.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + ....", s_semicolonSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -174,7 +172,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MultiCharMarkerInComment_ReturnsFalse()
 	{
-		// The ... is inside the comment, so it should not count.
+		// A marker inside a comment does not count.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 ; ...", s_semicolonSyntax, "...");
 
 		Assert.IsFalse(result);
@@ -204,7 +202,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_BlockCommentAfterMarker_ReturnsTrue()
 	{
-		// The block comment is stripped before checking the marker.
+		// The marker remains after the comment is removed.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + 2 ... /* c */", s_semicolonBlockSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -213,7 +211,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_BlockCommentBeforeMarker_ReturnsTrue()
 	{
-		// The marker after the block comment still counts.
+		// A marker after the block comment counts.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + 2 /* c */ ...", s_semicolonBlockSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -230,7 +228,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_BlockOpenerInsideLineComment_ReturnsTrue()
 	{
-		// The block opener inside the line comment is not a comment; the marker before it still counts.
+		// Text inside a line comment does not affect the marker before it.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + 2 ... // /* x */", s_cStyleSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -239,7 +237,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_UnclosedBlockCommentAfterMarker_ReturnsTrue()
 	{
-		// The unclosed block comment runs to the end; the marker before it still counts.
+		// An unclosed comment after the marker does not affect the result.
 		bool result = ContinuationHelper.IsValidContinuation("value = 1 + 2 ... /* c", s_semicolonBlockSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -256,7 +254,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_BlockMarkerInString_ReturnsFalse()
 	{
-		// The block comment and marker are inside the string, so neither counts.
+		// The comment and marker inside the string do not count.
 		bool result = ContinuationHelper.IsValidContinuation("\"value /* c */ ...\"", s_cStyleSyntax, "...");
 
 		Assert.IsFalse(result);
@@ -269,7 +267,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MarkerInsideTripleQuotedString_ReturnsFalse()
 	{
-		// The ... is inside the """ raw string, so it is not a code marker.
+		// A marker inside the raw string does not count.
 		bool result = ContinuationHelper.IsValidContinuation("\"\"\"a ...\"\"\"", s_cStyleSyntax, "...");
 
 		Assert.IsFalse(result);
@@ -278,7 +276,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MarkerAfterTripleQuotedString_ReturnsTrue()
 	{
-		// The marker after the closed raw string counts; the closing quotes are not code.
+		// A marker after the closed raw string counts.
 		bool result = ContinuationHelper.IsValidContinuation("\"\"\"a\"\"\" ...", s_cStyleSyntax, "...");
 
 		Assert.IsTrue(result);
@@ -287,7 +285,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_MarkerInsideTripleQuotedMultiline_ReturnsFalse()
 	{
-		// The ... on the second line is inside the multi-line raw string.
+		// A marker inside the multi-line raw string does not count.
 		bool result = ContinuationHelper.IsValidContinuation("\"\"\"a\n...\n\"\"\"", s_cStyleSyntax, "...");
 
 		Assert.IsFalse(result);
@@ -296,7 +294,7 @@ public sealed class ContinuationHelperTests
 	[TestMethod]
 	public void IsValidContinuation_UnclosedTripleQuotedString_ReturnsFalse()
 	{
-		// The unclosed raw string runs to the end, so the marker is not code.
+		// A marker inside an unclosed raw string does not count.
 		bool result = ContinuationHelper.IsValidContinuation("\"\"\"a ...", s_cStyleSyntax, "...");
 
 		Assert.IsFalse(result);

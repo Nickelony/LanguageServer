@@ -4,7 +4,7 @@ public sealed partial class WorkspaceFileChangeForwarder
 {
 	/// <summary>
 	/// Attempts to forward a new change set immediately.
-	/// The change set is buffered after forwarding was allowed when a transient startup or live transport failure occurs.
+	/// The change set is buffered when the startup callback reports no usable transport or when a recoverable live transport failure occurs.
 	/// When forwarding is not currently allowed, the change set is either buffered or ignored based on construction options.
 	/// </summary>
 	/// <param name="changes">The file changes to forward.</param>
@@ -16,6 +16,9 @@ public sealed partial class WorkspaceFileChangeForwarder
 		Func<IReadOnlyList<WorkspaceFileChange>, CancellationToken, Task> forwardAsync,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(changes);
+		ArgumentNullException.ThrowIfNull(forwardAsync);
+
 		if (!TryEnterOperation())
 			return false;
 
@@ -83,6 +86,8 @@ public sealed partial class WorkspaceFileChangeForwarder
 		Func<IReadOnlyList<WorkspaceFileChange>, CancellationToken, Task> forwardAsync,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(forwardAsync);
+
 		if (!TryEnterOperation())
 			return [];
 

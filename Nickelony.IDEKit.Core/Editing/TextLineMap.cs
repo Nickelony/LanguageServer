@@ -4,7 +4,7 @@ namespace Nickelony.IDEKit.Core.Editing;
 
 /// <summary>
 /// Provides a precomputed table of line start offsets and lengths for document content.
-/// Both <c>\r\n</c> and lone <c>\r</c> are treated as line breaks.
+/// LF, CRLF, and lone CR are treated as line breaks.
 /// </summary>
 public sealed class TextLineMap
 {
@@ -30,14 +30,16 @@ public sealed class TextLineMap
 	public int TextLength => _snapshot.TextLength;
 
 	/// <summary>
-	/// Gets the length of the specified zero-based line.
+	/// Gets the length of the specified zero-based line. The line index is clamped to the available
+	/// line range.
 	/// </summary>
 	/// <param name="lineIndex">The zero-based line index.</param>
 	/// <returns>The line length in UTF-16 code units.</returns>
 	public int GetLineLength(int lineIndex) => _lineLengths[ClampLineIndex(lineIndex)];
 
 	/// <summary>
-	/// Gets the absolute document offset where the specified zero-based line starts.
+	/// Gets the absolute document offset where the specified zero-based line starts. The line index
+	/// is clamped to the available line range.
 	/// </summary>
 	/// <param name="lineIndex">The zero-based line index.</param>
 	/// <returns>The absolute document offset.</returns>
@@ -58,7 +60,8 @@ public sealed class TextLineMap
 	}
 
 	/// <summary>
-	/// Gets the text of the specified zero-based line without its trailing newline sequence.
+	/// Gets the text of the specified zero-based line without its trailing newline sequence. The line
+	/// index is clamped to the available line range.
 	/// </summary>
 	/// <param name="lineIndex">The zero-based line index.</param>
 	/// <returns>The line text.</returns>
@@ -69,7 +72,8 @@ public sealed class TextLineMap
 	}
 
 	/// <summary>
-	/// Converts an offset into a zero-based line and character position.
+	/// Converts an offset into a zero-based line and character position. The offset is clamped to
+	/// the document bounds.
 	/// </summary>
 	/// <param name="offset">The zero-based UTF-16 document offset.</param>
 	/// <returns>The containing line and character position.</returns>

@@ -41,24 +41,28 @@ public static class IndentationTextHelper
 	}
 
 	/// <summary>
-	/// Gets the leading whitespace prefix for the supplied line.
+	/// Gets the leading whitespace prefix for the supplied line, excluding carriage returns and line feeds.
 	/// </summary>
 	/// <param name="lineText">The line text to inspect.</param>
 	/// <returns>The leading whitespace of the line.</returns>
 	public static string GetLeadingWhitespace(string lineText)
 	{
+		ArgumentNullException.ThrowIfNull(lineText);
+
 		return string.IsNullOrEmpty(lineText)
 			? string.Empty
 			: lineText[..GetLeadingWhitespaceLength(lineText)];
 	}
 
 	/// <summary>
-	/// Gets the number of leading whitespace characters in the supplied text.
+	/// Gets the number of leading whitespace characters in the supplied text, excluding carriage returns and line feeds.
 	/// </summary>
 	/// <param name="text">The text to inspect.</param>
 	/// <returns>The number of leading whitespace characters.</returns>
 	public static int GetLeadingWhitespaceLength(string text)
 	{
+		ArgumentNullException.ThrowIfNull(text);
+
 		int length = 0;
 
 		while (length < text.Length && char.IsWhiteSpace(text[length]) && text[length] != '\r' && text[length] != '\n')
@@ -75,6 +79,9 @@ public static class IndentationTextHelper
 	/// <returns>The indentation with one level removed.</returns>
 	public static string RemoveSingleIndentLevel(string indentation, string indentationUnit)
 	{
+		ArgumentNullException.ThrowIfNull(indentation);
+		ArgumentNullException.ThrowIfNull(indentationUnit);
+
 		if (string.IsNullOrEmpty(indentation))
 			return string.Empty;
 
@@ -97,6 +104,9 @@ public static class IndentationTextHelper
 	/// <returns>The composed indentation text.</returns>
 	public static string BuildIndentation(string currentLineIndentation, string indentationUnit, int indentLevel)
 	{
+		ArgumentNullException.ThrowIfNull(currentLineIndentation);
+		ArgumentNullException.ThrowIfNull(indentationUnit);
+
 		if (indentLevel <= 0)
 			return currentLineIndentation;
 
@@ -115,15 +125,20 @@ public static class IndentationTextHelper
 	/// <param name="text">The text to inspect.</param>
 	/// <returns><see langword="true"/> if the text contains a line break; otherwise, <see langword="false"/>.</returns>
 	public static bool ContainsLineBreak(string text)
-		=> text.IndexOfAny(['\r', '\n']) >= 0;
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		return text.IndexOfAny(['\r', '\n']) >= 0;
+	}
 
 	/// <summary>
 	/// Splits the supplied text into lines, preserving each line's delimiter and source offset.
 	/// </summary>
 	/// <param name="text">The text to split.</param>
-	/// <returns>The lines of the text, including a final empty line when the text ends with a line break.</returns>
+	/// <returns>The lines of the text, including a final empty line when the text is empty or ends with a line break.</returns>
 	public static IReadOnlyList<IndentationTextLine> SplitLines(string text)
 	{
+		ArgumentNullException.ThrowIfNull(text);
+
 		var lines = new List<IndentationTextLine>();
 		int lineStart = 0;
 		int index = 0;

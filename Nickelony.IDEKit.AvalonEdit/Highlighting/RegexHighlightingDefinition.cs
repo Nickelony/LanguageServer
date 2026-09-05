@@ -1,44 +1,44 @@
-using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Highlighting;
+using System.Windows.Media;
 
 namespace Nickelony.IDEKit.AvalonEdit.Highlighting;
 
 /// <summary>
-/// An <see cref="IHighlightingDefinition"/> built from declarative <see cref="RegexHighlightingRule"/>
-/// instances produced by <see cref="BuildRules"/>. The rule set is cached and can be rebuilt when an
-/// optional cache version changes, which lets derived definitions invalidate the cache when the
-/// source of their rules (for example a catalog) reloads.
+/// Provides a highlighting definition from regex-based rules.
+/// The main rule set is built lazily and rebuilt when the optional cache version changes.
 /// </summary>
 public abstract class RegexHighlightingDefinition : IHighlightingDefinition
 {
-	private readonly string _name;
 	private readonly Func<int>? _cacheVersion;
 	private readonly Color _fallbackColor;
+
 	private HighlightingRuleSet? _cachedRuleSet;
 	private int _cachedVersion;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="RegexHighlightingDefinition"/> class.
 	/// </summary>
-	/// <param name="name">The name of the highlighting definition and its main rule set.</param>
+	/// <param name="name">The definition name and the name of its main rule set.</param>
 	/// <param name="cacheVersion">
-	/// An optional version used to invalidate the cached rule set. When supplied and the returned
-	/// value changes between accesses, the rule set is rebuilt.
+	/// A function that returns a cache version. The main rule set is rebuilt when the returned value changes.
 	/// </param>
 	/// <param name="fallbackColor">
-	/// The color used when a rule style color cannot be parsed; defaults to white.
+	/// The fallback foreground color for missing or invalid rule colors. Defaults to black.
 	/// </param>
-	/// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+	/// <exception cref="ArgumentNullException"><paramref name="name"/> is <see langword="null"/>.</exception>
 	protected RegexHighlightingDefinition(string name, Func<int>? cacheVersion = null, Color? fallbackColor = null)
 	{
 		ArgumentNullException.ThrowIfNull(name);
 
-		_name = name;
+		Name = name;
+
 		_cacheVersion = cacheVersion;
-		_fallbackColor = fallbackColor ?? Colors.White;
+		_fallbackColor = fallbackColor ?? Colors.Black;
 	}
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Gets the main rule set. It is built on first access and rebuilt when the configured cache version changes.
+	/// </summary>
 	public HighlightingRuleSet MainRuleSet
 	{
 		get
@@ -54,33 +54,46 @@ public abstract class RegexHighlightingDefinition : IHighlightingDefinition
 	}
 
 	/// <inheritdoc/>
-	public string Name => _name;
+	public string Name { get; }
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Gets an empty collection because this definition has no named colors.
+	/// </summary>
 	public IEnumerable<HighlightingColor> NamedHighlightingColors => [];
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Gets an empty property collection.
+	/// </summary>
 	public IDictionary<string, string> Properties => new Dictionary<string, string>();
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Returns <see langword="null"/> because this definition has no named colors.
+	/// </summary>
+	/// <param name="name">The color name to look up.</param>
+	/// <returns><see langword="null"/>.</returns>
 	public HighlightingColor? GetNamedColor(string name)
 		=> null;
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Returns the main rule set when <paramref name="name"/> matches <see cref="Name"/>;
+	/// otherwise, returns <see langword="null"/>.
+	/// </summary>
+	/// <param name="name">The rule set name to look up.</param>
+	/// <returns>The main rule set for <see cref="Name"/>, or <see langword="null"/> when no match exists.</returns>
 	public HighlightingRuleSet? GetNamedRuleSet(string name)
 		=> name == MainRuleSet.Name ? MainRuleSet : null;
 
 	/// <summary>
-	/// Builds the declarative rules for the main rule set.
+	/// Provides the rules for the main rule set.
 	/// </summary>
-	/// <returns>The rules that make up the main rule set.</returns>
+	/// <returns>The rules used to build the main rule set.</returns>
 	protected abstract IEnumerable<RegexHighlightingRule> BuildRules();
 
 	private HighlightingRuleSet BuildRuleSet()
 	{
 		var ruleSet = new HighlightingRuleSet
 		{
-			Name = _name
+			Name = Name
 		};
 
 		foreach (RegexHighlightingRule rule in BuildRules())

@@ -33,7 +33,7 @@ public sealed class IdentifierHelperContainingSpanTests
 	}
 
 	[TestMethod]
-	public void ContainingSpan_ClassicScript_FirstArgumentAfterEquals()
+	public void ContainingSpan_ClassicScript_FirstArgument_IncludesLeadingWhitespace()
 	{
 		var snapshot = new StringTextSnapshot("Legend= 42");
 
@@ -45,7 +45,7 @@ public sealed class IdentifierHelperContainingSpanTests
 	}
 
 	[TestMethod]
-	public void ContainingSpan_ClassicScript_SecondArgumentAfterComma()
+	public void ContainingSpan_ClassicScript_SecondArgument_IncludesLeadingWhitespace()
 	{
 		var snapshot = new StringTextSnapshot("Customize= CUST_BAR, 5");
 

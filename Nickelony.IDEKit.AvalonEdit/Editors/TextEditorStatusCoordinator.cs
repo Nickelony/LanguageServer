@@ -3,24 +3,27 @@ using ICSharpCode.AvalonEdit.Editing;
 namespace Nickelony.IDEKit.AvalonEdit.Editors;
 
 /// <summary>
-/// Tracks caret position and zoom state for an AvalonEdit text area.
+/// Coordinates caret and selection notifications and maintains zoom state for an AvalonEdit <see cref="TextArea"/>.
 /// </summary>
 public sealed class TextEditorStatusCoordinator : IDisposable
 {
 	private readonly Action _raiseStatusChanged;
 	private readonly Action _raiseZoomChanged;
+
 	private readonly TextArea _textArea;
 
 	private bool _attached;
 	private bool _disposed;
-	private int _zoom = 100;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextEditorStatusCoordinator"/> class.
+	/// Associates a text area with callbacks for status and zoom changes.
 	/// </summary>
-	/// <param name="textArea">The text area whose caret and selection changes raise status updates.</param>
-	/// <param name="raiseStatusChanged">The callback invoked when the caret or selection changes.</param>
-	/// <param name="raiseZoomChanged">The callback invoked when the zoom changes.</param>
+	/// <param name="textArea">The text area to observe after <see cref="Attach"/> is called.</param>
+	/// <param name="raiseStatusChanged">The callback invoked when the observed caret position or selection changes.</param>
+	/// <param name="raiseZoomChanged">The callback invoked after a zoom change is applied.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textArea"/>, <paramref name="raiseStatusChanged"/>, or <paramref name="raiseZoomChanged"/> is <see langword="null"/>.
+	/// </exception>
 	public TextEditorStatusCoordinator(TextArea textArea, Action raiseStatusChanged, Action raiseZoomChanged)
 	{
 		ArgumentNullException.ThrowIfNull(textArea);
@@ -33,22 +36,17 @@ public sealed class TextEditorStatusCoordinator : IDisposable
 	}
 
 	/// <summary>
-	/// Gets or sets the current zoom percentage.
-	/// </summary>
-	/// <remarks>Setting this property directly does not apply a font size or invoke the zoom callback.</remarks>
-	public int Zoom
-	{
-		get => _zoom;
-		set => _zoom = value;
-	}
-
-	/// <summary>
-	/// Attaches to the text area's caret and selection change events.
+	/// Gets or sets the stored zoom percentage.
 	/// </summary>
 	/// <remarks>
-	/// Repeated calls are no-ops. Calling this method after disposal throws
-	/// <see cref="ObjectDisposedException"/>.
+	/// Direct assignment stores the value without validation. It does not apply a font size or invoke the zoom callback.
 	/// </remarks>
+	public int Zoom { get; set; } = 100;
+
+	/// <summary>
+	/// Subscribes to the text area's caret and selection change events.
+	/// </summary>
+	/// <remarks>Repeated calls before disposal have no effect.</remarks>
 	/// <exception cref="ObjectDisposedException">The coordinator has been disposed.</exception>
 	public void Attach()
 	{
@@ -58,6 +56,7 @@ public sealed class TextEditorStatusCoordinator : IDisposable
 			return;
 
 		_attached = true;
+
 		_textArea.Caret.PositionChanged += TextArea_PositionChanged;
 		_textArea.SelectionChanged += TextArea_SelectionChanged;
 	}
@@ -74,21 +73,30 @@ public sealed class TextEditorStatusCoordinator : IDisposable
 			return;
 
 		_attached = false;
+
 		_textArea.Caret.PositionChanged -= TextArea_PositionChanged;
 		_textArea.SelectionChanged -= TextArea_SelectionChanged;
 	}
 
 	/// <summary>
-	/// Tries to apply a zoom delta within the configured range.
+	/// Tries to adjust the stored zoom by one step toward the relevant supplied bound and applies the corresponding font size.
 	/// </summary>
-	/// <param name="delta">A positive value to zoom in, a negative value to zoom out, or <c>0</c> to do nothing.</param>
-	/// <param name="minZoom">The minimum allowed zoom percentage.</param>
-	/// <param name="maxZoom">The maximum allowed zoom percentage.</param>
-	/// <param name="zoomStepSize">The step size for each zoom change.</param>
-	/// <param name="defaultFontSize">The font size at 100% zoom.</param>
-	/// <param name="applyFontSize">The callback used to apply the scaled font size.</param>
+	/// <remarks>
+	/// Positive deltas are capped at <paramref name="maxZoom"/> and negative deltas at <paramref name="minZoom"/>.
+	/// Direct assignments to <see cref="Zoom"/> outside those bounds are not normalized before a step is applied.
+	/// </remarks>
+	/// <param name="delta">
+	/// The direction of the step: positive to zoom in, negative to zoom out,
+	/// or <c>0</c> to make no change. Only the sign is used.
+	/// </param>
+	/// <param name="minZoom">The lower bound used when zooming out.</param>
+	/// <param name="maxZoom">The upper bound used when zooming in.</param>
+	/// <param name="zoomStepSize">The size (in percentage points) of one zoom step.</param>
+	/// <param name="defaultFontSize">The font size at <c>100</c>% zoom.</param>
+	/// <param name="applyFontSize">The callback that receives the scaled font size.</param>
 	/// <returns>
-	/// <see langword="true"/> when the zoom changed and the callbacks were invoked; otherwise, <see langword="false"/>.
+	/// <see langword="true"/> when the zoom changes and the font-size and zoom-change callbacks are invoked;
+	/// otherwise, <see langword="false"/>.
 	/// </returns>
 	/// <exception cref="ArgumentNullException"><paramref name="applyFontSize"/> is <see langword="null"/>.</exception>
 	/// <exception cref="ArgumentOutOfRangeException">
@@ -105,38 +113,43 @@ public sealed class TextEditorStatusCoordinator : IDisposable
 		Action<double> applyFontSize)
 	{
 		ArgumentNullException.ThrowIfNull(applyFontSize);
+
 		ArgumentOutOfRangeException.ThrowIfGreaterThan(minZoom, maxZoom, nameof(minZoom));
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(zoomStepSize);
 
 		if (!double.IsFinite(defaultFontSize) || defaultFontSize <= 0)
+		{
 			throw new ArgumentOutOfRangeException(
 				nameof(defaultFontSize),
 				defaultFontSize,
 				"Default font size must be a finite positive number.");
+		}
 
 		int nextZoom;
 
 		if (delta > 0)
 		{
-			if (_zoom >= maxZoom)
+			if (Zoom >= maxZoom)
 				return false;
 
-			nextZoom = Math.Min(maxZoom, _zoom + zoomStepSize);
+			nextZoom = Math.Min(maxZoom, Zoom + zoomStepSize);
 		}
 		else if (delta < 0)
 		{
-			if (_zoom <= minZoom)
+			if (Zoom <= minZoom)
 				return false;
 
-			nextZoom = Math.Max(minZoom, _zoom - zoomStepSize);
+			nextZoom = Math.Max(minZoom, Zoom - zoomStepSize);
 		}
 		else
 		{
 			return false;
 		}
 
-		_zoom = nextZoom;
-		applyFontSize(defaultFontSize * _zoom / 100);
+		Zoom = nextZoom;
+
+		applyFontSize(defaultFontSize * Zoom / 100);
+
 		_raiseZoomChanged();
 		return true;
 	}

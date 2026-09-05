@@ -43,13 +43,15 @@ public static class MarkdownToolTipRenderer
 	/// <param name="options">The rendering options, or <see langword="null"/> for the default options.</param>
 	/// <returns>The rendered framework element.</returns>
 	/// <remarks>
-	/// The renderer supports the Markdown features enabled by its Markdig pipeline. HTML is omitted, and image
-	/// links render their link text without loading an image. Whitespace-only content or an exception while
-	/// parsing or rendering yields a plain-text element instead. Only absolute links whose schemes are listed
-	/// in the effective options can be opened.
+	/// The renderer supports the Markdown features enabled by its Markdig pipeline. Raw HTML blocks and inline
+	/// HTML are omitted, and image links render their link text without loading an image.
+	/// Whitespace-only content or an exception while parsing or rendering yields a plain-text element instead.
+	/// Only absolute links whose schemes are listed in the effective options can be opened.
 	/// </remarks>
 	public static FrameworkElement CreateContent(string content, MarkdownToolTipTheme? theme = null, MarkdownToolTipOptions? options = null)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		theme ??= MarkdownToolTipTheme.Default;
 		options ??= MarkdownToolTipOptions.Default;
 
@@ -80,7 +82,10 @@ public static class MarkdownToolTipRenderer
 	/// <returns>The rendered framework element.</returns>
 	/// <remarks>The content is displayed literally and is not parsed as Markdown.</remarks>
 	public static FrameworkElement CreatePlainTextContent(string content, MarkdownToolTipTheme? theme = null, MarkdownToolTipOptions? options = null)
-		=> CreateFallbackContent(content, theme ?? MarkdownToolTipTheme.Default, options ?? MarkdownToolTipOptions.Default);
+	{
+		ArgumentNullException.ThrowIfNull(content);
+		return CreateFallbackContent(content, theme ?? MarkdownToolTipTheme.Default, options ?? MarkdownToolTipOptions.Default);
+	}
 
 	/// <summary>
 	/// Creates a read-only code block editor with the given language and code.
@@ -91,13 +96,16 @@ public static class MarkdownToolTipRenderer
 	/// <param name="options">The rendering options, or <see langword="null"/> for the default options.</param>
 	/// <returns>The code block editor.</returns>
 	/// <remarks>
-	/// The custom highlighting callback, when configured, is invoked before built-in highlighting resolution.
+	/// When configured, the custom highlighting callback is invoked before built-in resolution. If it returns
+	/// <see langword="true"/>, built-in resolution is skipped; otherwise, built-in resolution is used.
 	/// Built-in resolution recognizes a highlighting name or extension and common aliases such as
 	/// <c>cs</c>, <c>csharp</c>, <c>js</c>, <c>ts</c>, and <c>json5</c>. The editor is read-only and does not
 	/// accept keyboard focus.
 	/// </remarks>
 	public static AvalonTextEditor CreateCodeBlockEditor(string? language, string code, MarkdownToolTipTheme? theme = null, MarkdownToolTipOptions? options = null)
 	{
+		ArgumentNullException.ThrowIfNull(code);
+
 		theme ??= MarkdownToolTipTheme.Default;
 		options ??= MarkdownToolTipOptions.Default;
 
@@ -135,7 +143,7 @@ public static class MarkdownToolTipRenderer
 		KeyboardNavigation.SetIsTabStop(editor, false);
 		KeyboardNavigation.SetIsTabStop(editor.TextArea, false);
 
-		// Code-block editors are passive; give host highlighting a chance before using built-in resolution.
+		// Code-block editors are passive; let the host provide highlighting before trying built-in resolution.
 		if (options.InstallCustomHighlighting?.Invoke(editor, language) is not true)
 			editor.SyntaxHighlighting = ResolveHighlighting(language);
 
@@ -144,7 +152,7 @@ public static class MarkdownToolTipRenderer
 
 	internal static string NormalizeLineEndings(string text)
 	{
-		return (text ?? string.Empty)
+		return text
 			.Replace("\r\n", "\n", StringComparison.Ordinal)
 			.Replace('\r', '\n');
 	}
@@ -639,7 +647,7 @@ public static class MarkdownToolTipRenderer
 		var textBlock = new TextBlock
 		{
 			Foreground = theme.Foreground,
-			Text = content ?? string.Empty,
+			Text = content,
 			TextWrapping = TextWrapping.Wrap,
 			FontFamily = theme.BodyFontFamily,
 			FontSize = theme.BodyFontSize,

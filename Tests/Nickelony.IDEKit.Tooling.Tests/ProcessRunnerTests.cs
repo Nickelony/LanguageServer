@@ -3,9 +3,9 @@ using System.Text;
 namespace Nickelony.IDEKit.Tooling.Tests;
 
 /// <summary>
-/// Tests <see cref="ProcessRunner"/> behavior for timeout and cancellation handling, process-tree
-/// termination fallback, launch failures, output capture, request forwarding, and disposal without
-/// launching a real process.
+/// Verifies that <see cref="ProcessRunner"/> waits for normal completion, reports timeouts and
+/// cancellation, handles launch and wait failures, preserves run requests, captures requested output,
+/// disposes run handles, and returns handles from <see cref="ProcessRunner.Start(ProcessRunRequest)"/>.
 /// </summary>
 [TestClass]
 public class ProcessRunnerTests

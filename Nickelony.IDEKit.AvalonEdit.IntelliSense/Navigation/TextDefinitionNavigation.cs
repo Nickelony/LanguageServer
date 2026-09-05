@@ -6,13 +6,13 @@ using Nickelony.IDEKit.IntelliSense.Navigation;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Navigation;
 
 /// <summary>
-/// Executes go-to-definition navigation for AvalonEdit editors over the IntelliSense
-/// hover and definition providers.
+/// Executes go-to-definition navigation for AvalonEdit editors using IntelliSense hover and
+/// definition providers.
 /// </summary>
 public static class TextDefinitionNavigation
 {
 	/// <summary>
-	/// Resolves the hovered symbol through the hover provider and navigates to its definition.
+	/// Resolves the symbol at the specified offset through the hover provider and navigates to its definition.
 	/// </summary>
 	/// <param name="textEditor">The editor to navigate.</param>
 	/// <param name="definitionProvider">The provider that resolves definition locations.</param>
@@ -41,17 +41,17 @@ public static class TextDefinitionNavigation
 	}
 
 	/// <summary>
-	/// Resolves and navigates to the definition of the supplied object name.
+	/// Resolves and navigates to the definition of the supplied symbol name.
 	/// </summary>
 	/// <param name="textEditor">The editor to navigate.</param>
 	/// <param name="definitionProvider">The provider that resolves definition locations.</param>
-	/// <param name="objectName">The name of the object whose definition is resolved.</param>
-	/// <param name="identifyingObject">The discriminator identifying the object, or <see langword="null"/> for none.</param>
+	/// <param name="objectName">The name of the symbol whose definition is resolved.</param>
+	/// <param name="identifyingObject">The optional discriminator for resolving the symbol's definition.</param>
 	/// <returns><see langword="true"/> when a definition location was found and its line was selected; otherwise, <see langword="false"/>.</returns>
 	public static bool TryGoToObject(
 		this ICSharpCode.AvalonEdit.TextEditor textEditor,
 		ITextDefinitionProvider definitionProvider,
-		string objectName,
+		string? objectName,
 		TextDefinitionDiscriminator? identifyingObject)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);

@@ -24,7 +24,10 @@ public static class IdentifierHelper
 	/// </code>
 	/// </example>
 	public static string GetPrefix(string value, int caretOffset)
-		=> GetPrefix(value, caretOffset, IsIdentifierCharacter);
+	{
+		ArgumentNullException.ThrowIfNull(value);
+		return GetPrefix(value, caretOffset, IsIdentifierCharacter);
+	}
 
 	/// <summary>
 	/// Gets the identifier prefix immediately before the specified caret offset, using a custom
@@ -47,6 +50,9 @@ public static class IdentifierHelper
 	/// </example>
 	public static string GetPrefix(string value, int caretOffset, Func<char, bool> isIdentifierCharacter)
 	{
+		ArgumentNullException.ThrowIfNull(value);
+		ArgumentNullException.ThrowIfNull(isIdentifierCharacter);
+
 		if (string.IsNullOrEmpty(value) || caretOffset <= 0 || caretOffset > value.Length)
 			return string.Empty;
 
@@ -59,22 +65,24 @@ public static class IdentifierHelper
 	}
 
 	/// <summary>
-	/// Attempts to locate the identifier or token span that contains the specified offset.
+	/// Attempts to locate an identifier or token span using the specified offset as a probe.
 	/// </summary>
 	/// <remarks>
-	/// With <see cref="IdentifierAffinity.Containing"/> (the default), the span is the token that
-	/// contains <paramref name="offset"/>; when the offset falls on a non-token character that
-	/// immediately follows a token, the token before the boundary is returned instead. With
-	/// <see cref="IdentifierAffinity.BeforeCaret"/>, the returned span ends exactly at the offset
-	/// and never includes text after it, which matches the word-being-typed semantics used by
-	/// completion filtering.
+	/// The offset is clamped to the document bounds. With
+	/// <see cref="IdentifierAffinity.Containing"/> (the default), the span is found by probing the
+	/// clamped offset; a preceding character is considered only for a non-token probe and only when
+	/// that preceding character is a token start. With <see cref="IdentifierAffinity.BeforeCaret"/>,
+	/// the returned span ends exactly at the offset and never includes text after it, matching the
+	/// word-being-typed semantics used by completion filtering. Policies whose start-character rule
+	/// is narrower than their part-character rule do not resolve a continuation character as a span
+	/// start.
 	/// </remarks>
 	/// <param name="snapshot">The text to inspect.</param>
 	/// <param name="offset">The zero-based offset to probe.</param>
 	/// <param name="policy">The character rules that define token membership.</param>
 	/// <param name="affinity">How the span is located relative to <paramref name="offset"/>.</param>
 	/// <returns>
-	/// The containing span, or <see langword="null"/> when the offset does not fall on a token.
+	/// The resolved token span, or <see langword="null"/> when the probe does not identify a token.
 	/// </returns>
 	public static TextRange? TryGetContainingSpan(
 		ITextSnapshot snapshot,

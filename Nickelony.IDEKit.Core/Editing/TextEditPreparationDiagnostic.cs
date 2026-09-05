@@ -19,7 +19,7 @@ public sealed record TextEditPreparationDiagnostic(
 public enum TextEditPreparationDiagnosticCode
 {
 	/// <summary>
-	/// The range is outside the snapshot.
+	/// The edit is <see langword="null"/> or its range is outside the snapshot.
 	/// </summary>
 	InvalidRange,
 

@@ -17,7 +17,7 @@ using Nickelony.IDEKit.IntelliSense.Completion;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Completion;
 
 /// <summary>
-/// Carries the sizing and timing options used by the <see cref="TextCompletionController"/>.
+/// Stores the sizing and timing options used by the <see cref="TextCompletionController"/>.
 /// </summary>
 /// <param name="RequestDebounceDelay">The debounce delay before a scheduled completion request runs.</param>
 /// <param name="ToolTipResolveDelay">The delay before a completion tooltip update is resolved.</param>
@@ -58,9 +58,9 @@ public sealed record TextCompletionControllerOptions(
 }
 
 /// <summary>
-/// Coordinates shared completion popup lifecycle, tooltip ownership, sizing, and request scheduling.
-/// The popup is owned through a <see cref="CompletionWindowCoordinator"/>, which tracks at most one
-/// window and replaces the previous window when a new one is opened.
+/// Coordinates completion request scheduling, window lifecycle, tooltip ownership, and sizing.
+/// The window is managed through a <see cref="CompletionWindowCoordinator"/>, which tracks at most
+/// one window and replaces it when a new one is opened.
 /// </summary>
 public sealed class TextCompletionController : IDisposable
 {
@@ -100,11 +100,11 @@ public sealed class TextCompletionController : IDisposable
 	/// <param name="editor">The editor the controller serves.</param>
 	/// <param name="windowCoordinator">The completion window coordinator that owns the window lifecycle.</param>
 	/// <param name="options">The controller options, or <see langword="null"/> to use the defaults.</param>
-	/// <param name="applyPresentationState">An optional callback that applies the completion presentation state.</param>
+	/// <param name="applyPresentationState">An optional callback that receives updated completion presentation state.</param>
 	/// <param name="configureWindow">An optional callback that configures a completion window before it is shown.</param>
 	/// <param name="completionItemFactory">An optional factory that maps provider items to completion data.</param>
-	/// <param name="resolveDescriptionAsync">An optional callback that resolves an item's description asynchronously.</param>
-	/// <param name="getDisplayInfo">An optional callback that resolves the display text and detail used for width measurement.</param>
+	/// <param name="resolveDescriptionAsync">An optional callback that resolves the selected item's description asynchronously.</param>
+	/// <param name="getDisplayInfo">An optional callback that supplies the display text and detail used for width measurement.</param>
 	/// <param name="toolTipBackground">The optional completion tooltip background brush.</param>
 	/// <param name="toolTipBorder">The optional completion tooltip border brush.</param>
 	/// <param name="logger">An optional logger for request failures.</param>
@@ -143,8 +143,7 @@ public sealed class TextCompletionController : IDisposable
 	public TextCompletionPresentationState CurrentPresentation { get; private set; } = TextCompletionPresentationState.Empty;
 
 	/// <summary>
-	/// Initializes request scheduling with the callback used to run a scheduled request.
-	/// This method also configures the debounce timers used by request and tooltip scheduling.
+	/// Configures request and tooltip debounce timers and supplies the callback used to run a scheduled request.
 	/// </summary>
 	/// <param name="scheduledRequestAsync">The callback that runs a scheduled completion request.</param>
 	public void InitializeScheduling(Func<Task> scheduledRequestAsync)
@@ -171,17 +170,17 @@ public sealed class TextCompletionController : IDisposable
 	public CompletionWindow? ActiveWindow => _isDisposed ? null : _windowCoordinator.ActiveWindow;
 
 	/// <summary>
-	/// Gets the cancellation token for the current request, or <see cref="CancellationToken.None"/>
-	/// when no current request exists. The token is cancelled when requests are invalidated, when a
-	/// newer request begins, or when the controller is disposed.
+	/// Gets the cancellation token retained for the latest completion request, or
+	/// <see cref="CancellationToken.None"/> when no request token is retained. The token is cancelled when requests
+	/// are invalidated, when a newer request begins, or when the controller is disposed.
 	/// </summary>
 	public CancellationToken CurrentRequestCancellationToken
 		=> _requestCancellation?.Token ?? CancellationToken.None;
 
 	/// <summary>
-	/// Begins a new request and returns its token.
+	/// Begins tracking a new completion request and returns its token.
 	/// </summary>
-	/// <returns>The token of the new request, or <c>-1</c> when the controller is disposed.</returns>
+	/// <returns>The new request token, or <c>-1</c> when the controller is disposed.</returns>
 	public int BeginRequest()
 	{
 		if (_isDisposed)
@@ -193,7 +192,7 @@ public sealed class TextCompletionController : IDisposable
 	}
 
 	/// <summary>
-	/// Determines whether the given request token is still the current request.
+	/// Determines whether the given request token has not been invalidated and the controller is not disposed.
 	/// </summary>
 	/// <param name="requestToken">The request token to check.</param>
 	/// <returns><see langword="true"/> when the token is current; otherwise, <see langword="false"/>.</returns>
@@ -254,7 +253,7 @@ public sealed class TextCompletionController : IDisposable
 	}
 
 	/// <summary>
-	/// Closes the active completion window and any completion tooltip.
+	/// Closes the active completion window and hides any completion tooltip.
 	/// </summary>
 	public void CloseWindow()
 	{
@@ -281,7 +280,8 @@ public sealed class TextCompletionController : IDisposable
 	}
 
 	/// <summary>
-	/// Opens a completion window with the given items, replacing any currently tracked window.
+	/// Opens a completion window with the given items, replacing any currently tracked window when the
+	/// item collection is non-empty.
 	/// The replacement range uses zero-based document offsets with an exclusive end offset.
 	/// </summary>
 	/// <param name="items">The completion items to show.</param>
@@ -327,7 +327,8 @@ public sealed class TextCompletionController : IDisposable
 	}
 
 	/// <summary>
-	/// Applies a completion session decision to the completion window.
+	/// Applies a completion session decision. A requested close is performed first; when the decision
+	/// requests items and includes both replacement offsets, the method maps the items and opens a completion window.
 	/// </summary>
 	/// <param name="decision">The decision to apply.</param>
 	/// <param name="mapItem">An optional mapper from provider items to completion data.</param>

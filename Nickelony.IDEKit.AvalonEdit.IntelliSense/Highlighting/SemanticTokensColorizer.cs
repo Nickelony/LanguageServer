@@ -7,25 +7,25 @@ using Nickelony.IDEKit.IntelliSense.SemanticTokens;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Highlighting;
 
 /// <summary>
-/// Describes the resolved visual style applied to a semantic token.
+/// Describes the resolved visual style for a semantic token.
 /// </summary>
-/// <param name="Foreground">The foreground brush, when the token has one.</param>
+/// <param name="Foreground">The foreground brush to use, when one is resolved.</param>
 /// <param name="IsBold">Whether the token is rendered bold.</param>
-/// <param name="TextDecorations">The text decorations applied to the token, when any.</param>
+/// <param name="TextDecorations">The text decorations applied to the token, when present.</param>
 public readonly record struct SemanticTokenStyle(
 	Brush? Foreground,
 	bool IsBold,
 	TextDecorationCollection? TextDecorations)
 {
 	/// <summary>
-	/// Gets a value indicating whether the style carries any formatting.
+	/// Gets a value indicating whether the style contains a non-null formatting component.
 	/// </summary>
 	public bool HasFormatting => Foreground is not null || IsBold || TextDecorations is not null;
 }
 
 /// <summary>
-/// Resolves a semantic token to its visual style. Implementations map token types and modifiers
-/// onto their own theme model, so the colorizer stays style-neutral.
+/// Resolves a semantic token to its visual style. Implementations can use the token type and
+/// modifiers with their own theme model, so the colorizer stays style-neutral.
 /// </summary>
 public interface ISemanticTokenStyleResolver
 {
@@ -38,11 +38,9 @@ public interface ISemanticTokenStyleResolver
 }
 
 /// <summary>
-/// Applies semantic token styling on top of the editor's baseline syntax highlighting.
-/// Tokens are styled when <see cref="SetTokens"/> or <see cref="Rebuild"/> is called so that
-/// <see cref="ColorizeLine"/>, which runs on every redraw and for every visible line, can avoid
-/// re-resolving brushes and modifier flags per token. Token ranges are grouped by their starting
-/// line and clipped to the current document and that line when rendered.
+/// Applies resolved semantic-token styles while AvalonEdit renders the text view. Each token is
+/// assigned to the line containing its start offset, then clipped to the current document and that
+/// rendered line.
 /// </summary>
 public sealed class SemanticTokensColorizer : DocumentColorizingTransformer
 {
@@ -73,10 +71,12 @@ public sealed class SemanticTokensColorizer : DocumentColorizingTransformer
 	/// <summary>
 	/// Replaces the semantic tokens currently applied to the text view.
 	/// </summary>
-	/// <param name="tokens">The semantic tokens to render.</param>
+	/// <param name="tokens">The semantic tokens to render; an empty collection clears the current tokens.</param>
 	public void SetTokens(IReadOnlyList<TextSemanticToken> tokens)
 	{
-		if (tokens is null || tokens.Count == 0)
+		ArgumentNullException.ThrowIfNull(tokens);
+
+		if (tokens.Count == 0)
 		{
 			ClearTokens();
 			return;
@@ -89,8 +89,9 @@ public sealed class SemanticTokensColorizer : DocumentColorizingTransformer
 
 	/// <summary>
 	/// Rebuilds the styled semantic token cache from the most recent token set. Call this after the
-	/// style resolver's theme changes so the cached styles reflect the new theme. Tokens outside the
-	/// current document are ignored and tokens extending past a line are clipped to that line.
+	/// style resolver's configuration changes so the cached styles reflect the new configuration. Tokens whose start
+	/// offset is outside the current document are ignored, and tokens extending past their start line are clipped to
+	/// that line.
 	/// </summary>
 	public void Rebuild()
 	{

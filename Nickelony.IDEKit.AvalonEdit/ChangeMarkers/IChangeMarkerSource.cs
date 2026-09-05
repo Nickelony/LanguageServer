@@ -3,12 +3,12 @@ using ICSharpCode.AvalonEdit.Document;
 namespace Nickelony.IDEKit.AvalonEdit.ChangeMarkers;
 
 /// <summary>
-/// Provides the set of document lines that a <see cref="ChangeMarkerMargin"/> should mark.
+/// Provides document lines for a <see cref="ChangeMarkerMargin"/> to mark.
 /// </summary>
 public interface IChangeMarkerSource
 {
 	/// <summary>
-	/// Gets the lines that should be marked, sorted by line number.
+	/// Gets the document lines to mark, sorted by line number (ascending).
 	/// </summary>
 	IReadOnlyList<DocumentLine> GetMarkedLines();
 }

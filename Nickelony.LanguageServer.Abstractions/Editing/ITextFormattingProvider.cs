@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Produces document-formatting edits.
+/// Produces edits for document formatting.
 /// </summary>
 public interface ITextFormattingProvider
 {

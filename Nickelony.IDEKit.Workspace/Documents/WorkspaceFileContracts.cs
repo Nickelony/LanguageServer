@@ -142,9 +142,9 @@ public enum WorkspaceFileReplacementStatus
 /// Contains the outcome of replacing a destination file.
 /// </summary>
 /// <remarks>
-/// <see cref="ObservedOnDiskStamp"/> reports the stamp observed during conflict detection or after
-/// an indeterminate replacement when it could be captured. <see cref="Failure"/> explains a failed
-/// or indeterminate operation.
+/// <see cref="ObservedOnDiskStamp"/> reports the stamp observed during conflict detection or the
+/// resulting destination stamp after replacement when it could be captured. <see cref="Failure"/>
+/// explains a failed or indeterminate operation.
 /// </remarks>
 public sealed record WorkspaceFileReplacementResult(
 	WorkspaceFileReplacementStatus Status,
@@ -188,10 +188,10 @@ public sealed record WorkspaceFileMoveResult(
 /// </summary>
 public enum WorkspaceFileDeleteStatus
 {
-	/// <summary>The file or directory was deleted.</summary>
+	/// <summary>The file or directory is absent after the delete operation.</summary>
 	Deleted,
 
-	/// <summary>The target changed unexpectedly.</summary>
+	/// <summary>The expected stamp did not match, where stamp validation applies.</summary>
 	ExternalFileConflict,
 
 	/// <summary>The delete operation failed.</summary>
@@ -218,12 +218,15 @@ public sealed record WorkspaceFileDeleteResult(
 /// </summary>
 /// <remarks>
 /// Implementations return operation results for expected environmental failures and may throw for
-/// failures that the implementation cannot translate. File paths supplied by the document store are
-/// normalized document paths unless a method explicitly receives a display or directory path.
+/// failures that the implementation cannot translate. Document file paths supplied by the store are
+/// normalized document ids, except for the display-path destination of <see cref="MoveAsync"/> and
+/// the directory paths accepted by <see cref="WriteTemporaryAsync"/> and the directory methods.
 /// </remarks>
 public interface IWorkspaceFileSystem
 {
 	/// <summary>Reads a file and captures its content stamp.</summary>
+	/// <param name="path">The file path to read.</param>
+	/// <param name="cancellationToken">Cancels the read.</param>
 	/// <remarks>
 	/// An implementation may return decoded <see cref="WorkspaceFileReadResult.Content"/> or raw bytes
 	/// in <see cref="WorkspaceFileReadResult.RawBytes"/>. Missing files return
@@ -234,17 +237,26 @@ public interface IWorkspaceFileSystem
 		CancellationToken cancellationToken);
 
 	/// <summary>Captures the current stamp for a file.</summary>
+	/// <param name="path">The file path to inspect.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
 	Task<FileStamp> CaptureStampAsync(
 		string path,
 		CancellationToken cancellationToken);
 
-	/// <summary>Writes an encoded temporary file.</summary>
+	/// <summary>Writes bytes to a temporary file.</summary>
+	/// <param name="directory">The directory in which to create the temporary file.</param>
+	/// <param name="content">The bytes to write.</param>
+	/// <param name="cancellationToken">Cancels the write.</param>
 	Task<WorkspaceTemporaryFile> WriteTemporaryAsync(
 		string directory,
 		ReadOnlyMemory<byte> content,
 		CancellationToken cancellationToken);
 
 	/// <summary>Conditionally replaces a destination file after validating its expected stamp.</summary>
+	/// <param name="temporaryFile">The temporary file to move into the destination.</param>
+	/// <param name="destinationPath">The file path to replace or create.</param>
+	/// <param name="expectedStamp">The destination stamp that must still match.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
 	Task<WorkspaceFileReplacementResult> ReplaceAsync(
 		WorkspaceTemporaryFile temporaryFile,
 		string destinationPath,
@@ -252,6 +264,10 @@ public interface IWorkspaceFileSystem
 		CancellationToken cancellationToken);
 
 	/// <summary>Moves a file after validating its expected source stamp.</summary>
+	/// <param name="sourcePath">The file path to move.</param>
+	/// <param name="destinationPath">The destination path, which may retain the caller's display spelling.</param>
+	/// <param name="expectedSourceStamp">The source stamp that must still match.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
 	Task<WorkspaceFileMoveResult> MoveAsync(
 		string sourcePath,
 		string destinationPath,
@@ -259,12 +275,19 @@ public interface IWorkspaceFileSystem
 		CancellationToken cancellationToken);
 
 	/// <summary>Moves a directory without a source-stamp precondition.</summary>
+	/// <param name="sourcePath">The directory path to move.</param>
+	/// <param name="destinationPath">The destination directory path.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
 	Task<WorkspaceFileMoveResult> MoveDirectoryAsync(
 		string sourcePath,
 		string destinationPath,
 		CancellationToken cancellationToken);
 
 	/// <summary>Deletes a file after validating its expected stamp.</summary>
+	/// <param name="path">The file path to delete.</param>
+	/// <param name="expectedStamp">The file stamp that must still match.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <param name="useRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; otherwise, delete permanently.</param>
 	Task<WorkspaceFileDeleteResult> DeleteAsync(
 		string path,
 		FileStamp expectedStamp,
@@ -272,11 +295,15 @@ public interface IWorkspaceFileSystem
 		bool useRecycleBin = false);
 
 	/// <summary>Deletes a directory recursively.</summary>
+	/// <param name="path">The directory path to delete.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <param name="useRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; otherwise, delete permanently.</param>
 	Task<WorkspaceFileDeleteResult> DeleteDirectoryAsync(
 		string path,
 		CancellationToken cancellationToken,
 		bool useRecycleBin = false);
 
 	/// <summary>Deletes a temporary file.</summary>
+	/// <param name="temporaryFile">The temporary file to delete.</param>
 	Task DeleteTemporaryAsync(WorkspaceTemporaryFile temporaryFile);
 }

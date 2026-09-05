@@ -4,7 +4,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public class TrackedDocumentStateTests
 {
 	[TestMethod]
-	public void TrackedDocumentState_CreateSnapshot_CapturesCurrentCoreState()
+	public void TrackedDocumentState_CreateSnapshot_CapturesCurrentDocumentState()
 	{
 		var state = new TestTrackedDocumentState(
 			@"C:\Workspace\Scripts\start.lua",
@@ -37,7 +37,7 @@ public class TrackedDocumentStateTests
 	}
 
 	[TestMethod]
-	public async Task TrackedDocumentState_CreateSnapshot_DoesNotObserveMismatchedRenamePairsUnderConcurrency()
+	public async Task TrackedDocumentState_CreateSnapshot_DoesNotMixPathAndUriDuringConcurrentRename()
 	{
 		var state = new TestTrackedDocumentState(
 			@"C:\Workspace\Scripts\a.lua",
@@ -86,6 +86,6 @@ public class TrackedDocumentStateTests
 		await Task.WhenAll(writerTask, readerTask).ConfigureAwait(false);
 
 		Assert.AreEqual(0, mismatchMessages.Count,
-			"Snapshots should not observe mixed file-path/URI rename pairs: " + string.Join(", ", mismatchMessages));
+			"Snapshots should keep each file path paired with its URI: " + string.Join(", ", mismatchMessages));
 	}
 }

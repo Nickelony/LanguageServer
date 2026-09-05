@@ -32,7 +32,7 @@ public sealed class TextLineSyntaxServiceTests
 	}
 
 	[TestMethod]
-	public void IsEmptyOrComments_CommentLine_ReturnsTrue()
+	public void IsEmptyOrComments_LineCommentText_ReturnsTrue()
 	{
 		Assert.IsTrue(s_cStyleService.IsEmptyOrComments("// not leading"));
 	}

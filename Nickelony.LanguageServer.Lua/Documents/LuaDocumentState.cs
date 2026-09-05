@@ -59,7 +59,7 @@ internal sealed class LuaDocumentState : TrackedDocumentState
 		=> RenameDocument(filePath, uri);
 
 	/// <summary>
-	/// Marks the tracked server document as closed while preserving cached state.
+	/// Marks the tracked document as closed locally while preserving cached state.
 	/// </summary>
 	internal void MarkClosed()
 		=> MarkDocumentClosed();

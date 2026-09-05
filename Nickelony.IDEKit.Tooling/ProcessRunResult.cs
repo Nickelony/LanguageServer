@@ -10,7 +10,7 @@ namespace Nickelony.IDEKit.Tooling;
 public sealed record ProcessRunResult
 {
 	/// <summary>
-	/// Gets whether the process was successfully started.
+	/// Gets whether the launcher returned a process handle.
 	/// </summary>
 	public bool Started { get; init; }
 
@@ -37,5 +37,10 @@ public sealed record ProcessRunResult
 	/// <summary>
 	/// Gets whether cancellation was requested when the run outcome was created.
 	/// </summary>
+	/// <remarks>
+	/// When cancellation is observed while waiting, the runner attempts to terminate the process and its descendants,
+	/// falling back to the process alone if necessary, before creating the result. This property reports the token state;
+	/// it does not indicate whether termination succeeded.
+	/// </remarks>
 	public bool Cancelled { get; init; }
 }

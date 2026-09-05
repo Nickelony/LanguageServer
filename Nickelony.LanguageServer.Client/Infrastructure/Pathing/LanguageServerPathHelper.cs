@@ -37,7 +37,10 @@ public static class LanguageServerPathHelper
 	/// <param name="filePath">The local file path to convert.</param>
 	/// <returns>The absolute file URI.</returns>
 	public static string CreateFileUri(string filePath)
-		=> new Uri(NormalizeLocalPath(filePath)).AbsoluteUri;
+	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		return new Uri(NormalizeLocalPath(filePath)).AbsoluteUri;
+	}
 
 	/// <summary>
 	/// Reports whether two normalized local paths identify the same logical path on the current host.
@@ -55,6 +58,8 @@ public static class LanguageServerPathHelper
 	/// <returns>The normalized absolute path.</returns>
 	public static string NormalizeLocalPath(string filePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		if (string.IsNullOrWhiteSpace(filePath))
 			throw new ArgumentException("File path must not be empty.", nameof(filePath));
 
@@ -72,6 +77,8 @@ public static class LanguageServerPathHelper
 	/// <returns>The normalized absolute local path.</returns>
 	public static string NormalizeLocalPath(Uri uri)
 	{
+		ArgumentNullException.ThrowIfNull(uri);
+
 		string localPath = uri.LocalPath;
 
 		// On Windows, Uri.LocalPath may produce "/C:/..." which needs the leading slash trimmed.
@@ -95,6 +102,8 @@ public static class LanguageServerPathHelper
 	/// <returns><see langword="true"/> when normalization succeeded; otherwise, <see langword="false"/>.</returns>
 	public static bool TryNormalizeLocalPath(string filePath, out string normalizedFilePath)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		normalizedFilePath = string.Empty;
 
 		if (string.IsNullOrWhiteSpace(filePath))

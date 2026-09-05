@@ -4,6 +4,15 @@ using Nickelony.IDEKit.Workspace.Documents;
 
 namespace Nickelony.IDEKit.Workspace.Tests;
 
+/// <summary>
+/// Tests <see cref="WorkspaceFileCodec"/> encoding and newline handling together with store file
+/// operations and commits.
+/// </summary>
+/// <remarks>
+/// Codec and file-operation tests use temporary files that are removed after each test. Commit tests
+/// use a controllable filesystem to verify statuses, cleanup, and baseline updates without relying on
+/// timing or real replacement failures.
+/// </remarks>
 [TestClass]
 [TestCategory("TextEditorBaseModernization")]
 public sealed class WorkspaceDocumentFileSystemTests

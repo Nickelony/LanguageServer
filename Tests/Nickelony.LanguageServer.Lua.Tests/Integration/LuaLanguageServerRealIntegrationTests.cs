@@ -9,10 +9,11 @@ using System.Reflection;
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 /// <summary>
-/// Live integration tests for a configured Lua language server.
-/// Tests skip when no existing archive is available from NICKELONY_LUA_LANGUAGE_SERVER_ARCHIVE
-/// or the Tests/TestAssets/LuaLS.zip fallback. They launch a real server process and cover
-/// diagnostics, semantic tokens, completion, navigation, rename, configuration reload, restart, and shutdown.
+/// Live integration tests for the Lua language server.
+/// Tests are inconclusive when no archive is configured or the expected executable is missing after extraction.
+/// A malformed archive fails during setup. The tests launch a real server process and cover diagnostics,
+/// semantic tokens, completion, definition and reference navigation, rename, workspace file changes,
+/// restart after a server crash, and shutdown.
 /// </summary>
 [TestClass]
 public class LuaLanguageServerRealIntegrationTests
@@ -22,7 +23,7 @@ public class LuaLanguageServerRealIntegrationTests
 
 	[TestMethod]
 	[TestCategory("Integration")]
-	public async Task Provider_WithBundledLuaLanguageServer_HandlesLiveWorkflowConfigurationReloadAndShutdown()
+	public async Task Provider_WithBundledLuaLanguageServer_HandlesLiveWorkflowWorkspaceChangesAndShutdown()
 	{
 		using var session = new RealLuaLanguageServerTestSession();
 

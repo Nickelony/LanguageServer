@@ -19,6 +19,8 @@ public sealed record TextHoverRequest
 	/// </exception>
 	public TextHoverRequest(string documentText, int hoveredOffset)
 	{
+		ArgumentNullException.ThrowIfNull(documentText);
+
 		if (hoveredOffset < 0 || hoveredOffset > documentText.Length)
 			throw new ArgumentOutOfRangeException(nameof(hoveredOffset));
 

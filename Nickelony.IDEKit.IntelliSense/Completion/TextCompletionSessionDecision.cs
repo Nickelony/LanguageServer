@@ -35,6 +35,7 @@ public readonly record struct TextCompletionSessionDecision(
 		int startOffset,
 		int endOffset)
 	{
+		ArgumentNullException.ThrowIfNull(items);
 		return new(false, items, startOffset, endOffset);
 	}
 }

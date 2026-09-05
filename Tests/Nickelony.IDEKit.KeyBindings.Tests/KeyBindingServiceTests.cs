@@ -161,14 +161,14 @@ public class KeyBindingServiceTests
 		bool saved = false;
 		var service = new KeyBindingService<TestCommand>(CreateCatalog(), overrides, o => { saved = true; return true; });
 
-		// Initially, the Save override should be Ctrl+X.
+		// The configured Save binding should be Ctrl+X.
 		IReadOnlyList<KeyCombo> bindingsBefore = service.GetBindings(TestCommand.Save);
 		Assert.AreEqual(1, bindingsBefore.Count);
 		Assert.AreEqual(new KeyCombo(Key.X, ModifierKeys.Control), bindingsBefore[0]);
 
 		service.Reset(TestCommand.Save);
 
-		// After reset, the Save binding should be restored to Ctrl+S.
+		// Reset should restore Save's default Ctrl+S binding.
 		IReadOnlyList<KeyCombo> bindingsAfter = service.GetBindings(TestCommand.Save);
 		Assert.AreEqual(1, bindingsAfter.Count);
 		Assert.AreEqual(new KeyCombo(Key.S, ModifierKeys.Control), bindingsAfter[0]);
@@ -190,7 +190,7 @@ public class KeyBindingServiceTests
 
 		service.ResetAll();
 
-		// After ResetAll, the overridden Save binding should be restored to Ctrl+S.
+		// ResetAll should restore Save's default Ctrl+S binding.
 		IReadOnlyList<KeyCombo> bindings = service.GetBindings(TestCommand.Save);
 		Assert.AreEqual(1, bindings.Count);
 		Assert.AreEqual(new KeyCombo(Key.S, ModifierKeys.Control), bindings[0]);

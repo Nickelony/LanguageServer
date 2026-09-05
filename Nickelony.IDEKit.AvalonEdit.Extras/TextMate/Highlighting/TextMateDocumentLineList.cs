@@ -7,7 +7,7 @@ namespace Nickelony.IDEKit.AvalonEdit.Extras.TextMate.Highlighting;
 
 /// <summary>
 /// Provides TextMateSharp with a live, zero-based view of an AvalonEdit <see cref="TextDocument"/>'s lines.
-/// The view includes line terminators and is updated when the document changes.
+/// Each line includes its terminator when present, and the view is updated when the document changes.
 /// </summary>
 public sealed class TextMateDocumentLineList : AbstractLineList
 {
@@ -19,7 +19,7 @@ public sealed class TextMateDocumentLineList : AbstractLineList
 	/// Initializes a new instance of the <see cref="TextMateDocumentLineList"/> class.
 	/// </summary>
 	/// <param name="document">The document whose lines are tracked.</param>
-	/// <remarks>Dispose the instance when the document is no longer being tokenized.</remarks>
+	/// <remarks>Dispose the instance to stop tracking document changes when it is no longer being tokenized.</remarks>
 	public TextMateDocumentLineList(TextDocument document)
 	{
 		ArgumentNullException.ThrowIfNull(document);

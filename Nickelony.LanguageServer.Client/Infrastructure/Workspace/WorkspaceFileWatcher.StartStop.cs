@@ -10,7 +10,7 @@ public sealed partial class WorkspaceFileWatcher
 		=> Start(out _) is WorkspaceWatcherStartStatus.Started or WorkspaceWatcherStartStatus.AlreadyRunning;
 
 	/// <summary>
-	/// Starts watching the configured workspace for external file changes and reports why startup failed.
+	/// Starts watching the configured workspace for external file changes and reports the startup status.
 	/// </summary>
 	/// <remarks>
 	/// A startup failure disposes this watcher instance, so later retries should use a replacement watcher.

@@ -1,12 +1,11 @@
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Identifies a source location returned by symbol reference lookup.
+/// Identifies a symbol reference in a source file.
 /// </summary>
 /// <remarks>
-/// Reference locations use one-based line and column coordinates for this editor-facing contract. They remain stable
-/// across documents without depending on an editor-specific offset or segment instance. Coordinates are normalized to
-/// at least one, and the end coordinate is never placed before the start coordinate.
+/// Coordinates use one-based line and column numbers. Values less than one are changed to one, and an end coordinate
+/// before the start is changed to the start.
 /// </remarks>
 public sealed class TextReferenceLocation
 {
@@ -20,6 +19,8 @@ public sealed class TextReferenceLocation
 	/// <param name="endColumnNumber">The one-based end column number.</param>
 	public TextReferenceLocation(string filePath, int startLineNumber, int startColumnNumber, int endLineNumber, int endColumnNumber)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		FilePath = filePath;
 
 		(int safeStartLineNumber, int safeStartColumnNumber, int safeEndLineNumber, int safeEndColumnNumber) =

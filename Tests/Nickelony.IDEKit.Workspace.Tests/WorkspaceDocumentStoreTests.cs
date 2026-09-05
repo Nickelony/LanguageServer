@@ -2,6 +2,14 @@ using Nickelony.IDEKit.Workspace.Documents;
 
 namespace Nickelony.IDEKit.Workspace.Tests;
 
+/// <summary>
+/// Tests <see cref="WorkspaceDocumentStore"/> opening, mutation, reload, conflict, file-operation,
+/// and disposal behavior.
+/// </summary>
+/// <remarks>
+/// A fake filesystem controls reads, writes, and operation timing while the tests exercise document
+/// reservations and verify returned statuses, snapshots, and filesystem calls.
+/// </remarks>
 [TestClass]
 [TestCategory("TextEditorBaseModernization")]
 public sealed class WorkspaceDocumentStoreTests
@@ -969,6 +977,9 @@ public sealed class WorkspaceDocumentStoreTests
 		public Task DeleteTemporaryAsync(WorkspaceTemporaryFile temporaryFile)
 			=> Task.CompletedTask;
 
+		/// <summary>
+		/// Creates a read result for the configured content, format, and deterministic disk stamp.
+		/// </summary>
 		public WorkspaceFileReadResult CreateReadResult()
 		{
 			return new WorkspaceFileReadResult(

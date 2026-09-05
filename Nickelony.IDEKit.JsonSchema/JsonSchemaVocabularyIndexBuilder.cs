@@ -6,11 +6,8 @@ using Newtonsoft.Json.Schema;
 namespace Nickelony.IDEKit.JsonSchema;
 
 /// <summary>
-/// Builds an immutable <see cref="JsonSchemaVocabularyIndex"/> from a JSON Schema. The builder
-/// collects property descriptors and string values from the root and supported nested schema
-/// locations, and returns build diagnostics with the index. It accepts already-parsed schema
-/// objects, schema tokens, and schema text readers; file loading and logging remain the host's
-/// responsibility. Outcomes are returned explicitly through
+/// Builds an immutable <see cref="JsonSchemaVocabularyIndex"/> from a JSON Schema. It accepts
+/// parsed schemas, schema tokens, and schema text, and reports outcomes through
 /// <see cref="JsonSchemaVocabularyIndexResult"/>.
 /// </summary>
 public sealed class JsonSchemaVocabularyIndexBuilder
@@ -41,8 +38,8 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 	/// </summary>
 	/// <param name="schemaToken">The token that represents the root schema.</param>
 	/// <returns>
-	/// The built vocabulary index and any diagnostics, or a failed result when the token cannot
-	/// be converted to or indexed as a schema object.
+	/// The built vocabulary index and diagnostics, or a failed result when conversion or indexing
+	/// fails.
 	/// </returns>
 	/// <exception cref="ArgumentNullException"><paramref name="schemaToken"/> is null.</exception>
 	public JsonSchemaVocabularyIndexResult Build(JToken schemaToken)
@@ -61,8 +58,7 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 
 	/// <summary>
 	/// Builds a vocabulary index from schema text read through a reader, optionally using custom
-	/// reader settings, including a <see cref="JSchemaResolver"/> for external <c>$ref</c>
-	/// references.
+	/// reader settings.
 	/// </summary>
 	/// <param name="reader">The reader over the schema text.</param>
 	/// <param name="settings">

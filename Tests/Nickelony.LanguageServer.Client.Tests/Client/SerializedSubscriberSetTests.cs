@@ -45,13 +45,13 @@ public sealed class SerializedSubscriberSetTests
 		subscribers.Dispatch(documentKey, CreateDiagnostics("First warning."));
 		await firstInvocationEntered.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
-		// Leave an intermediate payload pending while the first callback is blocked.
+		// Keep an intermediate payload pending while the first callback is blocked.
 		subscribers.Dispatch(documentKey, CreateDiagnostics("Intermediate warning."));
 
 		Task olderDispatch = Task.Run(() => subscribers.Dispatch(documentKey, CreateDiagnostics("Older warning.")));
 		await olderPayloadRead.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
-		// This payload is newer than the paused older enqueue and must remain the one delivered.
+		// The latest payload should replace the paused older update.
 		subscribers.Dispatch(documentKey, CreateDiagnostics("Latest warning."));
 		allowOlderReplacement.TrySetResult(true);
 		await olderDispatch.ConfigureAwait(false);

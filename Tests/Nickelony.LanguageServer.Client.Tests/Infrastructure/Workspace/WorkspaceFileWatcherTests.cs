@@ -97,7 +97,7 @@ public class WorkspaceFileWatcherTests
 	}
 
 	[TestMethod]
-	public void Start_MissingWorkspaceRoot_ReturnsStructuredFailureWithoutStartingWatchers()
+	public void Start_MissingWorkspaceRoot_ReportsMissingRootWithoutStartingWatchers()
 	{
 		string workspaceRoot = Path.Combine(Path.GetTempPath(), "WorkspaceWatcherMissing_" + Guid.NewGuid().ToString("N"));
 
@@ -432,7 +432,7 @@ public class WorkspaceFileWatcherTests
 	}
 
 	[TestMethod]
-	public async Task DisposeAsync_WhenFinalFlushStalls_CompletesWithoutWaitingIndefinitely()
+	public async Task DisposeAsync_WhenFinalFlushStalls_CancelsStalledFinalFlush()
 	{
 		using var workspace = new TemporaryWorkspaceRoot("LuaWatcherDisposeTimedFlush_");
 		string workspaceRoot = workspace.DirectoryPath;
@@ -725,7 +725,7 @@ public class WorkspaceFileWatcherTests
 	}
 
 	[TestMethod]
-	public async Task Start_ConcurrentWithDispose_DoesNotLeaveOwnedWatchersBehind()
+	public async Task Start_ConcurrentWithDispose_LeavesNoActiveWatchers()
 	{
 		using var workspace = new TemporaryWorkspaceRoot("WorkspaceWatcherStartDispose_");
 		string workspaceRoot = workspace.DirectoryPath;
@@ -792,7 +792,7 @@ public class WorkspaceFileWatcherTests
 	{
 		public override void Post(SendOrPostCallback d, object? state)
 		{
-			// Intentionally never pumps posted continuations.
+			// Posted continuations are intentionally ignored.
 		}
 
 		public override void Send(SendOrPostCallback d, object? state)

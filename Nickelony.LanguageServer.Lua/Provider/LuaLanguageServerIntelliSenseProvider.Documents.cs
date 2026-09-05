@@ -72,6 +72,10 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 	/// <inheritdoc/>
 	public void RenameDocument(string oldFilePath, string newFilePath, string content)
 	{
+		ArgumentNullException.ThrowIfNull(oldFilePath);
+		ArgumentNullException.ThrowIfNull(newFilePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		if (!LanguageServerPathHelper.TryNormalizeLocalPath(oldFilePath, out string normalizedOldFilePath)
 			|| !LanguageServerPathHelper.TryNormalizeLocalPath(newFilePath, out string normalizedNewFilePath)
 			|| string.Equals(normalizedOldFilePath, normalizedNewFilePath, StringComparison.OrdinalIgnoreCase))
@@ -367,8 +371,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 
 		DocumentSnapshot? document = _documents.GetDocumentSnapshot(filePath);
 
-		// Diagnostics for documents we have never opened are ignored: there is no editor to render them on,
-		// and reading the file from disk on the LSP read loop just to discard the result is wasteful.
+		// Diagnostics for documents that are not tracked locally are ignored: without a tracked snapshot, there is no
+		// synchronized content to map them to editor ranges, and reading the file from disk on the LSP read loop just to
+		// discard the result is wasteful.
 		if (document is null)
 			return;
 

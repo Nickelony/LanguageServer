@@ -6,9 +6,9 @@ using ICSharpCode.AvalonEdit.Editing;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Completion;
 
 /// <summary>
-/// Owns the completion window lifecycle for a single text area and tracks at most one window.
-/// Creating a new window force-closes any previously tracked window, so the host reflects only the
-/// latest completion window.
+/// Manages the completion window lifecycle for a single text area and tracks at most one window.
+/// Creating a new window closes the currently tracked window; a window is tracked after
+/// <see cref="Show(CompletionWindow, Action)"/> is called.
 /// </summary>
 public sealed class CompletionWindowHost
 {
@@ -21,11 +21,15 @@ public sealed class CompletionWindowHost
 	/// Initializes a new instance of the <see cref="CompletionWindowHost"/> class.
 	/// </summary>
 	/// <param name="textArea">The text area completion windows are created for.</param>
-	public CompletionWindowHost(TextArea textArea) => _textArea = textArea;
+	public CompletionWindowHost(TextArea textArea)
+	{
+		ArgumentNullException.ThrowIfNull(textArea);
+		_textArea = textArea;
+	}
 
 	/// <summary>
-	/// Creates a new completion window. Any previously tracked window is closed first, so only the
-	/// most recently created window remains tracked.
+	/// Creates a new completion window. Any previously tracked window is closed before the new window
+	/// is created; the new window is tracked when <see cref="Show(CompletionWindow, Action)"/> is called.
 	/// </summary>
 	/// <param name="width">The window width.</param>
 	/// <param name="height">The window height.</param>
@@ -35,6 +39,10 @@ public sealed class CompletionWindowHost
 	/// <returns>The new completion window.</returns>
 	public CompletionWindow Create(double width, double height, Brush borderBrush, Brush background, Brush foreground)
 	{
+		ArgumentNullException.ThrowIfNull(borderBrush);
+		ArgumentNullException.ThrowIfNull(background);
+		ArgumentNullException.ThrowIfNull(foreground);
+
 		CloseTrackedWindow();
 
 		return new(_textArea)
@@ -52,12 +60,15 @@ public sealed class CompletionWindowHost
 
 	/// <summary>
 	/// Shows the given completion window and tracks it until it closes. The callback is invoked when
-	/// the window closes.
+	/// the window closes, whether it is closed by the window itself or through <see cref="Close"/>.
 	/// </summary>
 	/// <param name="completionWindow">The window to show.</param>
 	/// <param name="onClosed">The callback invoked when the window closes.</param>
 	public void Show(CompletionWindow completionWindow, Action onClosed)
 	{
+		ArgumentNullException.ThrowIfNull(completionWindow);
+		ArgumentNullException.ThrowIfNull(onClosed);
+
 		TrackWindow(completionWindow, onClosed);
 
 		completionWindow.Show();
@@ -65,12 +76,14 @@ public sealed class CompletionWindowHost
 
 	/// <summary>
 	/// Closes the given completion window, releasing its tracking first when it is the currently tracked
-	/// window, and then invokes the callback.
+	/// window, and then invokes the callback when a window was supplied.
 	/// </summary>
 	/// <param name="completionWindow">The window to close, or <see langword="null"/> to do nothing.</param>
 	/// <param name="onClosed">The callback invoked when the window closes.</param>
 	public void Close(CompletionWindow? completionWindow, Action onClosed)
 	{
+		ArgumentNullException.ThrowIfNull(onClosed);
+
 		if (completionWindow is null)
 			return;
 

@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
-/// Coordinates callers waiting for an in-progress file or directory move or save-as destination.
+/// Represents a destination reserved by an in-progress file or directory move or Save As operation.
 /// </summary>
 internal sealed class DestinationReservation(string documentId)
 {

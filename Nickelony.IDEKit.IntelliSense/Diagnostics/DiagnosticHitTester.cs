@@ -4,9 +4,9 @@ namespace Nickelony.IDEKit.IntelliSense.Diagnostics;
 /// Selects and formats diagnostics for hover hit-testing without any editor or UI dependency.
 /// </summary>
 /// <remarks>
-/// The kernel is document- and presentation-agnostic: callers supply the diagnostic list and
+/// This helper is document- and presentation-agnostic: callers supply the diagnostic list and
 /// integer offsets, and receive the ordered selection or a formatted message. Severity labels
-/// are injectable so hosts can localize or customize the "Error:"/"Warning:" prefixes.
+/// are injectable so hosts can localize or customize the built-in severity prefixes.
 /// </remarks>
 public static class DiagnosticHitTester
 {
@@ -109,7 +109,7 @@ public static class DiagnosticHitTester
 
 	/// <summary>
 	/// Builds a combined hover message from the supplied diagnostics, deduplicating identical
-	/// messages and preserving their input order.
+	/// formatted messages and preserving their input order.
 	/// </summary>
 	/// <param name="diagnostics">The diagnostics to combine, in the order in which their messages should appear.</param>
 	/// <param name="severityLabel">The severity label, or <see langword="null"/> to use raw messages.</param>

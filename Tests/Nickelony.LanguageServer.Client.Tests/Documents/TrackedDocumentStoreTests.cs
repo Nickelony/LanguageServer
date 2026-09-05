@@ -21,7 +21,7 @@ public class TrackedDocumentStoreTests
 	}
 
 	[TestMethod]
-	public void Synchronize_WithoutReferencesCreatesIdleServerOpenState()
+	public void Synchronize_WithoutReferencesCreatesTrackedDocument()
 	{
 		const string filePath = @"C:\Workspace\Scripts\idle.lua";
 
@@ -37,7 +37,7 @@ public class TrackedDocumentStoreTests
 	}
 
 	[TestMethod]
-	public void SynchronizeAfterClose_CreatesAFreshTrackedStateWithNewContent()
+	public void Synchronize_AfterCloseCreatesFreshStateWithNewContent()
 	{
 		const string filePath = @"C:\Workspace\Scripts\after-close.lua";
 
@@ -205,7 +205,7 @@ public class TrackedDocumentStoreTests
 	}
 
 	[TestMethod]
-	public void TryReleaseRequest_PreservesEditorOwnedTrackedDocument()
+	public void TryReleaseRequest_PreservesDocumentWithOpenReference()
 	{
 		const string filePath = @"C:\Workspace\Scripts\open.lua";
 

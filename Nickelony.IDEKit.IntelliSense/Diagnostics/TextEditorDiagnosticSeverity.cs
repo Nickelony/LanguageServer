@@ -6,7 +6,7 @@ namespace Nickelony.IDEKit.IntelliSense.Diagnostics;
 public enum TextEditorDiagnosticSeverity
 {
 	/// <summary>
-	/// The diagnostic has no severity and is not intended to be displayed to the user.
+	/// The diagnostic has no specified severity.
 	/// </summary>
 	None = 0,
 

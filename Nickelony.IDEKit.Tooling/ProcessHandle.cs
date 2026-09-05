@@ -6,8 +6,8 @@ namespace Nickelony.IDEKit.Tooling;
 /// Adapts <see cref="Process"/> to <see cref="IProcessHandle"/>.
 /// </summary>
 /// <remarks>
-/// Standard output and error are read on demand, so callers should read them only when the corresponding stream was
-/// redirected and after the process has exited when complete output is required.
+/// Standard output and error are read on demand from their redirected streams. Reading a stream to completion can
+/// block until the stream closes.
 /// </remarks>
 internal sealed class ProcessHandle : IProcessHandle
 {

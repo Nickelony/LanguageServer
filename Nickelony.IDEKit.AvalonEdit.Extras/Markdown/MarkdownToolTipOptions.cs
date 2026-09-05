@@ -15,7 +15,8 @@ public sealed record MarkdownToolTipOptions
 
 	/// <summary>
 	/// Gets or initializes the URI schemes that may be opened from hyperlinks.
-	/// The default set allows HTTP and HTTPS links, and scheme comparison is case-insensitive.
+	/// The default set allows HTTP and HTTPS links and uses case-insensitive comparison. A custom set controls
+	/// its own comparison behavior.
 	/// </summary>
 	public IReadOnlySet<string> SupportedHyperlinkSchemes { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 	{

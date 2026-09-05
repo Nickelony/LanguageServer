@@ -1,11 +1,11 @@
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Describes a reference lookup request against the current document.
+/// Describes a request to find symbol references at a document position.
 /// </summary>
 /// <remarks>
-/// Reference requests use zero-based line and column indices. Returned <see cref="TextReferenceLocation"/> values
-/// use one-based coordinates for this editor-facing contract. Negative line and column values are normalized to zero.
+/// The request position uses zero-based line and column indices. Returned <see cref="TextReferenceLocation"/> values
+/// use one-based coordinates. Negative line and column values are changed to zero.
 /// </remarks>
 public sealed class TextReferenceRequest
 {
@@ -19,6 +19,9 @@ public sealed class TextReferenceRequest
 	/// <param name="includeDeclaration"><see langword="true"/> to include the symbol declaration when available.</param>
 	public TextReferenceRequest(string filePath, string documentText, int line, int column, bool includeDeclaration = true)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(documentText);
+
 		FilePath = filePath;
 		DocumentText = documentText;
 		Line = Math.Max(0, line);

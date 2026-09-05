@@ -20,5 +20,9 @@ public sealed class FindReplaceSource : List<FindReplaceItem>
 	/// Creates a find-and-replace source for the named document.
 	/// </summary>
 	/// <param name="name">The display name of the document.</param>
-	public FindReplaceSource(string name) => Name = name;
+	public FindReplaceSource(string name)
+	{
+		ArgumentNullException.ThrowIfNull(name);
+		Name = name;
+	}
 }

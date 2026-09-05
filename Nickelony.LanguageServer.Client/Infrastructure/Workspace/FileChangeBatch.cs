@@ -10,7 +10,10 @@ public sealed class FileChangeBatch
 	/// </summary>
 	/// <param name="entries">The entries captured for the batch.</param>
 	public FileChangeBatch(IEnumerable<WorkspaceFileChange> entries)
-		=> Entries = Array.AsReadOnly([.. entries]);
+	{
+		ArgumentNullException.ThrowIfNull(entries);
+		Entries = Array.AsReadOnly([.. entries]);
+	}
 
 	/// <summary>
 	/// Gets the file-change entries in the batch.
@@ -18,7 +21,7 @@ public sealed class FileChangeBatch
 	public IReadOnlyList<WorkspaceFileChange> Entries { get; }
 
 	/// <summary>
-	/// Gets the number of coalesced entries in the batch.
+	/// Gets the number of entries in the batch.
 	/// </summary>
 	public int Count => Entries.Count;
 }

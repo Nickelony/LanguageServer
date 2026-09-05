@@ -134,12 +134,20 @@ public sealed class TextCompletionItemKind : IEquatable<TextCompletionItemKind>
 	/// Creates a custom completion category.
 	/// </summary>
 	/// <param name="identifier">
-	/// The custom identifier. Letters, digits, underscore, period, hyphen, and colon are allowed.
+	/// The custom identifier. After trimming, it must start with an ASCII letter or underscore, be at most 128 characters,
+	/// and contain only ASCII letters, digits, underscore, period, hyphen, or colon.
 	/// </param>
 	/// <returns>An immutable custom completion category.</returns>
+	/// <example>
+	/// <code>
+	/// TextCompletionItemKind kind = TextCompletionItemKind.CreateCustom("lua.type");
+	/// </code>
+	/// </example>
 	/// <exception cref="ArgumentException">The identifier is invalid or reserved for a well-known category.</exception>
 	public static TextCompletionItemKind CreateCustom(string identifier)
 	{
+		ArgumentNullException.ThrowIfNull(identifier);
+
 		string normalizedIdentifier = NormalizeAndValidate(identifier);
 
 		if (s_wellKnownKinds.ContainsKey(normalizedIdentifier))
@@ -158,6 +166,8 @@ public sealed class TextCompletionItemKind : IEquatable<TextCompletionItemKind>
 	/// <exception cref="ArgumentException">The identifier is invalid.</exception>
 	public static TextCompletionItemKind FromIdentifier(string identifier)
 	{
+		ArgumentNullException.ThrowIfNull(identifier);
+
 		string normalizedIdentifier = NormalizeAndValidate(identifier);
 
 		return s_wellKnownKinds.TryGetValue(normalizedIdentifier, out TextCompletionItemKind? wellKnownKind)

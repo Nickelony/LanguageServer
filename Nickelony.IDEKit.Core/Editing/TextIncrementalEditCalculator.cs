@@ -10,8 +10,8 @@ public static class TextIncrementalEditCalculator
 	/// <summary>
 	/// Computes the minimal replacement that transforms one document snapshot into another.
 	/// </summary>
-	/// <param name="oldText">The previously synchronized document content.</param>
-	/// <param name="newText">The updated document content.</param>
+	/// <param name="oldText">The previously synchronized document content; <see langword="null"/> is treated as empty.</param>
+	/// <param name="newText">The updated document content; <see langword="null"/> is treated as empty.</param>
 	/// <returns>The replacement range and text, expressed as UTF-16 offsets.</returns>
 	public static TextIncrementalChange Compute(string? oldText, string? newText)
 	{

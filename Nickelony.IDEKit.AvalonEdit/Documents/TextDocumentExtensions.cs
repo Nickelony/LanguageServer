@@ -3,16 +3,20 @@ using ICSharpCode.AvalonEdit.Document;
 namespace Nickelony.IDEKit.AvalonEdit.Documents;
 
 /// <summary>
-/// Provides shared helpers for working with AvalonEdit text documents.
+/// Extension methods for AvalonEdit <see cref="TextDocument"/> instances.
 /// </summary>
 public static class TextDocumentExtensions
 {
 	/// <summary>
-	/// Clamps an offset so it always falls within the current document bounds.
+	/// Clamps a zero-based document offset to its inclusive position range.
 	/// </summary>
-	/// <param name="document">The document whose bounds should be used.</param>
-	/// <param name="offset">The offset to clamp.</param>
-	/// <returns>A valid document offset between 0 and <see cref="TextDocument.TextLength"/>.</returns>
+	/// <param name="document">
+	/// The AvalonEdit <see cref="TextDocument"/> whose <see cref="TextDocument.TextLength"/> defines the upper bound.
+	/// </param>
+	/// <param name="offset">The zero-based offset to clamp.</param>
+	/// <returns>
+	/// The offset clamped to the inclusive range from <c>0</c> through <see cref="TextDocument.TextLength"/>.
+	/// </returns>
 	/// <exception cref="ArgumentNullException"><paramref name="document"/> is <see langword="null"/>.</exception>
 	public static int ClampOffset(this TextDocument document, int offset)
 	{

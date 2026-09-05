@@ -4,20 +4,22 @@ using Nickelony.IDEKit.Core.Text;
 namespace Nickelony.IDEKit.AvalonEdit.Documents;
 
 /// <summary>
-/// An immutable <see cref="ITextSnapshot"/> that captures the content of an AvalonEdit
-/// <see cref="TextDocument"/> at construction time. The snapshot does not observe later
-/// document edits and may be retained freely.
+/// An immutable <see cref="ITextSnapshot"/> of an AvalonEdit <see cref="TextDocument"/>,
+/// including its text and optional file name.
 /// </summary>
 public sealed class TextDocumentSnapshot : ITextSnapshot
 {
 	private readonly StringTextSnapshot _snapshot;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextDocumentSnapshot"/> class
-	/// by capturing the document content and file name.
+	/// Captures the current text and optional file name from an AvalonEdit <see cref="TextDocument"/>.
 	/// </summary>
-	/// <param name="document">The AvalonEdit document to snapshot. Must not be null.</param>
-	/// <exception cref="ArgumentNullException"><paramref name="document"/> is null.</exception>
+	/// <remarks>The AvalonEdit <see cref="TextDocument"/> must be accessed from its owner thread.</remarks>
+	/// <param name="document">The AvalonEdit <see cref="TextDocument"/> to capture.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="document"/> is <see langword="null"/>.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// The current thread is not the owner thread of the AvalonEdit <see cref="TextDocument"/>.
+	/// </exception>
 	public TextDocumentSnapshot(TextDocument document)
 	{
 		ArgumentNullException.ThrowIfNull(document);

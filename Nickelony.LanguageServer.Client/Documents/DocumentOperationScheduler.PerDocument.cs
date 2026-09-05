@@ -12,6 +12,9 @@ public sealed partial class DocumentOperationScheduler
 	/// <returns>A task that completes with the queued operation result.</returns>
 	public Task<TResult> EnqueuePerDocumentAsync<TResult>(string filePath, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(operation);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -55,6 +58,10 @@ public sealed partial class DocumentOperationScheduler
 		Func<CancellationToken, Task<TResult>> operation,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(firstFilePath);
+		ArgumentNullException.ThrowIfNull(secondFilePath);
+		ArgumentNullException.ThrowIfNull(operation);
+
 		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
 		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
 
@@ -88,13 +95,16 @@ public sealed partial class DocumentOperationScheduler
 	}
 
 	/// <summary>
-	/// Waits for the per-document and latest-update operations queued for one or two document paths when this method is called.
+	/// Waits for the per-document, latest-update, and exclusion-barrier operations queued for one or two document paths when this method is called.
 	/// </summary>
 	/// <param name="firstFilePath">The first document path to await.</param>
 	/// <param name="secondFilePath">The second document path to await.</param>
 	/// <returns>A task that completes when the queued operations have finished.</returns>
 	public async Task WaitForPerDocumentOperationsAsync(string firstFilePath, string secondFilePath)
 	{
+		ArgumentNullException.ThrowIfNull(firstFilePath);
+		ArgumentNullException.ThrowIfNull(secondFilePath);
+
 		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
 		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
 

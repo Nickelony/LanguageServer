@@ -14,6 +14,9 @@ public sealed partial class LanguageServerClient
 	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before local dispatch completes.</exception>
 	public async Task SendNotificationAsync(string method, object parameters, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(method);
+		ArgumentNullException.ThrowIfNull(parameters);
+
 		LanguageServerTransportSession session = GetRequiredReadySession(allowDisposed: false);
 
 		try
@@ -50,6 +53,9 @@ public sealed partial class LanguageServerClient
 	/// <exception cref="OperationCanceledException">Thrown when <paramref name="cancellationToken"/> is canceled before the request completes.</exception>
 	public async Task<TResult> SendRequestAsync<TResult>(string method, object parameters, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(method);
+		ArgumentNullException.ThrowIfNull(parameters);
+
 		LanguageServerTransportSession session = GetRequiredReadySession(allowDisposed: false);
 
 		TResult result;

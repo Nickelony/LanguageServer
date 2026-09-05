@@ -19,6 +19,8 @@ public sealed record TextSignatureHelpRequest
 	/// </exception>
 	public TextSignatureHelpRequest(string documentText, int caretOffset)
 	{
+		ArgumentNullException.ThrowIfNull(documentText);
+
 		if (caretOffset < 0 || caretOffset > documentText.Length)
 			throw new ArgumentOutOfRangeException(nameof(caretOffset));
 

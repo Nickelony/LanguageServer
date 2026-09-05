@@ -3,13 +3,13 @@ using Newtonsoft.Json.Schema;
 namespace Nickelony.IDEKit.JsonSchema;
 
 /// <summary>
-/// Traverses the schema locations used by the vocabulary index, guarding against cycles.
+/// Traverses schemas reachable from a root schema and guards against cycles.
 /// </summary>
 internal static class SchemaTraversal
 {
 	/// <summary>
 	/// Returns the root schema and nested schemas reachable through properties, array items,
-	/// <c>oneOf</c>, <c>anyOf</c>, <c>allOf</c>, and resolved <c>$ref</c> targets.
+	/// combinators, and resolved <c>$ref</c> targets.
 	/// </summary>
 	internal static IReadOnlyList<JSchema> FlattenSchemas(JSchema schema)
 	{
@@ -48,7 +48,7 @@ internal static class SchemaTraversal
 			foreach (JSchema nestedSchema in current.AllOf ?? [])
 				Visit(nestedSchema);
 
-			// Follow a resolved reference when the reader provided its target.
+			// Follow a reference when its resolved target is available.
 			if (current.Ref is not null)
 				Visit(current.Ref);
 		}

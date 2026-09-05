@@ -218,7 +218,7 @@ public sealed partial class LanguageServerClient
 			=> _owner.LogServerMessage("window/logMessage", parameters);
 
 		/// <summary>
-		/// Logs a modal-style server message through the host logger.
+		/// Logs a server message through the host logger.
 		/// </summary>
 		/// <param name="parameters">The window message payload.</param>
 		[JsonRpcMethod("window/showMessage", UseSingleObjectParameterDeserialization = true)]

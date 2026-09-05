@@ -12,6 +12,8 @@ public sealed class TextSignatureParameterInfo
 	/// <param name="documentation">Optional parameter documentation.</param>
 	public TextSignatureParameterInfo(string label, string? documentation = null)
 	{
+		ArgumentNullException.ThrowIfNull(label);
+
 		Label = label;
 		Documentation = documentation;
 	}

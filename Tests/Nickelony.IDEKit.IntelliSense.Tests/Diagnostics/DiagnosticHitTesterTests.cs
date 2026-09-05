@@ -3,7 +3,7 @@ using Nickelony.IDEKit.IntelliSense.Diagnostics;
 namespace Nickelony.IDEKit.IntelliSense.Tests.Diagnostics;
 
 /// <summary>
-/// Tests for the <see cref="DiagnosticHitTester"/> hover hit-testing kernel.
+/// Tests diagnostic span selection and hover message formatting with <see cref="DiagnosticHitTester"/>.
 /// </summary>
 [TestClass]
 public sealed class DiagnosticHitTesterTests
@@ -36,8 +36,7 @@ public sealed class DiagnosticHitTesterTests
 	{
 		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.GetDiagnosticsForRange(s_allDiagnostics, 21, 25);
 
-		// Warning (20-30) and Hint (22-24) both intersect 21-25; Warning sorts before Hint.
-		// Severity is ordered Error < Warning < Information < Hint.
+		// The warning and hint spans intersect the queried range, and severity ordering places Warning before Hint.
 		Assert.AreEqual(2, result.Count);
 		Assert.AreSame(s_warningDiagnostic, result[0]);
 		Assert.AreSame(s_hintDiagnostic, result[1]);
@@ -63,7 +62,7 @@ public sealed class DiagnosticHitTesterTests
 	{
 		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.SelectHoverDiagnostics(s_allDiagnostics, 25, allowLineFallback: true, lineStartOffset: 18, lineEndOffset: 32);
 
-		// Offset 25 is inside Warning (20-30), so the result includes the warning diagnostic.
+		// The queried offset is within the warning span, so the exact-offset selection includes it.
 		Assert.IsTrue(result.Count >= 1);
 		Assert.IsTrue(result.Contains(s_warningDiagnostic));
 	}
@@ -71,7 +70,7 @@ public sealed class DiagnosticHitTesterTests
 	[TestMethod]
 	public void SelectHoverDiagnostics_NoExactHit_NoFallback_ReturnsEmpty()
 	{
-		// Offset 15 falls in no diagnostic span, and line fallback is disabled.
+		// No diagnostic covers offset 15, and line fallback is disabled.
 		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.SelectHoverDiagnostics(s_allDiagnostics, 15, allowLineFallback: false, lineStartOffset: 18, lineEndOffset: 32);
 
 		Assert.AreEqual(0, result.Count);
@@ -105,7 +104,7 @@ public sealed class DiagnosticHitTesterTests
 	[TestMethod]
 	public void BuildCombinedMessage_DeduplicatesIdenticalFormattedMessages()
 	{
-		// Identical severity + message produce the same formatted text, so only one survives.
+		// Both diagnostics format to the same message, so the combined result contains one copy.
 		var first = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "same", 1, 2);
 		var duplicate = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "same", 4, 5);
 

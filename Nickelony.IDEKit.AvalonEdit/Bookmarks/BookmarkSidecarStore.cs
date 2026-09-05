@@ -3,26 +3,24 @@ using Nickelony.IDEKit.Core.Persistence;
 namespace Nickelony.IDEKit.AvalonEdit.Bookmarks;
 
 /// <summary>
-/// Persists bookmarks to a <c>.bkmrk</c> sidecar file whose path is formed by appending the
-/// extension to the document path.
+/// Persists bookmarked line numbers in a sidecar file associated with each document.
 /// </summary>
-/// <remarks>
-/// This is the default <see cref="IBookmarkStore"/> for hosts that want file-local bookmark
-/// persistence. Hosts that persist bookmarks elsewhere (settings, workspace store, database)
-/// implement <see cref="IBookmarkStore"/> directly and never use this type.
-/// </remarks>
 public sealed class BookmarkSidecarStore : IBookmarkStore
 {
 	private readonly string _sidecarExtension;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="BookmarkSidecarStore"/> class.
+	/// Initializes a store that appends the specified suffix to each document path.
 	/// </summary>
 	/// <param name="sidecarExtension">
-	/// The text appended to the document path, or <see langword="null"/> to use the default <c>.bkmrk</c>.
+	/// The suffix appended to document paths. Defaults to <c>.bkmrk</c>.
 	/// </param>
-	public BookmarkSidecarStore(string? sidecarExtension = null)
-		=> _sidecarExtension = sidecarExtension ?? ".bkmrk";
+	/// <exception cref="ArgumentNullException"><paramref name="sidecarExtension"/> is <see langword="null"/>.</exception>
+	public BookmarkSidecarStore(string sidecarExtension = ".bkmrk")
+	{
+		ArgumentNullException.ThrowIfNull(sidecarExtension);
+		_sidecarExtension = sidecarExtension;
+	}
 
 	/// <inheritdoc/>
 	public bool Save(string filePath, IReadOnlyList<int> bookmarkedLineNumbers)
@@ -37,7 +35,6 @@ public sealed class BookmarkSidecarStore : IBookmarkStore
 	public IReadOnlyList<int> Restore(string filePath)
 	{
 		ArgumentNullException.ThrowIfNull(filePath);
-
 		return [.. SidecarLineFile.Restore(filePath, _sidecarExtension)];
 	}
 }

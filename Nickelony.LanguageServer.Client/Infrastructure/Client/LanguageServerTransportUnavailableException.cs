@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// The exception thrown when the active language-server transport becomes unavailable while sending an operation.
+/// The exception thrown when the active language-server transport becomes unavailable while sending a request or notification.
 /// </summary>
 public sealed class LanguageServerTransportUnavailableException : IOException
 {

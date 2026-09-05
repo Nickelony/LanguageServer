@@ -1,10 +1,9 @@
 namespace Nickelony.IDEKit.JsonSchema;
 
 /// <summary>
-/// The explicit outcome of building a <see cref="JsonSchemaVocabularyIndex"/> from a schema.
-/// Build failures, such as schema text that cannot be parsed, are reported through
-/// <see cref="Succeeded"/> and <see cref="Diagnostics"/> instead of being logged. A null
-/// argument is still reported as an argument error by the corresponding builder method.
+/// Represents the outcome of building a <see cref="JsonSchemaVocabularyIndex"/> from a schema.
+/// Failed builds expose diagnostics; successful builds may also contain diagnostics for skipped
+/// entries.
 /// </summary>
 public sealed class JsonSchemaVocabularyIndexResult
 {
@@ -20,9 +19,8 @@ public sealed class JsonSchemaVocabularyIndexResult
 	public JsonSchemaVocabularyIndex? Index { get; }
 
 	/// <summary>
-	/// Gets the messages produced while building the vocabulary index. A failed build contains an
-	/// error message; a successful build may contain warnings about entries that were skipped,
-	/// such as a <c>definitions</c> or <c>$defs</c> entry that is not a schema object.
+	/// Gets the diagnostics produced while building the vocabulary index. Failed builds contain an
+	/// error message; successful builds may contain messages about skipped definitions.
 	/// </summary>
 	public IReadOnlyList<string> Diagnostics { get; }
 

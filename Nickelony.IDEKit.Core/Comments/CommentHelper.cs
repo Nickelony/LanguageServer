@@ -71,10 +71,10 @@ public static class CommentHelper
 		=> new(text, syntax);
 
 	/// <summary>
-	/// Gets the code range for the given text, excluding comments. The range covers
-	/// the text before the first comment (the whitespace-inclusive start for a line
-	/// comment, or the opener for a block comment); if no comment is found, it covers
-	/// the entire text.
+	/// Gets the code range for the given text, excluding comments. For a line comment,
+	/// whitespace immediately before the delimiter belongs to the comment span and is
+	/// therefore excluded; for a block comment, the range ends at the opener. If no
+	/// comment is found, the range covers the entire text.
 	/// </summary>
 	/// <param name="text">The text to evaluate. May contain multiple lines.</param>
 	/// <param name="syntax">The comment syntax of the language.</param>
@@ -120,18 +120,24 @@ public static class CommentHelper
 	/// <param name="syntax">The comment syntax of the language.</param>
 	/// <returns>The text with all comments removed.</returns>
 	public static string RemoveComments(string text, CommentSyntax syntax)
-		=> TransformComments(text, syntax, maskComments: false, includeLineComments: true);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		return TransformComments(text, syntax, maskComments: false, includeLineComments: true);
+	}
 
 	/// <summary>
-	/// Masks all comments with spaces, preserving the total string length and any line
-	/// breaks inside block comments so character offsets and line numbers remain stable
-	/// for consumers that rely on them.
+	/// Masks all comments with spaces, preserving the total string length. LF characters inside
+	/// block comments are preserved; line-comment spans are replaced entirely with spaces. Other
+	/// line-ending characters inside block comments are replaced with spaces.
 	/// </summary>
 	/// <param name="text">The text to process. May contain multiple lines.</param>
 	/// <param name="syntax">The comment syntax of the language.</param>
 	/// <returns>The text with comment spans replaced by spaces.</returns>
 	public static string MaskComments(string text, CommentSyntax syntax)
-		=> TransformComments(text, syntax, maskComments: true, includeLineComments: true);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		return TransformComments(text, syntax, maskComments: true, includeLineComments: true);
+	}
 
 	/// <summary>
 	/// Removes all block comments from the text, leaving line comments untouched. For a
@@ -144,20 +150,25 @@ public static class CommentHelper
 	/// <param name="syntax">The comment syntax of the language.</param>
 	/// <returns>The text with all block comments removed.</returns>
 	public static string RemoveBlockComments(string text, CommentSyntax syntax)
-		=> TransformComments(text, syntax, maskComments: false, includeLineComments: false);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		return TransformComments(text, syntax, maskComments: false, includeLineComments: false);
+	}
 
 	/// <summary>
 	/// Masks all block comments with spaces, leaving line comments untouched, and
-	/// preserving the total string length and any line breaks inside block comments so
-	/// character offsets and line numbers remain stable for consumers that rely on them.
-	/// Line comments still participate in scanning, so a block opener inside a line
-	/// comment is not recognized.
+	/// preserving the total string length and LF characters inside block comments. Other
+	/// line-ending characters are replaced with spaces. Line comments still participate in scanning, so
+	/// a block opener inside a line comment is not recognized.
 	/// </summary>
 	/// <param name="text">The text to process. May contain multiple lines.</param>
 	/// <param name="syntax">The comment syntax of the language.</param>
 	/// <returns>The text with comment spans replaced by spaces.</returns>
 	public static string MaskBlockComments(string text, CommentSyntax syntax)
-		=> TransformComments(text, syntax, maskComments: true, includeLineComments: false);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		return TransformComments(text, syntax, maskComments: true, includeLineComments: false);
+	}
 
 	// Transforms the text by removing or masking comment spans. When includeLineComments
 	// is false, line comments are left untouched but still participate in scanning, so
@@ -165,7 +176,7 @@ public static class CommentHelper
 	// MaskBlockComments, which remove only block comments).
 	internal static string TransformComments(string text, CommentSyntax syntax, bool maskComments, bool includeLineComments)
 	{
-		if (string.IsNullOrEmpty(text))
+		if (text.Length == 0)
 			return string.Empty;
 
 		var result = new StringBuilder(text.Length);
@@ -188,11 +199,12 @@ public static class CommentHelper
 			{
 				// Line comments mask everything to spaces, including a line ending that
 				// precedes a comment-only line (matching the legacy line-comment behavior);
-				// block comments preserve line breaks so line numbers stay stable.
+				// Block comments preserve LF characters; other characters, including CR,
+				// are masked with spaces.
 				AppendMasked(result, text.AsSpan(span.Start, span.Length), preserveLineBreaks: !span.IsLineComment);
 			}
 
-			// Resume at the comment end, which is always a code position.
+			// Resume after the comment span.
 			sourceOffset = span.End;
 		}
 

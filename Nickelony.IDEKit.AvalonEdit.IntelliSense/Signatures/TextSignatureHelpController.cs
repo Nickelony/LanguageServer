@@ -110,10 +110,11 @@ public sealed class TextSignatureHelpController : IDisposable
 	}
 
 	/// <summary>
-	/// Requests signature help at the specified offset.
+	/// Requests signature help at the specified offset. When another request is in flight, the
+	/// request is queued for a debounced refresh after the active request finishes.
 	/// </summary>
 	/// <param name="offset">The zero-based document offset to request signature help for.</param>
-	/// <returns>A task that completes when the request has been processed.</returns>
+	/// <returns>A task that completes after an immediate request finishes or a superseding request has been queued for refresh.</returns>
 	public Task RequestAsync(int offset)
 	{
 		if (_isDisposed)
@@ -218,8 +219,7 @@ public sealed class TextSignatureHelpController : IDisposable
 	{
 		if (_signatureRequestInFlight)
 		{
-			// When supplied, the cancellation callback stops the active provider call before the
-			// replacement is scheduled; invalidating the token drops the old result when it completes.
+			// Let the host stop the active provider call when possible, then reject its result as stale.
 			_cancelInFlightRequest?.Invoke();
 			_signatureRequestTokens.Invalidate();
 			_pendingSignatureHelpOffset = offset;

@@ -40,6 +40,11 @@ public sealed partial class WorkspaceFileChangeForwarder : IDisposable
 		Action<WorkspaceFileForwardingFailure>? logForwardingFailure = null,
 		bool bufferChangesWhileForwardingDisabled = true)
 	{
+		ArgumentNullException.ThrowIfNull(canForwardAccessor);
+		ArgumentNullException.ThrowIfNull(isDisposedAccessor);
+		ArgumentNullException.ThrowIfNull(ensureStartedAsync);
+		ArgumentNullException.ThrowIfNull(markTransportUnavailable);
+
 		_canForwardAccessor = canForwardAccessor;
 		_isDisposedAccessor = isDisposedAccessor;
 		_ensureStartedAsync = ensureStartedAsync;

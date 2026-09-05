@@ -4,7 +4,7 @@ namespace Nickelony.IDEKit.KeyBindings;
 
 /// <summary>
 /// Value type representing a WPF key combo composed of a <see cref="Key"/> and
-/// <see cref="ModifierKeys"/>. Provides value equality, display text, and factory methods
+/// <see cref="ModifierKeys"/>. Provides value equality, display text, and a factory method
 /// from WPF key events.
 /// </summary>
 public readonly record struct KeyCombo
@@ -30,7 +30,8 @@ public readonly record struct KeyCombo
 	public Key Key { get; }
 
 	/// <summary>
-	/// The modifier flags (Control, Shift, Alt, and Windows).
+	/// The modifier flags associated with the combo.
+	/// Display text renders Ctrl, Shift, Alt, and Windows flags.
 	/// </summary>
 	public ModifierKeys Modifiers { get; }
 
@@ -42,6 +43,7 @@ public readonly record struct KeyCombo
 	/// the combination is a modifier-only keystroke.
 	/// </summary>
 	/// <param name="e">The WPF key event whose key and currently pressed modifier keys are read.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="e"/> is <see langword="null"/>.</exception>
 	public static KeyCombo? FromKeyEventArgs(KeyEventArgs e)
 	{
 		ArgumentNullException.ThrowIfNull(e);
@@ -78,10 +80,10 @@ public readonly record struct KeyCombo
 	}
 
 	/// <summary>
-	/// Returns a display string suitable for menu and toolbar presentation.
+	/// Returns display text suitable for menu and toolbar presentation.
 	/// Control, Shift, Alt, and Windows flags are formatted in that order; other modifier bits
-	/// are not rendered. This text is never persisted; it is calculated from <see cref="Key"/>
-	/// and <see cref="Modifiers"/>.
+	/// are omitted. The text is calculated from <see cref="Key"/> and <see cref="Modifiers"/>
+	/// rather than persisted.
 	/// </summary>
 	public string GetDisplayText()
 	{

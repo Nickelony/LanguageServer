@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Core.Infrastructure;
 
 /// <summary>
-/// Provides monotonically-increasing request tokens used to invalidate stale asynchronous results.
+/// Provides request tokens used to identify the latest asynchronous result and invalidate stale ones.
 /// </summary>
 public sealed class RequestTokenSource
 {

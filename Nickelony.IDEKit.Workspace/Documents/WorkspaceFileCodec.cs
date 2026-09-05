@@ -48,6 +48,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 	/// </remarks>
 	public static byte[] Encode(string content, TextFileFormat fileFormat)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		if (fileFormat.HasBom && fileFormat.Encoding == TextEncodingKind.Windows1252)
 			throw new ArgumentException("Windows-1252 does not support a BOM.", nameof(fileFormat));
 
@@ -67,6 +69,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 	/// <summary>Detects the newline style used by text content without changing the content.</summary>
 	public static TextNewlineStyle DetectNewlineStyle(string content)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		bool hasCrLf = false;
 		bool hasLf = false;
 		bool hasCr = false;
@@ -113,6 +117,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		string path,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(path);
+
 		cancellationToken.ThrowIfCancellationRequested();
 
 		if (!File.Exists(path))
@@ -126,6 +132,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 	/// <summary>Captures a file's current byte length, last-write time, and content hash.</summary>
 	public async Task<FileStamp> CaptureStampAsync(string path, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(path);
+
 		cancellationToken.ThrowIfCancellationRequested();
 
 		if (!File.Exists(path))
@@ -142,6 +150,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		ReadOnlyMemory<byte> content,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(directory);
+
 		string path = Path.Combine(directory, $".{Guid.NewGuid():N}.tmp");
 		try
 		{
@@ -177,6 +187,9 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		FileStamp expectedStamp,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(temporaryFile);
+		ArgumentNullException.ThrowIfNull(destinationPath);
+
 		FileStamp actualStamp = await CaptureStampAsync(destinationPath, cancellationToken).ConfigureAwait(false);
 		if (actualStamp != expectedStamp)
 			return new WorkspaceFileReplacementResult(
@@ -237,6 +250,9 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		FileStamp expectedSourceStamp,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(sourcePath);
+		ArgumentNullException.ThrowIfNull(destinationPath);
+
 		try
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -304,6 +320,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		CancellationToken cancellationToken,
 		bool useRecycleBin = false)
 	{
+		ArgumentNullException.ThrowIfNull(path);
+
 		try
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -341,6 +359,9 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		string destinationPath,
 		CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(sourcePath);
+		ArgumentNullException.ThrowIfNull(destinationPath);
+
 		try
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -406,6 +427,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 		CancellationToken cancellationToken,
 		bool useRecycleBin = false)
 	{
+		ArgumentNullException.ThrowIfNull(path);
+
 		try
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -434,6 +457,8 @@ public sealed class WorkspaceFileCodec : IWorkspaceFileSystem
 	/// <summary>Deletes a temporary file created by <see cref="WriteTemporaryAsync"/>.</summary>
 	public Task DeleteTemporaryAsync(WorkspaceTemporaryFile temporaryFile)
 	{
+		ArgumentNullException.ThrowIfNull(temporaryFile);
+
 		File.Delete(temporaryFile.Path);
 		return Task.CompletedTask;
 	}

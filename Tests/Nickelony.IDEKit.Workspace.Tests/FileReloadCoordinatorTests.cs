@@ -2,6 +2,14 @@ using Nickelony.IDEKit.Workspace.Documents;
 
 namespace Nickelony.IDEKit.Workspace.Tests;
 
+/// <summary>
+/// Tests <see cref="FileReloadCoordinator{TDocument}"/> queueing, prompting, conflict resolution,
+/// and failure reporting.
+/// </summary>
+/// <remarks>
+/// The tests also verify that duplicate paths are ignored and nested processing cannot start while a
+/// queue is already being processed.
+/// </remarks>
 [TestClass]
 [TestCategory("TextEditorBaseModernization")]
 public sealed class FileReloadCoordinatorTests

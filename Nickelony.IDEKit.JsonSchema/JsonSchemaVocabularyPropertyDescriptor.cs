@@ -1,11 +1,8 @@
 namespace Nickelony.IDEKit.JsonSchema;
 
 /// <summary>
-/// Immutable, context-free description of one property name in a vocabulary index. A descriptor
-/// carries the property name, its JSON types, and its description; it does not carry the schema
-/// path or location where the name was declared. When a name occurs more than once, the index
-/// surfaces the first occurrence in traversal order (see
-/// <see cref="JsonSchemaVocabularyIndexBuilder"/>). The constructor copies the supplied type list.
+/// Describes a property in a JSON Schema vocabulary index. The descriptor is immutable and
+/// includes the property's name, JSON types, and description.
 /// </summary>
 public sealed class JsonSchemaVocabularyPropertyDescriptor
 {
@@ -45,7 +42,7 @@ public sealed class JsonSchemaVocabularyPropertyDescriptor
 
 		Name = name;
 
-		// Keep a private read-only copy of the supplied types.
+		// Keep a read-only copy of the supplied types.
 		Types = Array.AsReadOnly([.. types]);
 		Description = description;
 	}

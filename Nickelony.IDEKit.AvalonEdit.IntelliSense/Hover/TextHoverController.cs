@@ -11,8 +11,8 @@ namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Hover;
 
 /// <summary>
 /// Coordinates hover requests, request invalidation, and hover-versus-diagnostic tooltip display.
-/// Completed results are displayed only when they still correspond to the current pointer position
-/// and session generation.
+/// Completed results are displayed only when the request is still current, the pointer still maps
+/// to the same request offset, and the optional session generation is unchanged.
 /// </summary>
 public sealed class TextHoverController : IDisposable
 {
@@ -165,7 +165,7 @@ public sealed class TextHoverController : IDisposable
 	}
 
 	/// <summary>
-	/// Cancels the current hover request, if one is still in flight.
+	/// Cancels the current hover request, if any.
 	/// </summary>
 	public void CancelPendingRequest()
 	{

@@ -301,9 +301,8 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 	}
 
 	/// <summary>
-	/// Restarts a failed workspace file watcher and reports whether recovery succeeded.
+	/// Attempts to restart a failed workspace file watcher.
 	/// </summary>
-	/// <remarks>This method is used by <c>LuaLanguageServerIntelliSenseProviderTests</c> via reflection. Do not remove without updating the tests.</remarks>
 	private bool TryRestartWorkspaceFileWatcher(WorkspaceFileWatcher failedWatcher)
 		=> RecoverWorkspaceFileWatcher(failedWatcher) == WorkspaceWatcherRecoveryResult.Recovered;
 

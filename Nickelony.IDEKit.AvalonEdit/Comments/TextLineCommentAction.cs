@@ -1,16 +1,23 @@
 namespace Nickelony.IDEKit.AvalonEdit.Comments;
 
 /// <summary>
-/// Describes the line-comment transformation applied by <see cref="TextLineCommentService"/>.
+/// Specifies the line-comment operation applied to lines touched by a selection.
 /// </summary>
 public enum TextLineCommentAction
 {
-	/// <summary>Comments the selected lines.</summary>
+	/// <summary>
+	/// Adds the line-comment delimiter to each non-whitespace selected line.
+	/// </summary>
 	Comment,
 
-	/// <summary>Uncomments the selected lines.</summary>
+	/// <summary>
+	/// Removes the line-comment delimiter from each selected line that has one.
+	/// </summary>
 	Uncomment,
 
-	/// <summary>Comments or uncomments the selected lines depending on their current state.</summary>
+	/// <summary>
+	/// Uncomments when at least one non-whitespace selected line exists and all such lines have the delimiter;
+	/// otherwise, comments the selected lines.
+	/// </summary>
 	Toggle
 }

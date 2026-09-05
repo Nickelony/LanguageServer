@@ -1,9 +1,9 @@
 namespace Nickelony.IDEKit.KeyBindings;
 
 /// <summary>
-/// Catalog of all commands that can participate in key bindings.
-/// The catalog supplies command descriptors and their default bindings to the
-/// binding service and other command surfaces.
+/// Catalog of commands that can participate in key bindings.
+/// Each entry supplies a command identity, stable identifier, default bindings,
+/// and remapping policy.
 /// </summary>
 public sealed class CommandCatalog<TCommandId>
 	where TCommandId : notnull
@@ -12,11 +12,13 @@ public sealed class CommandCatalog<TCommandId>
 	private readonly Dictionary<string, CommandDescriptor<TCommandId>> _descriptorsById;
 
 	/// <summary>
-	/// Creates a catalog from the supplied descriptors. Construction rejects
-	/// <see langword="default"/> command values, duplicate command identities, and
-	/// duplicate serialized identifiers.
+	/// Creates a catalog from the supplied descriptors.
 	/// </summary>
 	/// <param name="descriptors">The descriptors to include in the catalog.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="descriptors"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException">
+	/// A descriptor uses the <see langword="default"/> command value, or a command identity or serialized identifier is repeated.
+	/// </exception>
 	public CommandCatalog(IReadOnlyList<CommandDescriptor<TCommandId>> descriptors)
 	{
 		ArgumentNullException.ThrowIfNull(descriptors);
@@ -41,7 +43,7 @@ public sealed class CommandCatalog<TCommandId>
 	}
 
 	/// <summary>
-	/// Gets a read-only view of all catalog entries.
+	/// Gets all descriptors in the catalog. Enumeration order is not specified.
 	/// </summary>
 	public IReadOnlyCollection<CommandDescriptor<TCommandId>> Descriptors => _descriptorsByCommand.Values;
 
@@ -61,13 +63,16 @@ public sealed class CommandCatalog<TCommandId>
 	/// </summary>
 	public CommandDescriptor<TCommandId>? TryGetDescriptorById(string serializedId)
 	{
+		ArgumentNullException.ThrowIfNull(serializedId);
+
 		_descriptorsById.TryGetValue(serializedId, out CommandDescriptor<TCommandId>? descriptor);
 		return descriptor;
 	}
 
 	/// <summary>
 	/// Finds duplicate use of a default key binding, including repeated bindings within
-	/// one descriptor. Returns violation descriptions, or an empty list when no duplicates exist.
+	/// one descriptor. Returns one description for each duplicate, or an empty list when
+	/// no duplicates exist.
 	/// </summary>
 	public IReadOnlyList<string> ValidateNoDuplicateDefaults()
 	{

@@ -7,10 +7,9 @@ namespace Nickelony.IDEKit.Workspace.Views;
 /// Represents a view of a workspace document into another editor or model.
 /// </summary>
 /// <remarks>
-/// The manager calls view members through its host-invocation callback. A detached view has a
-/// <see langword="null"/> <see cref="DocumentKey"/>; <see cref="HasPendingEdits"/> and
-/// <see cref="HasConflict"/> are treated as blockers for operations that would overwrite, move,
-/// or delete the document.
+/// The manager uses its host-invocation callback for view operations that require host affinity. A
+/// detached view has a <see langword="null"/> <see cref="DocumentKey"/>; <see cref="HasPendingEdits"/>
+/// and <see cref="HasConflict"/> can block document persistence, moves, and deletes.
 /// </remarks>
 public interface IWorkspaceDocumentView : ITextEditTarget
 {
@@ -52,11 +51,11 @@ public interface IWorkspaceDocumentView : ITextEditTarget
 	WorkspaceDocumentViewIdentityResult AcknowledgeIdentity(WorkspaceDocumentIdentityChange change);
 
 	/// <summary>Sets or releases the view's delete guard.</summary>
-	/// <param name="active"><see langword="true"/> to block conflicting view activity while a delete or move is prepared; <see langword="false"/> to release the guard.</param>
+	/// <param name="active"><see langword="true"/> to block conflicting view activity during a directory move or deletion of a file or directory; <see langword="false"/> to release the guard.</param>
 	WorkspaceDocumentViewDeleteGuardResult SetDeleteGuard(bool active);
 
-	/// <summary>Acknowledges the result of publishing content requested by the view.</summary>
-	/// <remarks>A failed or non-refreshed acknowledgement leaves the view unsynchronized from the manager's perspective.</remarks>
+	/// <summary>Acknowledges the result of applying a logical document mutation to the view.</summary>
+	/// <remarks>Used for content published by the view and manager-initiated mutations such as discarding edits. A non-refreshed acknowledgement leaves the view unsynchronized.</remarks>
 	WorkspaceDocumentViewRefreshResult AcknowledgeApply(WorkspaceDocumentMutationResult result);
 
 	/// <summary>Closes the view and detaches it from its current document.</summary>

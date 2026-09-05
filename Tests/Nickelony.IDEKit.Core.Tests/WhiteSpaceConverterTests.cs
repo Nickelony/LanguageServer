@@ -73,7 +73,7 @@ public sealed class WhiteSpaceConverterTests
 	[TestMethod]
 	public void ConvertSpacesToTabs_SpacesNotAlignedToTabStop_KeepTrailingPartialGroup()
 	{
-		// Six leading spaces with tabSize 4: the first four become a tab, the last two stay as spaces.
+		// The first four spaces form a tab; the remaining two stay as spaces.
 		Assert.AreEqual("\t  Legend= 42", WhiteSpaceConverter.ConvertSpacesToTabs("      Legend= 42", 4));
 	}
 
@@ -96,14 +96,14 @@ public sealed class WhiteSpaceConverterTests
 
 		string result = WhiteSpaceConverter.ConvertSpacesToTabs(input, 4);
 
-		// All non-indentation content is preserved character-for-character.
+		// Content after indentation is unchanged.
 		Assert.AreEqual("\tLegend= \"  hello;world  \" ; 42 >\n  , 43", result);
 	}
 
 	[TestMethod]
 	public void ConvertSpacesToTabs_LargeTabSize_KeepsSpaces()
 	{
-		// No indentation reaches a tab stop, so the input stays unchanged.
+		// Four spaces do not reach a tab stop of 1024.
 		Assert.AreEqual("    Legend= 42", WhiteSpaceConverter.ConvertSpacesToTabs("    Legend= 42", 1024));
 	}
 

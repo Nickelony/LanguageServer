@@ -92,7 +92,7 @@ public sealed class ProcessRunner : IProcessRunner
 		}
 		catch (Exception exception) when (exception is InvalidOperationException or NotSupportedException or Win32Exception)
 		{
-			// Some process types do not support whole-tree termination. Fall back to terminating only the launched process.
+			// Tree termination can be unsupported or fail when the process is no longer available. Fall back to terminating only the launched process.
 			try
 			{
 				process.Kill();

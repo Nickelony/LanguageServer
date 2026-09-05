@@ -39,6 +39,10 @@ public abstract class TrackedDocumentState
 		int requestReferenceCount,
 		long lastAccessStamp)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(uri);
+		ArgumentNullException.ThrowIfNull(content);
+
 		_filePath = filePath;
 		_uri = uri;
 		_content = content;
@@ -152,6 +156,8 @@ public abstract class TrackedDocumentState
 	/// <param name="content">The reopened content.</param>
 	protected void ReopenDocument(string content)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		lock (_stateSyncRoot)
 		{
 			_content = content;
@@ -167,6 +173,8 @@ public abstract class TrackedDocumentState
 	/// <returns>The previous content snapshot.</returns>
 	protected string ReplaceContent(string content)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		lock (_stateSyncRoot)
 		{
 			string previousContent = _content;
@@ -184,6 +192,9 @@ public abstract class TrackedDocumentState
 	/// <param name="uri">The replacement file URI.</param>
 	protected void RenameDocument(string filePath, string uri)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(uri);
+
 		lock (_stateSyncRoot)
 		{
 			_filePath = filePath;

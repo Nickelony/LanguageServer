@@ -8,7 +8,7 @@ namespace Nickelony.IDEKit.AvalonEdit.Extras.TextMate.Highlighting;
 
 /// <summary>
 /// Resolves TextMate token scopes into <see cref="TextMateHighlightingStyle"/> instances using a
-/// <see cref="TextMateTokenTheme"/>. Resolved styles are cached for each scope sequence.
+/// <see cref="TextMateTokenTheme"/>. Resolved styles for non-empty scope sequences are cached.
 /// </summary>
 public sealed class TextMateThemeStyleResolver
 {
@@ -29,7 +29,7 @@ public sealed class TextMateThemeStyleResolver
 	/// Initializes a new instance of the <see cref="TextMateThemeStyleResolver"/> class.
 	/// </summary>
 	/// <param name="theme">The token theme whose rules drive style resolution.</param>
-	/// <param name="logger">An optional logger for malformed theme data.</param>
+	/// <param name="logger">An optional logger used to report invalid foreground colors.</param>
 	public TextMateThemeStyleResolver(TextMateTokenTheme theme, ILogger? logger = null)
 	{
 		ArgumentNullException.ThrowIfNull(theme);
@@ -43,10 +43,11 @@ public sealed class TextMateThemeStyleResolver
 	/// </summary>
 	/// <param name="scopes">The token scopes to resolve.</param>
 	/// <returns>
-	/// The resolved style, or <see cref="TextMateHighlightingStyle.Empty"/> when no scope matches a theme rule.
-	/// When several rules match, more-specific scope selectors provide each formatting value first.
+	/// The resolved style. When <paramref name="scopes"/> is <see langword="null"/> or empty, the shared
+	/// <see cref="TextMateHighlightingStyle.Empty"/> instance is returned. When rules match, values from more-specific
+	/// selectors take precedence, while values not supplied by those rules can come from less-specific matches.
 	/// </returns>
-	public TextMateHighlightingStyle Resolve(IList<string> scopes)
+	public TextMateHighlightingStyle Resolve(IList<string>? scopes)
 	{
 		if (scopes is null || scopes.Count == 0)
 			return TextMateHighlightingStyle.Empty;
@@ -118,9 +119,6 @@ public sealed class TextMateThemeStyleResolver
 	private List<ParsedThemeRule> CreateRules(TextMateTokenTheme theme)
 	{
 		var rules = new List<ParsedThemeRule>();
-
-		if (theme.Rules is null)
-			return rules;
 
 		for (int i = 0; i < theme.Rules.Count; i++)
 		{

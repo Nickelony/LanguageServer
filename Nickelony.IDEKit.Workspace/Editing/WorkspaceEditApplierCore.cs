@@ -53,8 +53,13 @@ public sealed class WorkspaceEditApplierCore
 	/// document before returning or throwing.
 	/// </returns>
 	/// <example>
-	/// A caller can inspect <c>ChangedTargetIds</c> and <c>UnknownTargetIds</c> separately when a result
-	/// has <see cref="TextWorkspaceEditApplicationStatus.PartiallyApplied"/> status.
+	/// <code>
+	/// if (result.Status == TextWorkspaceEditApplicationStatus.PartiallyApplied)
+	/// {
+	/// 	IReadOnlyList&lt;string&gt; changed = result.ChangedTargetIds;
+	/// 	IReadOnlyList&lt;string&gt; unknown = result.UnknownTargetIds;
+	/// }
+	/// </code>
 	/// </example>
 	public TextWorkspaceEditApplicationResult Apply(IReadOnlyList<WorkspaceEditTargetPreparation> targets)
 	{

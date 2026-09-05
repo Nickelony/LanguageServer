@@ -9,7 +9,7 @@ namespace Nickelony.IDEKit.IntelliSense.DocumentSymbols;
 /// Aligned with the LSP <c>DocumentSymbol</c> shape but protocol-independent: ranges use neutral
 /// zero-based UTF-16 offsets (<see cref="TextRange"/>) rather than protocol line and column
 /// coordinates, and the symbol kind is <see cref="TextDocumentSymbolKind"/>. Nested symbols are
-/// carried in <see cref="Children"/>, and an optional host payload rides in <see cref="Data"/>.
+/// carried in <see cref="Children"/>, and an optional host payload is available through <see cref="Data"/>.
 /// </remarks>
 public sealed class TextDocumentSymbol
 {
@@ -78,7 +78,7 @@ public sealed class TextDocumentSymbol
 	public string? Detail { get; }
 
 	/// <summary>
-	/// Gets the owned immutable snapshot of nested symbols.
+	/// Gets the owned snapshot of nested symbols.
 	/// </summary>
 	public IReadOnlyList<TextDocumentSymbol> Children => _children;
 

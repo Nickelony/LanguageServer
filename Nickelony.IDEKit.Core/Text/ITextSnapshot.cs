@@ -44,7 +44,9 @@ public interface ITextSnapshot
 	string GetText(int offset, int length);
 
 	/// <summary>
-	/// Gets the line that contains the specified zero-based UTF-16 offset.
+	/// Gets the line associated with the specified zero-based UTF-16 offset. An offset on a line
+	/// terminator is associated with the preceding line, and the end-of-text offset is associated
+	/// with the final line.
 	/// </summary>
 	/// <param name="offset">The zero-based UTF-16 offset to locate.</param>
 	/// <returns>The line containing the specified offset.</returns>

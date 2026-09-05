@@ -40,7 +40,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task DispatchAsync_WhenForwardingNotCurrentlyAllowed_UsesExplicitDropModeWithoutBuffering()
+	public async Task DispatchAsync_WhenForwardingNotCurrentlyAllowed_DropsChangesWhenBufferingIsDisabled()
 	{
 		bool ensureStartedCalled = false;
 		bool forwardCalled = false;
@@ -139,7 +139,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task DispatchAsync_WhenForwardingThrowsIOException_BuffersMarksTransportUnavailableAndReplays()
+	public async Task DispatchAsync_WhenIOExceptionDuringForwarding_BuffersChangesAndMarksTransportUnavailable()
 	{
 		int markTransportUnavailableCallCount = 0;
 		int logForwardingFailureCallCount = 0;
@@ -238,7 +238,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task DispatchAsync_WhenForwardingThrowsObjectDisposedExceptionWhileOwnerAlive_BuffersMarksTransportUnavailableAndReplays()
+	public async Task DispatchAsync_WhenTransportClosesWhileOwnerIsAlive_BuffersChangesAndMarksTransportUnavailable()
 	{
 		int markTransportUnavailableCallCount = 0;
 		IReadOnlyList<WorkspaceFileChange>? replayedChanges = null;
@@ -269,7 +269,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task DispatchAsync_WhenForwardingThrowsUnexpectedException_LogsAndIntentionallyDropsChangesWithoutReplay()
+	public async Task DispatchAsync_WhenForwardingThrowsUnexpectedException_LogsAndDropsChangesWithoutReplay()
 	{
 		int markTransportUnavailableCallCount = 0;
 		int logForwardingFailureCallCount = 0;
@@ -622,7 +622,7 @@ public class WorkspaceFileChangeForwarderTests
 	}
 
 	[TestMethod]
-	public async Task Dispose_WhileDispatchWaitsForGate_DoesNotStartForwardingAfterGateOpens()
+	public async Task Dispose_WhileDispatchWaitsForGate_DoesNotStartBlockedForwarding()
 	{
 		bool ensureStartedCalled = false;
 		bool forwardCalled = false;

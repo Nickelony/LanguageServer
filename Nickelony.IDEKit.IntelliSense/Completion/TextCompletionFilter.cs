@@ -11,8 +11,8 @@ public static class TextCompletionFilter
 	/// Reduces a completion item set to the items matching the word being typed at the request point.
 	/// </summary>
 	/// <remarks>
-	/// Matching is case-insensitive and tolerant: an item is kept when its insertion text contains the
-	/// typed word. An empty word (for example on a fresh line or via Ctrl+Space) keeps all items.
+	/// The built-in filter performs a case-insensitive substring match against each item's insertion text.
+	/// An empty word (for example on a fresh line or via Ctrl+Space) keeps all items.
 	/// </remarks>
 	/// <param name="items">The candidate completion items.</param>
 	/// <param name="context">The completion request context.</param>
@@ -31,8 +31,8 @@ public static class TextCompletionFilter
 	/// Reduces a completion item set to the items matching the supplied word.
 	/// </summary>
 	/// <remarks>
-	/// Matching is case-insensitive and tolerant: an item is kept when its insertion text contains the
-	/// typed word. An empty word keeps all items.
+	/// The built-in filter performs a case-insensitive substring match against each item's insertion text.
+	/// An empty word keeps all items.
 	/// </remarks>
 	/// <param name="items">The candidate completion items.</param>
 	/// <param name="word">The word being typed.</param>

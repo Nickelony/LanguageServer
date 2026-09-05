@@ -18,6 +18,8 @@ public sealed class TextEditorDiagnostic
 	/// <param name="endOffset">The zero-based exclusive end offset.</param>
 	public TextEditorDiagnostic(TextEditorDiagnosticSeverity severity, string message, int startOffset, int endOffset)
 	{
+		ArgumentNullException.ThrowIfNull(message);
+
 		Severity = severity;
 		Message = message;
 		StartOffset = Math.Max(0, startOffset);

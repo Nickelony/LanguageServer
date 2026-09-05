@@ -3,8 +3,8 @@ using System.Windows.Input;
 namespace Nickelony.IDEKit.KeyBindings;
 
 /// <summary>
-/// Dispatches editor key-down events to the command bound to the pressed key combo.
-/// Implements the key-down, binding lookup, can-execute, and execute pipeline.
+/// Routes WPF key-down events to the command bound to the pressed key combo when
+/// that command can currently execute.
 /// </summary>
 public sealed class KeyBindingDispatcher<TCommandId>
 	where TCommandId : notnull
@@ -19,6 +19,7 @@ public sealed class KeyBindingDispatcher<TCommandId>
 	/// <param name="keyBindings">The binding service used to resolve key combos to commands.</param>
 	/// <param name="canExecuteCommand">Determines whether a resolved command may currently execute.</param>
 	/// <param name="executeCommand">Invokes the resolved command.</param>
+	/// <exception cref="ArgumentNullException">A parameter is <see langword="null"/>.</exception>
 	public KeyBindingDispatcher(
 		IKeyBindingService<TCommandId> keyBindings,
 		Func<TCommandId, bool> canExecuteCommand,
@@ -31,8 +32,8 @@ public sealed class KeyBindingDispatcher<TCommandId>
 
 	/// <summary>
 	/// Attempts to dispatch <paramref name="e"/> to the command bound to the pressed key combo.
-	/// Returns <see langword="true"/> when a key combo was recognized, the command can execute,
-	/// and the command was invoked; the caller should mark the event handled in that case.
+	/// Returns <see langword="true"/> only when a key combo was recognized, the command can
+	/// execute, and the command was invoked; the caller should mark the event handled in that case.
 	/// Returns <see langword="false"/> for modifier-only keystrokes, unbound key combos,
 	/// and commands that cannot currently execute.
 	/// </summary>

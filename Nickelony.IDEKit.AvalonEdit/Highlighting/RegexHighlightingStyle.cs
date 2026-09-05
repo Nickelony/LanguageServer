@@ -1,25 +1,27 @@
+using ICSharpCode.AvalonEdit.Highlighting;
 using System.Windows;
 using System.Windows.Media;
-using ICSharpCode.AvalonEdit.Highlighting;
 
 namespace Nickelony.IDEKit.AvalonEdit.Highlighting;
 
 /// <summary>
-/// Describes the declarative style applied to a <see cref="RegexHighlightingRule"/>. The color is
-/// kept as a string so empty or malformed values can use a fallback color when the style is converted
-/// to an AvalonEdit <see cref="HighlightingColor"/>.
+/// Defines the color and font styles for text matched by a <see cref="RegexHighlightingRule"/>.
+/// The color is parsed during conversion. <see langword="null"/>, blank, or invalid values use the fallback.
 /// </summary>
-/// <param name="HtmlColor">A color string accepted by WPF's <see cref="ColorConverter"/>; empty or malformed values fall back.</param>
-/// <param name="IsBold">Whether the highlighted text is bold.</param>
-/// <param name="IsItalic">Whether the highlighted text is italic.</param>
+/// <param name="HtmlColor">
+/// A color string accepted by WPF's <see cref="ColorConverter"/>.
+/// <see langword="null"/>, whitespace-only, or invalid values use the fallback color.
+/// </param>
+/// <param name="IsBold">Whether matched text uses a bold font weight.</param>
+/// <param name="IsItalic">Whether matched text uses an italic font style.</param>
 public sealed record RegexHighlightingStyle(string? HtmlColor = null, bool IsBold = false, bool IsItalic = false)
 {
 	/// <summary>
-	/// Converts the style to an AvalonEdit highlighting color, falling back to
-	/// <paramref name="fallbackColor"/> when the color value is empty or malformed.
+	/// Converts this style to an AvalonEdit <see cref="HighlightingColor"/>.
+	/// Missing or invalid color values use <paramref name="fallbackColor"/>.
 	/// </summary>
-	/// <param name="fallbackColor">The color used when the color value cannot be parsed.</param>
-	/// <returns>The converted highlighting color.</returns>
+	/// <param name="fallbackColor">The foreground color used when the configured color cannot be parsed.</param>
+	/// <returns>A highlighting color with the resolved foreground color and configured font settings.</returns>
 	public HighlightingColor ToHighlightingColor(Color fallbackColor)
 	{
 		Color foreground = TryParseColor(HtmlColor, out Color color) ? color : fallbackColor;

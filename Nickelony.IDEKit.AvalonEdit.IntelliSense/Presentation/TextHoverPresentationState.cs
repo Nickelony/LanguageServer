@@ -34,12 +34,12 @@ public readonly record struct TextHoverPresentationState(
 		CanShowDiagnosticFallback: false);
 
 	/// <summary>
-	/// Gets a value indicating whether a non-empty hover tooltip can be shown.
+	/// Gets a value indicating whether hover information contains non-whitespace content.
 	/// </summary>
 	public bool HasDisplayableHover => HoverInfo is not null && !string.IsNullOrWhiteSpace(HoverInfo.Content);
 
 	/// <summary>
-	/// Gets a value indicating whether a non-empty diagnostic tooltip can be shown.
+	/// Gets a value indicating whether diagnostic information contains a non-whitespace message.
 	/// </summary>
 	public bool HasDisplayableDiagnostic
 		=> DiagnosticInfo is not null && !string.IsNullOrWhiteSpace(DiagnosticInfo.Message);

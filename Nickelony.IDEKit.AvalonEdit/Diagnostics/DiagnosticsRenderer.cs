@@ -1,9 +1,9 @@
-using System.Windows;
-using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
 using Nickelony.IDEKit.AvalonEdit.Documents;
 using Nickelony.IDEKit.Infrastructure;
+using System.Windows;
+using System.Windows.Media;
 
 namespace Nickelony.IDEKit.AvalonEdit.Diagnostics;
 
@@ -11,9 +11,8 @@ namespace Nickelony.IDEKit.AvalonEdit.Diagnostics;
 /// Renders diagnostic underlines in an AvalonEdit text view.
 /// </summary>
 /// <remarks>
-/// Segments are clamped to the current document by <see cref="TextSegmentFactory"/>. Empty or
-/// reversed ranges therefore underline one character when the document is non-empty. The segment
-/// provider is queried each time AvalonEdit asks the renderer to draw.
+/// The segment provider is queried during rendering and is not monitored for changes.
+/// Hosts must invalidate the text view when the diagnostic segments change.
 /// </remarks>
 public sealed class DiagnosticsRenderer : IBackgroundRenderer
 {
@@ -28,56 +27,68 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 	private static Pen s_hintPen = BrushHelpers.CreateFrozenDashedPen(s_hintBrush, 1.5, [1.0, 3.0]);
 
 	/// <summary>
-	/// Gets or sets the brush used to draw error underlines. Reassigning the brush rebuilds the
-	/// underline pen so the new color applies to subsequent drawing.
+	/// Gets or sets the brush used to draw error underlines.
+	/// The assigned brush is used by subsequent renders. Setting it rebuilds the pen used for drawing.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static SolidColorBrush ErrorBrush
 	{
 		get => s_errorBrush;
 		set
 		{
+			ArgumentNullException.ThrowIfNull(value);
+
 			s_errorBrush = value;
 			s_errorPen = BrushHelpers.CreateFrozenPen(value, 1.4);
 		}
 	}
 
 	/// <summary>
-	/// Gets or sets the brush used to draw warning underlines. Reassigning the brush rebuilds the
-	/// underline pen so the new color applies to subsequent drawing.
+	/// Gets or sets the brush used to draw warning underlines.
+	/// The assigned brush is used by subsequent renders. Setting it rebuilds the pen used for drawing.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static SolidColorBrush WarningBrush
 	{
 		get => s_warningBrush;
 		set
 		{
+			ArgumentNullException.ThrowIfNull(value);
+
 			s_warningBrush = value;
 			s_warningPen = BrushHelpers.CreateFrozenPen(value, 1.4);
 		}
 	}
 
 	/// <summary>
-	/// Gets or sets the brush used to draw information underlines. Reassigning the brush rebuilds the
-	/// underline pen so the new color applies to subsequent drawing.
+	/// Gets or sets the brush used to draw information underlines.
+	/// The assigned brush is used by subsequent renders. Setting it rebuilds the pen used for drawing.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static SolidColorBrush InformationBrush
 	{
 		get => s_informationBrush;
 		set
 		{
+			ArgumentNullException.ThrowIfNull(value);
+
 			s_informationBrush = value;
 			s_informationPen = BrushHelpers.CreateFrozenPen(value, 1.4);
 		}
 	}
 
 	/// <summary>
-	/// Gets or sets the brush used to draw hint underlines. Reassigning the brush rebuilds the
-	/// underline pen so the new color applies to subsequent drawing.
+	/// Gets or sets the brush used to draw hint underlines.
+	/// The assigned brush is used by subsequent renders. Setting it rebuilds the pen used for drawing.
 	/// </summary>
+	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
 	public static SolidColorBrush HintBrush
 	{
 		get => s_hintBrush;
 		set
 		{
+			ArgumentNullException.ThrowIfNull(value);
+
 			s_hintBrush = value;
 			s_hintPen = BrushHelpers.CreateFrozenDashedPen(value, 1.5, [1.0, 3.0]);
 		}
@@ -87,14 +98,20 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 	private readonly Func<IReadOnlyList<TextDiagnosticSegment>> _segmentsProvider;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="DiagnosticsRenderer"/> class.
+	/// Initializes a renderer with providers for the document and diagnostic segments.
 	/// </summary>
-	/// <param name="documentProvider">Provides the document the segments are clamped against.</param>
+	/// <param name="documentProvider">Provides the document used to clamp ranges; may return <see langword="null"/>.</param>
 	/// <param name="segmentsProvider">Provides the diagnostic segments to render.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="documentProvider"/> or <paramref name="segmentsProvider"/> is <see langword="null"/>.
+	/// </exception>
 	public DiagnosticsRenderer(
 		Func<TextDocument?> documentProvider,
 		Func<IReadOnlyList<TextDiagnosticSegment>> segmentsProvider)
 	{
+		ArgumentNullException.ThrowIfNull(documentProvider);
+		ArgumentNullException.ThrowIfNull(segmentsProvider);
+
 		_documentProvider = documentProvider;
 		_segmentsProvider = segmentsProvider;
 	}
@@ -120,7 +137,7 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 			foreach (Rect rect in BackgroundGeometryBuilder.GetRectsForSegment(textView, textSegment, false))
 			{
 				if (rect.Width < 2.0)
-					continue;
+					continue; // Skip very narrow rectangles
 
 				switch (segment.Severity)
 				{
@@ -146,9 +163,10 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 
 	private static void DrawSquigglyUnderline(DrawingContext drawingContext, Rect rect, Pen pen)
 	{
+		const double amplitude = 1.6;
+		const double step = 4.0;
+
 		double baseline = rect.Bottom - 1.0;
-		double amplitude = 1.6;
-		double step = 4.0;
 
 		var geometry = new StreamGeometry();
 
@@ -159,7 +177,7 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 
 			for (double x = rect.Left; x < rect.Right; x += step)
 			{
-				double nextX = Math.Min(x + step / 2.0, rect.Right);
+				double nextX = Math.Min(x + (step / 2.0), rect.Right);
 				double y = baseline + (goingUp ? -amplitude : amplitude);
 				context.LineTo(new Point(nextX, y), true, false);
 

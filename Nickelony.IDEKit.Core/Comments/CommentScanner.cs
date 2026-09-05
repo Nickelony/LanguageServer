@@ -3,8 +3,8 @@ namespace Nickelony.IDEKit.Core.Comments;
 // Internal. Incrementally walks a span of text and tracks whether each position is
 // inside a quoted string literal, a line comment, or a block comment, so comment
 // scanners can recognize delimiters only in code. Single- and double-quoted string
-// styles reset at each LF line break; backtick and triple-quoted (raw) strings span lines; line
-// comments end at an LF line break; block comments may span lines and nest when enabled.
+// styles reset at each LF line break; backtick, triple-quoted (raw), and long-bracket strings span
+// lines; line comments end at an LF line break; block comments may span lines and nest when enabled.
 internal ref struct CommentScanner
 {
 	private readonly ReadOnlySpan<char> _text;
@@ -59,16 +59,16 @@ internal ref struct CommentScanner
 	// The index of the character most recently consumed, or -1 before the first move.
 	public readonly int CurrentIndex => _position - 1;
 
-	// True when the most recently consumed character is in code (not inside a string or comment).
+	// True when the scanner state after the most recent move is outside strings and comments.
 	public readonly bool IsInCode => _quoteChar == '\0' && !_inLineComment && _blockDepth == 0 && _closerRemaining == 0 && _rawStringQuote == '\0' && _longBracketEqualsCount < 0 && !_inCloserRemainder;
 
-	// True when the most recently consumed character is inside a quoted string literal.
+	// True when the scanner state after the most recent move is inside a quoted string literal.
 	public readonly bool IsInsideString => _quoteChar != '\0' || _rawStringQuote != '\0' || _longBracketEqualsCount >= 0;
 
-	// True when the most recently consumed character is inside a line comment.
+	// True when the scanner state after the most recent move is inside a line comment.
 	public readonly bool IsInLineComment => _inLineComment;
 
-	// True when the most recently consumed character is inside a block comment.
+	// True when the scanner state after the most recent move is inside a block comment.
 	public readonly bool IsInBlockComment => _blockDepth > 0;
 
 	// The index where a line comment started during the most recent move, or -1.
@@ -133,7 +133,7 @@ internal ref struct CommentScanner
 
 		if (_closerRemaining > 0)
 		{
-			// Consume the remainder of a just-closed block comment closer or raw-string closer.
+			// Consume the remainder of a just-closed comment or string closer.
 			// These characters are still part of the closer, so the move is never reported as code.
 			_inCloserRemainder = true;
 			_closerRemaining--;

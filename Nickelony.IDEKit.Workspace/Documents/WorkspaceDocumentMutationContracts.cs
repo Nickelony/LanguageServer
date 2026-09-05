@@ -75,7 +75,7 @@ public enum WorkspaceDocumentRenameStatus
 	/// <summary>The move failed.</summary>
 	MoveFailed,
 
-	/// <summary>The document moved, but one or more attached views could not be updated.</summary>
+	/// <summary>View synchronization failed after the document moved.</summary>
 	ViewUpdateFailed,
 
 	/// <summary>The operation was cancelled.</summary>
@@ -103,7 +103,7 @@ public sealed record WorkspaceDocumentRenameResult(
 /// <summary>
 /// Requests that a document be persisted at a second path.
 /// </summary>
-/// <remarks>The source document remains at its original path until the operation retargets the tracked identity.</remarks>
+/// <remarks>The source file is retained; the tracked document is retargeted to the destination on success.</remarks>
 public sealed record WorkspaceDocumentSaveAsRequest(
 	WorkspaceDocumentKey ExpectedDocumentKey,
 	string DocumentId,
@@ -155,7 +155,7 @@ public enum WorkspaceDocumentSaveAsStatus
 	/// <summary>The replacement state is unknown.</summary>
 	ReplacementStateUnknown,
 
-	/// <summary>The document was saved at the destination, but one or more attached views could not be updated.</summary>
+	/// <summary>View synchronization failed after the document was saved at the destination.</summary>
 	ViewUpdateFailed,
 
 	/// <summary>The operation was cancelled.</summary>
@@ -226,7 +226,7 @@ public enum WorkspaceDocumentDeleteStatus
 	/// <summary>The delete failed.</summary>
 	DeleteFailed,
 
-	/// <summary>The document was deleted, but one or more attached views could not be updated.</summary>
+	/// <summary>View synchronization failed after the document was deleted.</summary>
 	ViewUpdateFailed,
 
 	/// <summary>The operation was cancelled.</summary>
@@ -260,7 +260,7 @@ public enum WorkspaceDocumentMutationStatus
 	/// <summary>The content was replaced.</summary>
 	Replaced,
 
-	/// <summary>The requested replacement made no change.</summary>
+	/// <summary>The request made no logical change.</summary>
 	NoChange,
 
 	/// <summary>The document version was stale.</summary>

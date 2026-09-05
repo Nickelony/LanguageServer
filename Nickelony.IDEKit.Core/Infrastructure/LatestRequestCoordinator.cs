@@ -2,12 +2,12 @@ namespace Nickelony.IDEKit.Core.Infrastructure;
 
 /// <summary>
 /// Coordinates asynchronous operations so that only the most recently requested operation may
-/// publish its result, and any previously outstanding operation is cancelled.
+/// publish its result. Starting a newer operation cancels any previously outstanding operation.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Each <see cref="RunAsync{TState, TResult}(TState, Func{TState, CancellationToken, Task{TResult}}, Func{TState, TResult, bool}, Action{TResult}, CancellationToken)"/>
-/// invocation supersedes any operation that is still pending: the older operation's linked
+/// invocation supersedes any operation that is still pending: the older operation's per-request
 /// cancellation token is cancelled and, even if its compute delegate ignores cancellation, its
 /// result is discarded when it does not belong to the latest request. Hosts supply the operation's
 /// state and a <c>canApply</c> predicate for current-state checks (for example a document version
@@ -85,9 +85,9 @@ public sealed class LatestRequestCoordinator
 		{
 			requestId = ++_latestRequestId;
 
-			// Cancel (do not dispose) the previous run: the previous run disposes its own source in
-			// its finally block, after it has stopped reading the token. Disposing it here could
-			// race with a continuation still reading the token.
+			// Cancel (do not dispose) the previous run: it may still be reading the token, and
+			// disposing it here could race with that work. The finally block disposes the source only
+			// when it is still the current run's source.
 			_currentRunCancellation?.Cancel();
 
 			runCancellation = new CancellationTokenSource();

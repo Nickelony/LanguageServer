@@ -36,9 +36,11 @@ public sealed class IncrementalLineStateCache<TState>
 
 	/// <summary>
 	/// Gets the parser continuation state that applies at the start of the specified one-based line.
+	/// Line numbers below 1 return the default state; line numbers past the end of the snapshot are
+	/// clamped to its final line.
 	/// </summary>
 	/// <param name="lineNumber">The one-based document line number.</param>
-	/// <returns>The cached or computed line-start parser state.</returns>
+	/// <returns>The cached or computed line-start parser state, or the default state for an empty snapshot.</returns>
 	public TState GetLineStartState(int lineNumber)
 	{
 		if (lineNumber <= 1)

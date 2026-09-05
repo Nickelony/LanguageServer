@@ -5,6 +5,14 @@ using Nickelony.IDEKit.Workspace.Editing;
 
 namespace Nickelony.IDEKit.Workspace.Tests;
 
+/// <summary>
+/// Tests <see cref="WorkspaceEditApplierCore"/> results for empty, no-op, successful, and failed
+/// applications.
+/// </summary>
+/// <remarks>
+/// The replacement callback records requests or returns controlled mutation results so the tests can
+/// verify target statuses, failure details, and the accumulated change set.
+/// </remarks>
 [TestClass]
 [TestCategory("TextEditorBaseModernization")]
 public sealed class WorkspaceEditApplierCoreTests

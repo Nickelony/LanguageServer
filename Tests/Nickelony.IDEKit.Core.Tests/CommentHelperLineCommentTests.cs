@@ -3,13 +3,12 @@ using Nickelony.IDEKit.Core.Text;
 namespace Nickelony.IDEKit.Core.Comments.Tests;
 
 /// <summary>
-/// Tests line-comment detection, masking, and removal by <see cref="CommentHelper"/>
-/// using explicit line-comment syntax.
+/// Tests line-comment detection, removal, and masking by <see cref="CommentHelper"/>.
 /// </summary>
 [TestClass]
 public sealed class CommentHelperLineCommentTests
 {
-	// Each test supplies the comment syntax explicitly.
+	// Comment syntax used by the tests.
 	private static readonly CommentSyntax s_semicolonSyntax = new(";", null, null, StringLiteralStyle.None);
 	private static readonly CommentSyntax s_cStyleSyntax = new("//", null, null, StringLiteralStyle.DoubleQuoted | StringLiteralStyle.TripleDoubleQuoted);
 
@@ -191,11 +190,9 @@ public sealed class CommentHelperLineCommentTests
 	}
 
 	[TestMethod]
-	public void RemoveLineComment_NullString_ReturnsEmpty()
+	public void RemoveLineComment_NullString_ThrowsArgumentNullException()
 	{
-		string result = RemoveLineComment(null!, s_semicolonSyntax);
-
-		Assert.AreEqual(string.Empty, result);
+		Assert.ThrowsExactly<ArgumentNullException>(() => RemoveLineComment(null!, s_semicolonSyntax));
 	}
 
 	[TestMethod]
@@ -209,8 +206,7 @@ public sealed class CommentHelperLineCommentTests
 	[TestMethod]
 	public void RemoveLineComment_CRLFLineEnding_PreservesLFOnly()
 	{
-		// The comment span includes the carriage return and ends before the line feed,
-		// so only the line feed remains.
+		// The carriage return is removed; the line feed is preserved.
 		string result = RemoveLineComment("Legend= 42 ; comment\r\n", s_semicolonSyntax);
 
 		Assert.AreEqual("Legend= 42\n", result);
@@ -247,7 +243,7 @@ public sealed class CommentHelperLineCommentTests
 	[TestMethod]
 	public void RemoveLineComment_TrailingCommentOnlyLine_RemovesPrecedingLineEnding()
 	{
-		// A comment-only line includes the preceding line ending in its removable span.
+		// A comment-only line also removes its preceding line ending.
 		string input = "Line1 ; comment\n; comment";
 
 		string result = RemoveLineComment(input, s_semicolonSyntax);
@@ -296,11 +292,9 @@ public sealed class CommentHelperLineCommentTests
 	}
 
 	[TestMethod]
-	public void MaskLineComment_NullString_ReturnsEmpty()
+	public void MaskLineComment_NullString_ThrowsArgumentNullException()
 	{
-		string result = MaskLineComment(null!, s_semicolonSyntax);
-
-		Assert.AreEqual(string.Empty, result);
+		Assert.ThrowsExactly<ArgumentNullException>(() => MaskLineComment(null!, s_semicolonSyntax));
 	}
 
 	[TestMethod]

@@ -1,16 +1,13 @@
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Document;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
-using ICSharpCode.AvalonEdit.Document;
 
 namespace Nickelony.IDEKit.AvalonEdit.Editing;
 
 /// <summary>
-/// Applies bracket, quote, and backtick auto-closing and overtyping over an AvalonEdit text editor.
+/// Provides bracket, quote, and backtick auto-closing and overtyping for an AvalonEdit <see cref="TextEditor"/>.
 /// </summary>
-/// <remarks>
-/// The service is created once per editor as part of the editor service composition and
-/// intentionally keeps its members instance, even though it holds no state.
-/// </remarks>
 [SuppressMessage(
 	"Performance",
 	"CA1822:MarkMembersAsStatic",
@@ -20,25 +17,32 @@ public sealed class TextAutoClosingService
 	/// <summary>
 	/// Tries to resolve an auto-closing action for <paramref name="inputText"/> at the caret.
 	/// </summary>
-	/// <param name="document">The document the caret belongs to.</param>
+	/// <param name="document">The document containing the caret.</param>
 	/// <param name="caretOffset">The zero-based caret offset.</param>
-	/// <param name="inputText">The text the user is about to enter.</param>
-	/// <param name="options">The auto-closing configuration to apply.</param>
-	/// <param name="action">The resolved action when one applies.</param>
-	/// <returns><see langword="true"/> when an auto-closing action applies; otherwise, <see langword="false"/>.</returns>
+	/// <param name="inputText">The text being entered.</param>
+	/// <param name="options">The auto-closing configuration.</param>
+	/// <param name="action">
+	/// The resolved action when the method returns <see langword="true"/>;
+	/// otherwise, the <see langword="default"/> action.
+	/// </param>
+	/// <returns><see langword="true"/> when an action applies; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="document"/>, <paramref name="inputText"/>, or <paramref name="options"/> is <see langword="null"/>.
+	/// </exception>
 	public bool TryGetAction(
 		TextDocument document,
 		int caretOffset,
-		string? inputText,
+		string inputText,
 		TextAutoClosingOptions options,
 		out TextAutoClosingAction action)
 	{
 		ArgumentNullException.ThrowIfNull(document);
+		ArgumentNullException.ThrowIfNull(inputText);
 		ArgumentNullException.ThrowIfNull(options);
 
 		action = default;
 
-		if (string.IsNullOrEmpty(inputText))
+		if (inputText.Length == 0)
 			return false;
 
 		if (TryGetBracketAction(
@@ -118,22 +122,29 @@ public sealed class TextAutoClosingService
 	}
 
 	/// <summary>
-	/// Handles text entering by applying the matching auto-closing action, if any.
+	/// Applies the auto-closing action (if any) for text entering the editor.
 	/// </summary>
 	/// <remarks>
-	/// An insert action updates the editor and leaves the event available for the normal text-input
-	/// pipeline. A skip action advances over the existing closing text and marks the event handled.
+	/// An insert action updates the editor without handling the event, allowing normal text input to continue.
+	/// A skip action moves past existing closing text, marks the event handled, and invokes the callback when supplied.
 	/// </remarks>
 	/// <param name="editor">The editor receiving the text.</param>
 	/// <param name="e">The text-composition event being handled.</param>
-	/// <param name="options">The auto-closing configuration to apply.</param>
-	/// <param name="onElementSkipped">The callback invoked when an existing closing element is skipped.</param>
+	/// <param name="options">The auto-closing configuration.</param>
+	/// <param name="onElementSkipped">An optional callback invoked when a closing element is skipped.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="editor"/>, <paramref name="e"/>, or <paramref name="options"/> is <see langword="null"/>.
+	/// </exception>
 	public void HandleTextEntering(
-		ICSharpCode.AvalonEdit.TextEditor editor,
+		TextEditor editor,
 		TextCompositionEventArgs e,
 		TextAutoClosingOptions options,
 		Action<string>? onElementSkipped = null)
 	{
+		ArgumentNullException.ThrowIfNull(editor);
+		ArgumentNullException.ThrowIfNull(e);
+		ArgumentNullException.ThrowIfNull(options);
+
 		if (!TryGetAction(editor.Document, editor.CaretOffset, e.Text, options, out TextAutoClosingAction action))
 			return;
 
@@ -141,7 +152,7 @@ public sealed class TextAutoClosingService
 	}
 
 	private static void ApplyAction(
-		ICSharpCode.AvalonEdit.TextEditor editor,
+		TextEditor editor,
 		TextCompositionEventArgs e,
 		TextAutoClosingAction action,
 		Action<string>? onElementSkipped)
@@ -151,24 +162,28 @@ public sealed class TextAutoClosingService
 			case TextAutoClosingActionKind.InsertClosingElement:
 				editor.SelectedText += action.Element;
 				editor.CaretOffset -= action.Element.Length;
+
 				editor.SelectionStart = editor.CaretOffset;
 				editor.SelectionLength = 0;
+
 				break;
 
 			case TextAutoClosingActionKind.SkipExistingClosingElement:
 				editor.CaretOffset += action.Element.Length;
+
 				e.Handled = true;
 				onElementSkipped?.Invoke(action.Element);
+
 				break;
 		}
 	}
 
 	/// <summary>
-	/// Resolves an action for a bracket pair whose opening and closing tokens differ.
+	/// Resolves an action for a bracket pair with distinct opening and closing tokens.
 	/// </summary>
 	/// <remarks>
-	/// The closing token is skipped together with the rest of the closing string when it is
-	/// present at the caret, so multi-character closing strings (e.g. <c>},</c>) are consumed as a unit.
+	/// Typing either the closing token or the full closing string skips the configured closing string
+	/// when it is already at the caret.
 	/// </remarks>
 	private static bool TryGetBracketAction(
 		string inputText,
@@ -202,12 +217,12 @@ public sealed class TextAutoClosingService
 	}
 
 	/// <summary>
-	/// Resolves an action for a quote-like token whose opening and closing characters are identical.
+	/// Resolves an action for a quote-like token with the same opening and closing character.
 	/// </summary>
 	/// <remarks>
-	/// Mirrors VS Code's auto-closing behavior: the token is overtyped when it is already at the caret,
-	/// inserted as a raw character when already inside a run of the same token (which is what allows
-	/// building <c>"""</c>), suppressed after word characters for quotes, and only otherwise auto-closed.
+	/// A token already at the caret is skipped. When the preceding character is the same token, the
+	/// typed character is left to normal input so runs such as <c>"""</c> can be built.
+	/// Quote auto-closing is suppressed after a letter, digit, or underscore; backticks bypass that check.
 	/// </remarks>
 	private static bool TryGetQuoteAction(
 		string inputText,
@@ -227,21 +242,18 @@ public sealed class TextAutoClosingService
 		if (inputText != token)
 			return false;
 
-		// Overtype: the token at the caret is an existing closing token, so move past it
-		// instead of inserting (typing between "" moves the caret to the end).
+		// Skip an existing quote-like token at the caret instead of inserting another one.
 		if (IsCharAtCaret(document, caretOffset, token))
 		{
 			action = TextAutoClosingAction.CreateSkip(token);
 			return true;
 		}
 
-		// Already inside a run of the same token (e.g. at the end of ""): the typed character
-		// is inserted as-is, which is what allows building """.
+		// Let normal text input add a token when the same token immediately precedes the caret.
 		if (IsCharBeforeCaret(document, caretOffset, token))
 			return false;
 
-		// Quotes do not auto-close after a word character because the typed quote is closing a
-		// string. Backticks are exempt (see VS Code issue #61070).
+		// Quotes do not auto-close after a letter, digit, or underscore; backticks bypass this check.
 		if (suppressAfterWordCharacter && IsWordCharacterBeforeCaret(document, caretOffset))
 			return false;
 
@@ -285,24 +297,25 @@ public sealed class TextAutoClosingService
 }
 
 /// <summary>
-/// Configures bracket, quote, and backtick auto-closing.
+/// Configures bracket, quote, and backtick auto-closing and overtyping.
 /// </summary>
 /// <remarks>
-/// An empty closing string disables the corresponding action at resolution time. The values are not
-/// validated against their opening tokens, so hosts are responsible for supplying compatible pairs.
+/// An empty closing string disables auto-closing and overtyping for its pair.
+/// Closing strings are not validated against their opening tokens,
+/// so hosts must provide compatible pairs.
 /// </remarks>
-/// <param name="AutoClosingParentheses">Whether parentheses are auto-closed.</param>
-/// <param name="AutoClosingBraces">Whether braces are auto-closed.</param>
-/// <param name="AutoClosingBrackets">Whether brackets are auto-closed.</param>
-/// <param name="AutoClosingDoubleQuotes">Whether double quotes are auto-closed.</param>
-/// <param name="AutoClosingSingleQuotes">Whether single quotes are auto-closed.</param>
-/// <param name="AutoClosingBackticks">Whether backticks are auto-closed.</param>
-/// <param name="ParenthesesClosingString">The closing text inserted after an opening parenthesis.</param>
-/// <param name="BracesClosingString">The closing text inserted after an opening brace.</param>
-/// <param name="BracketsClosingString">The closing text inserted after an opening bracket.</param>
-/// <param name="DoubleQuotesClosingString">The closing text inserted after an opening double quote.</param>
-/// <param name="SingleQuotesClosingString">The closing text inserted after an opening single quote.</param>
-/// <param name="BackticksClosingString">The closing text inserted after an opening backtick.</param>
+/// <param name="AutoClosingParentheses">Whether to auto-close and overtype parentheses.</param>
+/// <param name="AutoClosingBraces">Whether to auto-close and overtype braces.</param>
+/// <param name="AutoClosingBrackets">Whether to auto-close and overtype brackets.</param>
+/// <param name="AutoClosingDoubleQuotes">Whether to auto-close and overtype double quotes.</param>
+/// <param name="AutoClosingSingleQuotes">Whether to auto-close and overtype single quotes.</param>
+/// <param name="AutoClosingBackticks">Whether to auto-close and overtype backticks.</param>
+/// <param name="ParenthesesClosingString">The closing text to insert or skip for parentheses.</param>
+/// <param name="BracesClosingString">The closing text to insert or skip for braces.</param>
+/// <param name="BracketsClosingString">The closing text to insert or skip for brackets.</param>
+/// <param name="DoubleQuotesClosingString">The closing text inserted for double quotes.</param>
+/// <param name="SingleQuotesClosingString">The closing text inserted for single quotes.</param>
+/// <param name="BackticksClosingString">The closing text inserted for backticks.</param>
 public sealed record TextAutoClosingOptions(
 	bool AutoClosingParentheses,
 	bool AutoClosingBraces,
@@ -318,24 +331,24 @@ public sealed record TextAutoClosingOptions(
 	string BackticksClosingString);
 
 /// <summary>
-/// Describes one auto-closing action to apply for an input token.
+/// Describes an auto-closing action.
 /// </summary>
 /// <param name="Kind">The kind of auto-closing action.</param>
-/// <param name="Element">The closing text to insert or skip.</param>
+/// <param name="Element">The text to insert or skip.</param>
 public readonly record struct TextAutoClosingAction(TextAutoClosingActionKind Kind, string Element)
 {
 	/// <summary>
-	/// Creates an action that inserts the given closing element.
+	/// Creates an insert action for the specified closing text.
 	/// </summary>
-	/// <param name="element">The closing element to insert.</param>
+	/// <param name="element">The text to insert.</param>
 	/// <returns>The insert action.</returns>
 	public static TextAutoClosingAction CreateInsert(string element)
 		=> new(TextAutoClosingActionKind.InsertClosingElement, element);
 
 	/// <summary>
-	/// Creates an action that skips the existing closing element at the caret.
+	/// Creates a skip action for the specified closing text.
 	/// </summary>
-	/// <param name="element">The closing element to skip.</param>
+	/// <param name="element">The text to skip.</param>
 	/// <returns>The skip action.</returns>
 	public static TextAutoClosingAction CreateSkip(string element)
 		=> new(TextAutoClosingActionKind.SkipExistingClosingElement, element);
@@ -347,12 +360,12 @@ public readonly record struct TextAutoClosingAction(TextAutoClosingActionKind Ki
 public enum TextAutoClosingActionKind
 {
 	/// <summary>
-	/// Inserts the configured closing element after the caret.
+	/// Inserts the closing element.
 	/// </summary>
 	InsertClosingElement,
 
 	/// <summary>
-	/// Skips an existing closing element at the caret.
+	/// Skips an existing closing element.
 	/// </summary>
 	SkipExistingClosingElement
 }

@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Core.Text;
 
 /// <summary>
-/// Describes one validated text replacement using zero-based UTF-16 offsets.
+/// Describes one text replacement using zero-based UTF-16 offsets.
 /// </summary>
 /// <param name="StartOffset">The zero-based inclusive source offset.</param>
 /// <param name="EndOffset">The zero-based exclusive source offset.</param>

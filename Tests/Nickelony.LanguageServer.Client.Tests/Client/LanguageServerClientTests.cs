@@ -41,7 +41,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void CapabilityRegistrationParams_Deserialize_BindsRegistrationsWireProperty()
+	public void CapabilityRegistrationParams_Deserialize_ReadsRegistrationsProperty()
 	{
 		CapabilityRegistrationParams parameters = JsonSerializer.Deserialize<CapabilityRegistrationParams>(
 			"""
@@ -59,7 +59,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void CapabilityUnregistrationParams_Deserialize_BindsHistoricalWireProperty()
+	public void CapabilityUnregistrationParams_Deserialize_ReadsHistoricalProperty()
 	{
 		CapabilityUnregistrationParams parameters = JsonSerializer.Deserialize<CapabilityUnregistrationParams>(
 			"""
@@ -77,7 +77,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void CapabilityUnregistrationParams_Deserialize_BindsCorrectedPropertyName()
+	public void CapabilityUnregistrationParams_Deserialize_ReadsCorrectedPropertyName()
 	{
 		CapabilityUnregistrationParams parameters = JsonSerializer.Deserialize<CapabilityUnregistrationParams>(
 			"""
@@ -95,7 +95,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void CapabilityUnregistrationParams_Serialize_WritesHistoricalWirePropertyName()
+	public void CapabilityUnregistrationParams_Serialize_WritesHistoricalPropertyName()
 	{
 		string json = JsonSerializer.Serialize(
 			new CapabilityUnregistrationParams(
@@ -211,7 +211,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task MarkTransportUnhealthy_DuringInFlightRequest_DoesNotCancelOwnedSessionButBlocksFutureRequests()
+	public async Task MarkTransportUnhealthy_DuringInFlightRequest_LeavesRequestPendingAndBlocksFutureRequests()
 	{
 		using var serverOutputStream = new PendingReadStream();
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
@@ -247,7 +247,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task ActiveSessionDisconnect_WhileRequestIsInFlight_CompletesPendingRequestAndMarksClientNotReady()
+	public async Task ActiveSessionDisconnect_WhileRequestIsInFlight_FaultsOrCancelsPendingRequestAndMarksClientNotReady()
 	{
 		using var serverOutputStream = new PendingReadStream();
 		await using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
@@ -348,7 +348,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void JsonRpc_Disconnected_LocallyDisposedActiveTransport_LogsExpectedShutdownAtInfo()
+	public void JsonRpc_Disconnected_LocallyDisposedActiveTransport_LogsExpectedShutdownAtInfoLevel()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
@@ -428,7 +428,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void MarkTransportUnhealthy_WhenReady_LogsRestartBoundary()
+	public void MarkTransportUnhealthy_WhenReady_LogsRestartWarningAndResetsPublishedCapabilities()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
@@ -479,6 +479,7 @@ public partial class LanguageServerClientTests
 		Assert.IsFalse(client.SupportsReferences);
 		Assert.IsFalse(client.SupportsRename);
 		Assert.IsFalse(client.SupportsFormatting);
+		Assert.IsFalse(client.SupportsSemanticTokensFull);
 		Assert.IsFalse(client.SupportsSemanticTokensDelta);
 		Assert.AreEqual(1, transportUnavailableCount);
 		Assert.AreEqual(5L, unavailableGeneration);
@@ -735,7 +736,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task SendRequestAsync_WhenTransportGenerationIsReplacedBeforeSuccessfulResponse_CompletesWithTransportChangedException()
+	public async Task SendRequestAsync_WhenTransportGenerationIsReplacedBeforeSuccessfulResponse_FailsWithTransportChangedException()
 	{
 		using var deferredServerOutputStream = new DeferredJsonRpcResponseStream();
 		using var serverInputStream = new RecordingStream();
@@ -835,7 +836,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task DisposeAsync_WaitsForDetachedFailedSessionCleanup()
+	public async Task DisposeAsync_WaitsForDetachedSessionCleanup()
 	{
 		var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		var queuedCleanup = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

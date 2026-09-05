@@ -4,13 +4,12 @@ using Nickelony.IDEKit.Core.Diffing;
 namespace Nickelony.IDEKit.AvalonEdit.ChangeMarkers;
 
 /// <summary>
-/// An <see cref="IChangeMarkerSource"/> that marks the lines whose content differs from a recorded
-/// baseline, identifying the lines with unsaved changes after the document is edited.
+/// Provides document lines inserted or modified relative to a recorded baseline.
 /// </summary>
 /// <remarks>
-/// Before <see cref="SetBaseline"/> is called, the current document is compared with an empty
-/// baseline. The tracker computes changes when <see cref="GetMarkedLines"/> is called; it does not
-/// subscribe to document changes or request view redraws.
+/// Until <see cref="SetBaseline"/> is called, the baseline is empty.
+/// Line endings are normalized before comparison. Changes are computed on demand.
+/// This type does not subscribe to document changes or request view redraws.
 /// </remarks>
 public sealed class UnsavedChangesTracker : IChangeMarkerSource
 {
@@ -22,22 +21,31 @@ public sealed class UnsavedChangesTracker : IChangeMarkerSource
 	private string? _cachedText;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="UnsavedChangesTracker"/> class.
+	/// Initializes a tracker for the document returned by <paramref name="documentProvider"/>.
 	/// </summary>
 	/// <param name="documentProvider">Provides the document whose lines are tracked.</param>
-	/// <param name="onChanged">The callback invoked when the baseline is replaced, or <see langword="null"/> for none.</param>
+	/// <param name="onChanged">
+	/// Invoked synchronously after <see cref="SetBaseline"/> replaces the comparison baseline and invalidates the cached result.
+	/// Passing <see langword="null"/> disables the callback.
+	/// </param>
+	/// <exception cref="ArgumentNullException"><paramref name="documentProvider"/> is <see langword="null"/>.</exception>
 	public UnsavedChangesTracker(Func<TextDocument> documentProvider, Action? onChanged = null)
 	{
+		ArgumentNullException.ThrowIfNull(documentProvider);
+
 		_documentProvider = documentProvider;
 		_onChanged = onChanged;
 	}
 
 	/// <summary>
-	/// Records the supplied content as the saved baseline that later edits are compared against.
+	/// Replaces the comparison baseline with <paramref name="content"/>.
 	/// </summary>
-	/// <param name="content">The content as persisted.</param>
+	/// <param name="content">The content to compare with the current document.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="content"/> is <see langword="null"/>.</exception>
 	public void SetBaseline(string content)
 	{
+		ArgumentNullException.ThrowIfNull(content);
+
 		_baselineLines = SplitIntoLines(content);
 
 		_cachedLines = null;
@@ -47,9 +55,14 @@ public sealed class UnsavedChangesTracker : IChangeMarkerSource
 	}
 
 	/// <summary>
-	/// Gets the lines with unsaved changes, computed by diffing the current document against the
-	/// baseline. The result is cached until the document text or the baseline changes.
+	/// Gets the current document lines inserted or modified relative to the baseline.
 	/// </summary>
+	/// <remarks>
+	/// Only lines present in the current document are returned.
+	/// Deletion-only changes therefore produce no marked line.
+	/// A result is reused when the current document text matches the cached text.
+	/// Replacing the baseline clears the cache.
+	/// </remarks>
 	public IReadOnlyList<DocumentLine> GetMarkedLines()
 	{
 		TextDocument document = _documentProvider();

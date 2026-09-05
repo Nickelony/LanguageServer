@@ -9,7 +9,7 @@ namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests;
 public class TextSignatureHelpControllerTests
 {
 	[TestMethod]
-	public void RequestAsync_ThrowingProvider_DoesNotEscapeAndRemainsNotVisible()
+	public void RequestAsync_ThrowingProvider_LeavesSignatureHelpInactive()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -21,7 +21,7 @@ public class TextSignatureHelpControllerTests
 
 			controller.RequestAsync(5).GetAwaiter().GetResult();
 
-			// A provider failure must not escape; signature help remains neither visible nor pending.
+			// A provider failure leaves signature help hidden with no request pending.
 			Assert.IsFalse(controller.IsVisible);
 			Assert.IsFalse(controller.IsActiveOrPending);
 		});
@@ -39,7 +39,7 @@ public class TextSignatureHelpControllerTests
 				() => 0,
 				(offset, requestToken) =>
 				{
-					// Invalidate the request before returning its result so the controller must drop it.
+					// Invalidate the request before returning its result so the controller must ignore it.
 					controller!.InvalidateRequests();
 
 					return Task.FromResult<TextSignatureHelpInfo?>(
@@ -212,7 +212,7 @@ public class TextSignatureHelpControllerTests
 	}
 
 	[TestMethod]
-	public void RequestAsync_SupersedingRequest_InvokesCancelHookAndDropsInFlightResult()
+	public void RequestAsync_SupersedingRequest_InvokesCancelHookAndIgnoresEarlierResult()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
@@ -230,14 +230,14 @@ public class TextSignatureHelpControllerTests
 			Task firstRequest = controller.RequestAsync(5);
 			Task secondRequest = controller.RequestAsync(9);
 
-			// A superseding request invokes the cancellation hook and marks the active request stale.
+			// A superseding request invokes the cancellation hook.
 			Assert.AreEqual(1, cancelHookCalls);
 
 			completion.TrySetResult(new TextSignatureHelpInfo("spawn(room)", 0, "Spawns an object.", []));
 			firstRequest.GetAwaiter().GetResult();
 			secondRequest.GetAwaiter().GetResult();
 
-			// The superseded in-flight result is dropped.
+			// The earlier in-flight result is ignored.
 			Assert.IsFalse(shown);
 			Assert.IsFalse(controller.IsVisible);
 		});

@@ -72,7 +72,7 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 			if (ShouldStopBackgroundSemanticTokensWork(effectiveToken))
 				return;
 
-			// Persist the accepted result and notify listeners only for the current document version.
+			// Persist the server's delta state, then notify listeners only when the decoded tokens match the current document version.
 			_documents.StoreSemanticTokensDeltaState(document.FilePath, decodeResult.ResultId, decodeResult.Data);
 
 			if (!_documents.TryStoreSemanticTokens(document.FilePath, document.Version, decodeResult.Tokens))
@@ -82,7 +82,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 		}
 		catch (OperationCanceledException) when (effectiveToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
 		{
-			// A newer document version superseded this request.
+			// Provider-owned cancellation superseded this request because a newer request replaced it, the document closed,
+			// or the provider was disposed.
 		}
 		catch (OperationCanceledException)
 		{

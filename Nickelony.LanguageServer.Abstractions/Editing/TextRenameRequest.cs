@@ -1,12 +1,10 @@
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
-/// Describes a rename request against the current document.
+/// Describes a request to rename the symbol at a document position.
 /// </summary>
 /// <remarks>
-/// Rename requests use zero-based line and column indices for the editor-facing contract. Providers are responsible
-/// for translating these coordinates when they use a different coordinate system internally. Negative line and
-/// column values are normalized to zero.
+/// The position uses zero-based line and column indices. Negative line and column values are changed to zero.
 /// </remarks>
 public sealed class TextRenameRequest
 {
@@ -20,6 +18,10 @@ public sealed class TextRenameRequest
 	/// <param name="newName">The requested replacement name.</param>
 	public TextRenameRequest(string filePath, string documentText, int line, int column, string newName)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(documentText);
+		ArgumentNullException.ThrowIfNull(newName);
+
 		FilePath = filePath;
 		DocumentText = documentText;
 		Line = Math.Max(0, line);

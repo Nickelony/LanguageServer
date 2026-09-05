@@ -14,8 +14,7 @@ public sealed class NavigationHistory<TLocation>
 	private readonly Func<TLocation, TLocation, bool> _isEquivalent;
 	private readonly Func<TLocation, TLocation, bool> _isMeaningfulChange;
 
-	// The current position is meaningful only when the flag is set; the field is otherwise unused,
-	// which is why its initial value (null for reference locations) can never be observed.
+	// The current position is read only when this flag is set.
 	private bool _hasCurrentLocation;
 	private TLocation _currentLocation;
 	private int _suppressionDepth;
@@ -49,8 +48,9 @@ public sealed class NavigationHistory<TLocation>
 	public bool CanNavigateForward => _forwardStack.Count > 0;
 
 	/// <summary>
-	/// Observes the current editor position, recording the previous position when the change is
-	/// meaningful and clearing the forward stack.
+	/// Observes the current editor position, recording the previous position and clearing the
+	/// forward stack when the change is meaningful. Equivalent or otherwise non-meaningful changes
+	/// update the current position without changing the stacks.
 	/// </summary>
 	/// <param name="location">The current editor position.</param>
 	public void Observe(TLocation location)
@@ -81,8 +81,9 @@ public sealed class NavigationHistory<TLocation>
 	}
 
 	/// <summary>
-	/// Records a programmatic jump (for example a definition navigation) as the current position
-	/// without observing the intermediate caret movement.
+	/// Records the position before a programmatic jump, such as definition navigation, without
+	/// observing the intermediate caret movement. The target is used to determine whether the jump
+	/// is equivalent; callers must update the current position after the jump.
 	/// </summary>
 	/// <param name="currentLocation">The position before the programmatic jump.</param>
 	/// <param name="targetLocation">The position reached by the programmatic jump.</param>

@@ -34,10 +34,10 @@ public enum StringLiteralStyle
 
 	/// <summary>
 	/// Multi-line strings delimited by a run of three or more double quotes,
-	/// as in C# raw string literals, Java text blocks, Kotlin raw strings, and Swift multi-line strings.
+	/// as in C# raw string literals and other raw or multi-line string syntaxes.
 	/// The opening quote run is the delimiter; the string closes on a run of at least that length,
 	/// so content that must contain a three-quote sequence uses a longer opener (C#).
-	/// Backslash escapes are not processed, matching the C family.
+	/// Backslash escapes are not processed in this scanning mode.
 	/// </summary>
 	TripleDoubleQuoted = 1 << 3,
 

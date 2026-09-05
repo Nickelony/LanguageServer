@@ -52,9 +52,10 @@ public sealed class KeyBindingService<TCommandId> : IKeyBindingService<TCommandI
 	/// Creates the service, merging the catalog defaults with the loaded overrides.
 	/// </summary>
 	/// <param name="catalog">The command catalog that supplies descriptors and default bindings.</param>
-	/// <param name="loadedOverrides">The loaded overrides for the active workspace. The instance is updated in place when a service operation updates runtime state.</param>
-	/// <param name="saveOverrides">Receives each proposed override snapshot and returns <see langword="true"/> when persistence succeeds. Apply and clear honor this result; reset operations do not.</param>
+	/// <param name="loadedOverrides">The loaded overrides for the active workspace. This instance is updated in place when a service operation changes runtime state.</param>
+	/// <param name="saveOverrides">Receives each proposed override snapshot and returns <see langword="true"/> when persistence succeeds. Apply and clear leave runtime state unchanged when it returns <see langword="false"/>; reset operations do not inspect the result.</param>
 	/// <param name="logger">Optional logger for ignored or invalid override diagnostics.</param>
+	/// <exception cref="InvalidOperationException">The catalog defaults or loaded overrides produce a key combo collision.</exception>
 	public KeyBindingService(
 		CommandCatalog<TCommandId> catalog,
 		KeyBindingOverrideCollection loadedOverrides,
@@ -91,6 +92,8 @@ public sealed class KeyBindingService<TCommandId> : IKeyBindingService<TCommandI
 	/// <inheritdoc cref="IKeyBindingService{TCommandId}.GetDisplayText"/>
 	public string GetDisplayText(TCommandId command, string fallbackDisplayText = "")
 	{
+		ArgumentNullException.ThrowIfNull(fallbackDisplayText);
+
 		IReadOnlyList<KeyCombo> bindings = GetBindings(command);
 
 		if (bindings.Count == 0)
@@ -101,11 +104,16 @@ public sealed class KeyBindingService<TCommandId> : IKeyBindingService<TCommandI
 
 	/// <inheritdoc cref="IKeyBindingService{TCommandId}.Validate"/>
 	public KeyBindingValidationResult Validate(TCommandId command, IReadOnlyList<KeyCombo> bindings)
-		=> ValidateInternal(command, bindings, checkConflicts: true);
+	{
+		ArgumentNullException.ThrowIfNull(bindings);
+		return ValidateInternal(command, bindings, checkConflicts: true);
+	}
 
 	/// <inheritdoc cref="IKeyBindingService{TCommandId}.Apply"/>
 	public KeyBindingValidationResult Apply(TCommandId command, IReadOnlyList<KeyCombo> bindings, bool replaceConflicts)
 	{
+		ArgumentNullException.ThrowIfNull(bindings);
+
 		KeyBindingValidationResult result = ValidateInternal(command, bindings, checkConflicts: !replaceConflicts);
 
 		if (result != KeyBindingValidationResult.Valid && result != KeyBindingValidationResult.Conflict)
@@ -146,7 +154,7 @@ public sealed class KeyBindingService<TCommandId> : IKeyBindingService<TCommandI
 
 		// Persist before publishing the new in-memory maps.
 		if (!_saveOverrides(newOverrides))
-			return KeyBindingValidationResult.Conflict; // A save failure leaves runtime state unchanged.
+			return KeyBindingValidationResult.Conflict; // A false save result leaves runtime state unchanged.
 
 		// Publish the persisted state in memory.
 		UpdateOverridesInPlace(newOverrides);
@@ -317,7 +325,7 @@ public sealed class KeyBindingService<TCommandId> : IKeyBindingService<TCommandI
 		if (overrideEntry.Bindings.Count == 0)
 			return []; // An empty override explicitly unbinds the command.
 
-		// Validate and deserialize the stored binding entries.
+		// Parse the stored key names and modifier values.
 		if (descriptor.IsHostReserved)
 		{
 			s_logHostReservedOverrideIgnored(_logger, descriptor.SerializedId, null);

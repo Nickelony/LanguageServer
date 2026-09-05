@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Nickelony.LanguageServer.Client;
 
 /// <summary>
-/// Represents a typed diagnostics notification raised by the language server for a tracked document.
+/// Represents a typed diagnostics notification raised by the language server for a document URI.
 /// </summary>
 /// <param name="Uri">The document URI receiving diagnostics.</param>
 /// <param name="Version">The document version associated with the diagnostics.</param>

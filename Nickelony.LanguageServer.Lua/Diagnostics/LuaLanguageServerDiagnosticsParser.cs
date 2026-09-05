@@ -19,7 +19,7 @@ internal static class LuaLanguageServerDiagnosticsParser
 	/// <param name="documentContent">The current document content.</param>
 	/// <param name="documentVersion">The tracked document version to match against the diagnostics version.</param>
 	/// <param name="publishedDiagnostics">When this method returns <see langword="true"/>, contains the parsed diagnostics payload.</param>
-	/// <returns><see langword="true"/> when the payload is current for the tracked document version; otherwise, <see langword="false"/> when it is stale.</returns>
+	/// <returns><see langword="true"/> when the payload can be accepted for the tracked document version; otherwise, <see langword="false"/> when both versions are known and differ.</returns>
 	internal static bool TryParse(PublishDiagnosticsParams parameters, string filePath,
 		string documentContent, int documentVersion, [NotNullWhen(true)] out LuaPublishedDiagnostics? publishedDiagnostics)
 	{

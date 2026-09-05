@@ -10,9 +10,9 @@ internal static class LuaLanguageServerSettingsFactory
 	private static readonly string[] s_disabledDiagnostics = ["duplicate-set-field"];
 
 	/// <summary>
-	/// Builds the Lua language server settings payload for the active script workspace.
+	/// Builds the Lua language server settings payload for the current workspace.
 	/// </summary>
-	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua script workspace.</param>
+	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua workspace.</param>
 	/// <returns>An anonymous settings object serialized into the LuaLS configuration request.</returns>
 	internal static object Create(string workspaceRootDirectoryPath)
 	{

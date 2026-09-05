@@ -184,11 +184,8 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider
 
 	/// <inheritdoc/>
 	/// <remarks>
-	/// Disposal is idempotent. It first closes callback admission and detaches provider subscribers, then cancels
-	/// provider-owned work, disposes the workspace watcher/coordinator, and finally disposes the Lua language-server
-	/// client owned by this provider. A callback that passed admission before disposal began may still start or finish
-	/// after disposal begins; callbacks are not admitted once admission is closed. The provider must not be used after
-	/// disposal.
+	/// Disposal is idempotent. It stops callbacks, cancels provider-owned work, disposes the workspace watcher and the
+	/// owned Lua language-server client, and leaves the provider unusable.
 	/// </remarks>
 	public void Dispose()
 	{

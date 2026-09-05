@@ -9,12 +9,16 @@ public sealed class TextMateTokenTheme
 
 	/// <summary>
 	/// Gets or initializes the token styling rules of the theme.
-	/// The assigned collection is copied, so later changes to the source collection do not change this theme.
+	/// The assigned collection is copied, but its rule objects are not cloned.
 	/// </summary>
 	public IReadOnlyList<TextMateTokenThemeRule> Rules
 	{
 		get => _rules;
-		init => _rules = value is null ? [] : Array.AsReadOnly([.. value]);
+		init
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			_rules = Array.AsReadOnly([.. value]);
+		}
 	}
 }
 
@@ -25,6 +29,7 @@ public sealed class TextMateTokenThemeRule
 {
 	/// <summary>
 	/// Gets or sets the TextMate scope selector or comma-separated selectors matched by the rule.
+	/// A token scope matches a selector when it equals the selector or extends it with a dot-separated suffix.
 	/// </summary>
 	public string Scope { get; set; } = string.Empty;
 

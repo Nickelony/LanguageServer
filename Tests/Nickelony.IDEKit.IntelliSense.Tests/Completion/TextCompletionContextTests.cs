@@ -3,7 +3,7 @@ using Nickelony.IDEKit.IntelliSense.Completion;
 namespace Nickelony.IDEKit.IntelliSense.Tests.Completion;
 
 /// <summary>
-/// Tests for the <see cref="TextCompletionContext"/> validation rules.
+/// Tests the <see cref="TextCompletionContext"/> defaults and argument validation.
 /// </summary>
 [TestClass]
 public sealed class TextCompletionContextTests

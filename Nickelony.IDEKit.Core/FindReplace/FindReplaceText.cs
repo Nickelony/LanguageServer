@@ -12,10 +12,12 @@ public static class FindReplaceText
 	/// </summary>
 	/// <param name="findText">The text to find.</param>
 	/// <param name="useRegex">Whether the find text is already a regular expression.</param>
-	/// <param name="matchWholeWord">Whether the pattern should be anchored to whole words.</param>
+	/// <param name="matchWholeWord">Whether to add a regular-expression word boundary before and after the pattern.</param>
 	/// <returns>The built pattern, or an empty string when the find text is blank.</returns>
 	public static string BuildPattern(string findText, bool useRegex, bool matchWholeWord)
 	{
+		ArgumentNullException.ThrowIfNull(findText);
+
 		if (string.IsNullOrEmpty(findText))
 			return string.Empty;
 
@@ -43,7 +45,12 @@ public static class FindReplaceText
 	/// <param name="options">The options used for matching.</param>
 	/// <returns>The number of matches.</returns>
 	public static int CountMatches(string text, string pattern, RegexOptions options)
-		=> string.IsNullOrEmpty(pattern) ? 0 : Regex.Matches(text, pattern, options).Count;
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		ArgumentNullException.ThrowIfNull(pattern);
+
+		return string.IsNullOrEmpty(pattern) ? 0 : Regex.Matches(text, pattern, options).Count;
+	}
 
 	/// <summary>
 	/// Returns all matches of <paramref name="pattern"/> in <paramref name="text"/>.
@@ -53,7 +60,12 @@ public static class FindReplaceText
 	/// <param name="options">The options used for matching.</param>
 	/// <returns>The matches in document order.</returns>
 	public static MatchCollection FindAllMatches(string text, string pattern, RegexOptions options)
-		=> Regex.Matches(text, pattern, options);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		ArgumentNullException.ThrowIfNull(pattern);
+
+		return Regex.Matches(text, pattern, options);
+	}
 
 	/// <summary>
 	/// Returns the text before the given <paramref name="selectionStartIndex"/>.
@@ -63,7 +75,10 @@ public static class FindReplaceText
 	/// <param name="selectionStartIndex">The zero-based start of the current selection.</param>
 	/// <returns>The document prefix before the selection.</returns>
 	public static string GetTextBeforeSelection(string documentText, int selectionStartIndex)
-		=> documentText.Substring(0, selectionStartIndex);
+	{
+		ArgumentNullException.ThrowIfNull(documentText);
+		return documentText.Substring(0, selectionStartIndex);
+	}
 
 	/// <summary>
 	/// Returns the text after the given <paramref name="selectionEndIndex"/>.
@@ -73,7 +88,10 @@ public static class FindReplaceText
 	/// <param name="selectionEndIndex">The zero-based end of the current selection.</param>
 	/// <returns>The document suffix after the selection.</returns>
 	public static string GetTextAfterSelection(string documentText, int selectionEndIndex)
-		=> documentText.Substring(selectionEndIndex);
+	{
+		ArgumentNullException.ThrowIfNull(documentText);
+		return documentText.Substring(selectionEndIndex);
+	}
 
 	/// <summary>
 	/// Finds matches in the text section before or after the selection, depending on
@@ -94,6 +112,9 @@ public static class FindReplaceText
 		string pattern,
 		RegexOptions options)
 	{
+		ArgumentNullException.ThrowIfNull(documentText);
+		ArgumentNullException.ThrowIfNull(pattern);
+
 		return order switch
 		{
 			FindingOrder.Previous => FindAllMatches(
@@ -110,7 +131,10 @@ public static class FindReplaceText
 	/// <param name="matches">The matches to inspect.</param>
 	/// <returns>The last match, or <see langword="null"/> when the collection is empty.</returns>
 	public static Match? GetLastMatch(MatchCollection matches)
-		=> matches.Count > 0 ? matches[matches.Count - 1] : null;
+	{
+		ArgumentNullException.ThrowIfNull(matches);
+		return matches.Count > 0 ? matches[matches.Count - 1] : null;
+	}
 
 	/// <summary>
 	/// Returns the first match in a collection (for downward/next search).
@@ -118,7 +142,10 @@ public static class FindReplaceText
 	/// <param name="matches">The matches to inspect.</param>
 	/// <returns>The first match, or <see langword="null"/> when the collection is empty.</returns>
 	public static Match? GetFirstMatch(MatchCollection matches)
-		=> matches.Count > 0 ? matches[0] : null;
+	{
+		ArgumentNullException.ThrowIfNull(matches);
+		return matches.Count > 0 ? matches[0] : null;
+	}
 
 	/// <summary>
 	/// Computes the document-level offset of a match found in the text-after-selection section.
@@ -128,7 +155,10 @@ public static class FindReplaceText
 	/// <param name="match">The match found in that section.</param>
 	/// <returns>The zero-based document offset of the match.</returns>
 	public static int GetAbsoluteMatchOffset(int cutStringLength, Match match)
-		=> cutStringLength + match.Index;
+	{
+		ArgumentNullException.ThrowIfNull(match);
+		return cutStringLength + match.Index;
+	}
 
 	/// <summary>
 	/// Replaces all matches of <paramref name="pattern"/> in <paramref name="text"/>
@@ -140,5 +170,11 @@ public static class FindReplaceText
 	/// <param name="options">The options used for matching.</param>
 	/// <returns>The transformed text.</returns>
 	public static string ReplaceAll(string text, string pattern, string replacement, RegexOptions options)
-		=> Regex.Replace(text, pattern, replacement, options);
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		ArgumentNullException.ThrowIfNull(pattern);
+		ArgumentNullException.ThrowIfNull(replacement);
+
+		return Regex.Replace(text, pattern, replacement, options);
+	}
 }

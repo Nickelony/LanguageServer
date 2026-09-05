@@ -3,7 +3,7 @@ using Nickelony.IDEKit.Core.Text;
 namespace Nickelony.IDEKit.IntelliSense.SemanticTokens;
 
 /// <summary>
-/// A style-neutral semantic token: a typed, optionally modified span of document text.
+/// Represents a style-neutral semantic token identifying a range of document text.
 /// </summary>
 /// <remarks>
 /// The token carries only semantics - a range, a type, and modifiers - never a color or style.
@@ -43,7 +43,7 @@ public sealed class TextSemanticToken
 	public string Type { get; }
 
 	/// <summary>
-	/// Gets the owned immutable snapshot of semantic token modifiers.
+	/// Gets the owned snapshot of semantic token modifiers.
 	/// </summary>
 	public IReadOnlyList<string> Modifiers => _modifiers;
 

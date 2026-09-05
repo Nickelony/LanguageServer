@@ -9,22 +9,24 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// Synchronizes the tracked state for a document and returns the LSP action required to mirror it to the server.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <param name="content">The latest document content. <see langword="null"/> is treated as an empty document.</param>
+	/// <param name="content">The latest document content.</param>
 	/// <param name="acquireOpenReference">Whether an additional open-editor reference should be recorded.</param>
 	/// <param name="acquireRequestReference">Whether a temporary request-driven reference should be recorded.</param>
 	/// <returns>A synchronization request when the server copy must be updated; otherwise, <see langword="null"/>.</returns>
 	/// <remarks>
 	/// Synchronization can create an idle server-open record when neither reference option is selected. The record is
-	/// retained until explicitly closed or removed by request-only trimming.
+	/// retained until explicitly closed or removed by trimming.
 	/// </remarks>
 	public DocumentSynchronizationRequest? Synchronize(
 		string filePath,
-		string? content,
+		string content,
 		bool acquireOpenReference = false,
 		bool acquireRequestReference = false)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(content);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
-		string safeContent = content ?? string.Empty;
 
 		lock (_syncRoot)
 		{
@@ -33,7 +35,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 				state = CreateTrackedDocumentState(
 					normalizedFilePath,
 					LanguageServerPathHelper.CreateFileUri(normalizedFilePath),
-					safeContent,
+					content,
 					version: 1,
 					isOpen: true,
 					openReferenceCount: acquireOpenReference ? 1 : 0,
@@ -54,15 +56,15 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 
 			if (!state.IsOpen)
 			{
-				ReopenTrackedDocumentState(state, safeContent);
+				ReopenTrackedDocumentState(state, content);
 				return new(DocumentSynchronizationKind.Open, state.CreateSnapshot());
 			}
 
-			if (!string.Equals(state.Content, safeContent, StringComparison.Ordinal))
+			if (!string.Equals(state.Content, content, StringComparison.Ordinal))
 			{
-				string previousContent = ReplaceTrackedDocumentContent(state, safeContent);
+				string previousContent = ReplaceTrackedDocumentContent(state, content);
 				TextLineMap previousLineMap = TextLineMap.Build(previousContent);
-				TextIncrementalChange change = TextIncrementalEditCalculator.Compute(previousContent, safeContent);
+				TextIncrementalChange change = TextIncrementalEditCalculator.Compute(previousContent, content);
 				(int startLine, int startCharacter) = previousLineMap.GetPosition(change.Range.Offset);
 				(int endLine, int endCharacter) = previousLineMap.GetPosition(change.Range.EndOffset);
 				DocumentChangeRange changeRange = new(

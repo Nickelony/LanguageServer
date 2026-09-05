@@ -3,6 +3,14 @@ using Nickelony.IDEKit.Workspace.Documents;
 
 namespace Nickelony.IDEKit.Workspace.Views.Tests;
 
+/// <summary>
+/// Tests <see cref="WorkspaceDocumentManager.OpenWithViewAsync"/> view opening and host callback
+/// dispatch.
+/// </summary>
+/// <remarks>
+/// A temporary file supplies the document content, and a minimal test view records the snapshot it
+/// receives for the final assertion.
+/// </remarks>
 [TestClass]
 public sealed class WorkspaceDocumentManagerTests
 {

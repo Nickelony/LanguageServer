@@ -80,7 +80,7 @@ public class TextCompletionControllerDisposalTests
 			controller.InvalidateRequests();
 			controller.ScheduleCloseIfEmpty();
 
-			// Query members return safe defaults instead of touching editor-owned state.
+			// State queries return safe defaults after disposal, and the calls above complete without throwing.
 			Assert.IsNull(controller.ActiveWindow);
 			Assert.AreEqual(-1, controller.BeginRequest());
 			Assert.IsFalse(controller.IsRequestCurrent(1));

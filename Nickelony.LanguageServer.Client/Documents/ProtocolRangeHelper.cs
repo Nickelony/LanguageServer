@@ -12,7 +12,7 @@ public static class ProtocolRangeHelper
 	/// </summary>
 	/// <param name="rangePayload">The protocol range payload to convert.</param>
 	/// <param name="range">Receives the converted one-based document range.</param>
-	/// <returns><see langword="true"/> when the range payload contained valid start and end positions.</returns>
+	/// <returns><see langword="true"/> when the range payload contained non-negative start and end positions.</returns>
 	public static bool TryGetOneBasedRange(ProtocolRangePayload? rangePayload, [NotNullWhen(true)] out OneBasedDocumentRange? range)
 	{
 		range = null;
@@ -33,7 +33,7 @@ public static class ProtocolRangeHelper
 	/// <param name="position">The protocol position to convert.</param>
 	/// <param name="lineNumber">Receives the one-based line number.</param>
 	/// <param name="columnNumber">Receives the one-based column number.</param>
-	/// <returns><see langword="true"/> when the protocol position contained both line and character values.</returns>
+	/// <returns><see langword="true"/> when the protocol position contained non-negative line and character values.</returns>
 	public static bool TryGetOneBasedLineAndColumn(ProtocolNullablePosition? position, out int lineNumber, out int columnNumber)
 	{
 		lineNumber = 1;

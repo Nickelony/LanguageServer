@@ -22,7 +22,7 @@ internal static class ProcessJobObject
 	private static bool s_initializationFailed;
 
 	/// <summary>
-	/// Sets the logger used for job-object allocation diagnostics.
+	/// Sets the logger used for job-object diagnostics.
 	/// </summary>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
 	internal static void InitializeLogger(ILogger logger)

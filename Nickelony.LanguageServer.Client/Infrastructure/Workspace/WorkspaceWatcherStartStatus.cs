@@ -21,7 +21,7 @@ public enum WorkspaceWatcherStartStatus
 	Disposed,
 
 	/// <summary>
-	/// The watcher could not start because the workspace root path does not exist.
+	/// The watcher could not start because the workspace root could not be found or is unavailable.
 	/// </summary>
 	WorkspaceRootMissing,
 

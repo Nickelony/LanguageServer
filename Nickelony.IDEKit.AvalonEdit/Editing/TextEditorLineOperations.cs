@@ -1,20 +1,24 @@
-using System.Text.RegularExpressions;
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.Core.Text;
+using System.Text.RegularExpressions;
 
 namespace Nickelony.IDEKit.AvalonEdit.Editing;
 
 /// <summary>
-/// Provides shared line-based editor operations for small scripted document updates.
+/// Provides line-based editing operations for an AvalonEdit <see cref="TextEditor"/>.
 /// </summary>
 public static class TextEditorLineOperations
 {
 	/// <summary>
-	/// Selects the given document line.
+	/// Selects a document line's content, excluding its line terminator.
 	/// </summary>
 	/// <param name="textEditor">The editor whose selection is updated.</param>
-	/// <param name="line">The line to select.</param>
-	public static void SelectLine(this ICSharpCode.AvalonEdit.TextEditor textEditor, DocumentLine line)
+	/// <param name="line">The line whose content to select.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="line"/> is <see langword="null"/>.
+	/// </exception>
+	public static void SelectLine(this TextEditor textEditor, DocumentLine line)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(line);
@@ -23,15 +27,19 @@ public static class TextEditorLineOperations
 	}
 
 	/// <summary>
-	/// Replaces the content of the given document line, optionally deselecting it afterwards.
+	/// Replaces a document line's content,
+	/// optionally clearing the selection and moving the caret to the end of the document.
 	/// </summary>
-	/// <remarks>The line terminator is not part of the replacement range and is preserved.</remarks>
+	/// <remarks>The line terminator is preserved.</remarks>
 	/// <param name="textEditor">The editor whose document is updated.</param>
-	/// <param name="line">The line to replace.</param>
+	/// <param name="line">The line whose content is replaced.</param>
 	/// <param name="replacement">The replacement text.</param>
-	/// <param name="deselectAfterwards">Whether to deselect the replaced line afterwards.</param>
+	/// <param name="deselectAfterwards">Whether to clear the selection after replacement.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/>, <paramref name="line"/>, or <paramref name="replacement"/> is <see langword="null"/>.
+	/// </exception>
 	public static void ReplaceLine(
-		this ICSharpCode.AvalonEdit.TextEditor textEditor,
+		this TextEditor textEditor,
 		DocumentLine line,
 		string replacement,
 		bool deselectAfterwards = false)
@@ -44,41 +52,50 @@ public static class TextEditorLineOperations
 		textEditor.SelectedText = replacement;
 
 		if (deselectAfterwards)
-			textEditor.ResetSelection();
+			textEditor.ClearSelection();
 	}
 
 	/// <summary>
-	/// Replaces the entire document content with the given text.
+	/// Replaces the entire document content and places the caret at the end of the resulting document.
 	/// </summary>
 	/// <param name="textEditor">The editor whose document is updated.</param>
-	/// <param name="newContent">The new document content.</param>
-	public static void ReplaceContent(this ICSharpCode.AvalonEdit.TextEditor textEditor, string newContent)
+	/// <param name="newContent">The content to set.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="newContent"/> is <see langword="null"/>.
+	/// </exception>
+	public static void ReplaceContent(this TextEditor textEditor, string newContent)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(newContent);
 
 		textEditor.SelectAll();
 		textEditor.SelectedText = newContent;
-		textEditor.ResetSelection();
+		textEditor.ClearSelection();
 	}
 
 	/// <summary>
-	/// Resets the current selection to the default state, placing the caret at the end of the document.
+	/// Clears the current selection and places the caret at the end of the document.
 	/// </summary>
-	/// <param name="textEditor">The editor whose selection is updated.</param>
-	public static void ResetSelection(this ICSharpCode.AvalonEdit.TextEditor textEditor)
+	/// <param name="textEditor">The editor whose selection is cleared.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> is <see langword="null"/>.
+	/// </exception>
+	public static void ClearSelection(this TextEditor textEditor)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		textEditor.Select(textEditor.Document.TextLength, 0);
 	}
 
 	/// <summary>
-	/// Resets the selection and places the caret at the end of the given line.
+	/// Clears the selection and places the caret at the end of a document line.
 	/// </summary>
-	/// <remarks>The line terminator, when present, is not selected.</remarks>
-	/// <param name="textEditor">The editor whose selection is updated.</param>
-	/// <param name="line">The line to reset the selection at.</param>
-	public static void ResetSelectionAt(this ICSharpCode.AvalonEdit.TextEditor textEditor, DocumentLine line)
+	/// <remarks>The caret is positioned before the line terminator when one is present.</remarks>
+	/// <param name="textEditor">The editor whose selection is cleared.</param>
+	/// <param name="line">The line at which to place the caret.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="line"/> is <see langword="null"/>.
+	/// </exception>
+	public static void ClearSelectionAt(this TextEditor textEditor, DocumentLine line)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(line);
@@ -87,24 +104,31 @@ public static class TextEditorLineOperations
 	}
 
 	/// <summary>
-	/// Replaces the first line whose selector returns replacement text.
+	/// Replaces the first document line for which <paramref name="replacementSelector"/> returns replacement text.
 	/// </summary>
-	/// <param name="textEditor">The editor whose document should be updated.</param>
-	/// <param name="replacementSelector">Returns the replacement text for a matching line, or <see langword="null"/> to skip the line.</param>
-	/// <param name="scrollToLine">Whether to scroll the editor to the updated line.</param>
+	/// <param name="textEditor">The editor containing the lines to inspect.</param>
+	/// <param name="replacementSelector">
+	/// Returns replacement text for a line, or <see langword="null"/> to leave it unchanged.
+	/// </param>
+	/// <param name="scrollToLine">Whether to scroll to the replaced line.</param>
 	/// <param name="workspaceEditTarget">
-	/// The host workspace target to apply through, or <see langword="null"/> to apply to the editor document directly.
+	/// The target on which to apply the edit, or <see langword="null"/> to edit the editor document directly.
 	/// </param>
-	/// <param name="contentChanged">
-	/// The callback invoked when the edit was applied directly to the editor document, or <see langword="null"/> for none.
+	/// <param name="onContentChanged">
+	/// The callback invoked after a direct edit.
+	/// It is not invoked when <paramref name="workspaceEditTarget"/> is supplied.
+	/// Pass <see langword="null"/> to omit it.
 	/// </param>
-	/// <returns><see langword="true"/> when a matching line was replaced; otherwise, <see langword="false"/>.</returns>
+	/// <returns><see langword="true"/> when a replacement was applied; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/> or <paramref name="replacementSelector"/> is <see langword="null"/>.
+	/// </exception>
 	public static bool TryReplaceFirstMatchingLine(
-		ICSharpCode.AvalonEdit.TextEditor textEditor,
+		TextEditor textEditor,
 		Func<string, string?> replacementSelector,
 		bool scrollToLine = true,
 		ITextEditTarget? workspaceEditTarget = null,
-		Action? contentChanged = null)
+		Action? onContentChanged = null)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(replacementSelector);
@@ -117,7 +141,8 @@ public static class TextEditorLineOperations
 			if (replacementText is null)
 				continue;
 
-			TextEditorEditHelper.ReplaceText(textEditor, line.Offset, line.Length, replacementText, null, workspaceEditTarget, contentChanged);
+			TextEditorEditHelper.ReplaceText(
+				textEditor, line.Offset, line.Length, replacementText, null, workspaceEditTarget, onContentChanged);
 
 			if (scrollToLine)
 				textEditor.ScrollToLine(line.LineNumber);
@@ -129,35 +154,40 @@ public static class TextEditorLineOperations
 	}
 
 	/// <summary>
-	/// Replaces occurrences of <paramref name="oldName"/> with <paramref name="newName"/>
-	/// on the first line that matches <paramref name="lineRegex"/>. The name is extracted from each matching
-	/// line via <paramref name="nameExtractor"/> before comparison.
+	/// Replaces all occurrences of <paramref name="oldName"/> with <paramref name="newName"/> on the first line
+	/// that matches <paramref name="lineRegex"/> and whose extracted name equals <paramref name="oldName"/>.
 	/// </summary>
-	/// <param name="textEditor">The editor whose document should be updated.</param>
-	/// <param name="lineRegex">The regular expression used to identify candidate lines.</param>
+	/// <param name="textEditor">The editor containing the lines to inspect.</param>
+	/// <param name="lineRegex">The regular expression that identifies candidate lines.</param>
 	/// <param name="nameExtractor">
-	/// Extracts the normalized name from a candidate line. Receives the full line text and
-	/// the <paramref name="lineRegex"/> to remove the pattern; returns the cleaned name.
+	/// Produces the name compared with <paramref name="oldName"/> for each candidate line.
+	/// Receives the full line text and <paramref name="lineRegex"/>.
 	/// </param>
-	/// <param name="oldName">The name to search for.</param>
+	/// <param name="oldName">The name to match and replace.</param>
 	/// <param name="newName">The replacement name.</param>
-	/// <param name="scrollToLine">Whether to scroll the editor to the updated line.</param>
+	/// <param name="scrollToLine">Whether to scroll the editor to the replaced line.</param>
 	/// <param name="workspaceEditTarget">
-	/// The host workspace target to apply through, or <see langword="null"/> to apply to the editor document directly.
+	/// The target on which to apply the edit, or <see langword="null"/> to edit the editor document directly.
 	/// </param>
-	/// <param name="contentChanged">
-	/// The callback invoked when the edit was applied directly to the editor document, or <see langword="null"/> for none.
+	/// <param name="onContentChanged">
+	/// The callback invoked after a direct edit.
+	/// It is not invoked when <paramref name="workspaceEditTarget"/> is supplied.
+	/// Pass <see langword="null"/> to omit it.
 	/// </param>
-	/// <returns><see langword="true"/> when a matching line was replaced; otherwise, <see langword="false"/>.</returns>
-	public static bool TryReplaceFirstMatchingLine(
-		ICSharpCode.AvalonEdit.TextEditor textEditor,
+	/// <returns><see langword="true"/> when a replacement was applied; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textEditor"/>, <paramref name="lineRegex"/>, <paramref name="nameExtractor"/>,
+	/// <paramref name="oldName"/>, or <paramref name="newName"/> is <see langword="null"/>.
+	/// </exception>
+	public static bool TryReplaceNameInFirstMatchingLine(
+		TextEditor textEditor,
 		Regex lineRegex,
 		Func<string, Regex, string> nameExtractor,
 		string oldName,
 		string newName,
 		bool scrollToLine = true,
 		ITextEditTarget? workspaceEditTarget = null,
-		Action? contentChanged = null)
+		Action? onContentChanged = null)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(lineRegex);
@@ -175,6 +205,6 @@ public static class TextEditorLineOperations
 			return extractedName == oldName
 				? lineText.Replace(oldName, newName)
 				: null;
-		}, scrollToLine, workspaceEditTarget, contentChanged);
+		}, scrollToLine, workspaceEditTarget, onContentChanged);
 	}
 }

@@ -1,8 +1,7 @@
 namespace Nickelony.IDEKit.Core.Comments.Tests;
 
 /// <summary>
-/// Tests for Lua-style long-bracket string awareness in
-/// <see cref="CommentHelper"/> through <see cref="StringLiteralStyle.LongBracketQuoted"/>.
+/// Tests how <see cref="CommentHelper"/> handles Lua-style long-bracket strings.
 /// </summary>
 [TestClass]
 public sealed class CommentHelperLongBracketTests
@@ -53,9 +52,9 @@ public sealed class CommentHelperLongBracketTests
 	}
 
 	[TestMethod]
-	public void FindCommentStart_ClosingBracketWithMismatchedEquals_DoesNotClose()
+	public void FindCommentStart_LongBracketWithMismatchedCloser_ReturnsComment()
 	{
-		// [=[ requires ]=]; the plain ]] inside is content, so the string stays open.
+		// The input contains a mismatched closer, then a matching closer and a real comment.
 		int result = FindCommentStart("local s = [=[a ]] b]=] -- after", s_luaSyntax);
 
 		Assert.IsTrue(result >= 0);

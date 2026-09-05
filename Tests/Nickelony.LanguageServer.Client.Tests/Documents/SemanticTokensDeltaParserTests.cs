@@ -6,7 +6,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public class SemanticTokensDeltaParserTests
 {
 	[TestMethod]
-	public void Parse_MissingStartReturnsEmptyDeltaPayload()
+	public void Parse_MissingStartReturnsNoChanges()
 	{
 		SemanticTokensWireResponse response = JsonSerializer.Deserialize<SemanticTokensWireResponse>(
 			"""

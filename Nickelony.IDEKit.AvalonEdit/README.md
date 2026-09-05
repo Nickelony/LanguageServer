@@ -48,12 +48,12 @@ TextEditorEditHelper.InsertText(
     insertOffset,
     newText,
     workspaceEditTarget: editor.WorkspaceEditTarget,
-    contentChanged: () => editor.RunContentChangedWorker());
+    onContentChanged: () => editor.RunContentChangedWorker());
 ```
 
 When no workspace target is supplied, edits are applied through an
 `AvalonEditTextEditTarget` to the editor document directly, and the
-content-changed callback is invoked when one is provided.
+content-changed callback is invoked after the direct edit when one is provided.
 
 The bookmark coordinator is in-memory only: bookmark persistence (for example
 a sidecar file) is a host concern. A host restores bookmarks by passing the

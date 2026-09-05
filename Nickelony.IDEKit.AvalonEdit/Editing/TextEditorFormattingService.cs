@@ -1,18 +1,20 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Windows;
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.Core.Formatting;
+using System.Diagnostics.CodeAnalysis;
+using System.Windows;
 
 namespace Nickelony.IDEKit.AvalonEdit.Editing;
 
 /// <summary>
-/// Applies formatter output to an editor as a single undo operation while preserving the current
-/// caret line and scroll position. Because a full-document rewrite changes every offset, the
-/// selection is collapsed to the end of the preserved line rather than re-mapped to the formatted text.
+/// Applies formatted document changes to an AvalonEdit <see cref="TextEditor"/> in a single undo operation,
+/// preserving the caret line and scroll position when possible.
 /// </summary>
 /// <remarks>
-/// If formatting removes the original caret line, the caret is placed at offset <c>TextLength - 1</c>,
-/// one position before the final UTF-16 code unit, or at offset <c>0</c> when the document is empty.
+/// A full-document replacement invalidates existing offsets, so the selection is collapsed to the
+/// end of the line with the original caret line number. If that line does not exist in the result,
+/// the fallback offset is <c>TextLength - 1</c>, one position before the final UTF-16 code unit,
+/// or <c>0</c> for an empty document.
 /// </remarks>
 [SuppressMessage(
 	"Performance",
@@ -21,25 +23,19 @@ namespace Nickelony.IDEKit.AvalonEdit.Editing;
 public sealed class TextEditorFormattingService
 {
 	/// <summary>
-	/// Formats the current editor content as one undo step.
+	/// Formats the current editor content and applies any changes as one undo step.
 	/// </summary>
 	/// <param name="editor">The editor to update.</param>
 	/// <param name="formatter">The formatter to apply.</param>
-	/// <param name="trimOnly">
-	/// Whether only trailing whitespace should be trimmed. When <see langword="true"/>, the formatter
-	/// is skipped and the trailing whitespace is trimmed directly.
-	/// </param>
-	public void FormatDocument(
-		ICSharpCode.AvalonEdit.TextEditor editor,
-		ITextDocumentFormatter formatter,
-		bool trimOnly = false)
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="editor"/> or <paramref name="formatter"/> is <see langword="null"/>.
+	/// </exception>
+	public void FormatDocument(TextEditor editor, ITextDocumentFormatter formatter)
 	{
 		ArgumentNullException.ThrowIfNull(editor);
 		ArgumentNullException.ThrowIfNull(formatter);
 
-		string formattedContent = trimOnly
-			? TrimTrailingWhitespaceFormatter.Instance.FormatDocument(editor.Text)
-			: formatter.FormatDocument(editor.Text);
+		string formattedContent = formatter.FormatDocument(editor.Text);
 
 		if (string.Equals(editor.Text, formattedContent, StringComparison.Ordinal))
 			return;

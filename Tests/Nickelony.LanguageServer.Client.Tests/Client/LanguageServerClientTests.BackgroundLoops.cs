@@ -7,7 +7,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public partial class LanguageServerClientTests
 {
 	[TestMethod]
-	public async Task WaitForBackgroundLoopsAsync_WhenLoopFaults_LogsSpecificWarningWithoutFallback()
+	public async Task WaitForBackgroundLoopsAsync_WhenLoopFaults_LogsLoopFailureWithoutDuplicateDisposalWarning()
 	{
 		using var logScope = new TestLoggerScope(LogLevel.Debug);
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions, logScope.CreateLogger<LanguageServerClient>());
@@ -88,7 +88,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public async Task EnsureTransportBackgroundLoopsRunning_WhenFaultedPumpIsReplaced_ForgetsObservedTermination()
+	public async Task EnsureTransportBackgroundLoopsRunning_WhenFaultedPumpIsReplaced_ClearsObservedTermination()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		Task faultedCallbackPump = Task.FromException(new IOException("Simulated callback pump failure."));

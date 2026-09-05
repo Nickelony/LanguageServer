@@ -15,6 +15,9 @@ public static class LineDiffer
 	/// <returns>The one-based line numbers in <paramref name="current"/> that changed.</returns>
 	public static HashSet<int> GetChangedLines(string[] baseline, string[] current)
 	{
+		ArgumentNullException.ThrowIfNull(baseline);
+		ArgumentNullException.ThrowIfNull(current);
+
 		var changed = new HashSet<int>();
 		int baselineCount = baseline.Length;
 		int currentCount = current.Length;

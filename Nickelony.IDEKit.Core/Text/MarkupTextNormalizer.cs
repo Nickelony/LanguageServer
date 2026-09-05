@@ -6,10 +6,11 @@ namespace Nickelony.IDEKit.Core.Text;
 public static class MarkupTextNormalizer
 {
 	/// <summary>
-	/// Removes standalone Markdown fence lines while preserving inline backticks and code content.
+	/// Removes supported standalone Markdown fence lines while preserving inline backticks and code
+	/// content. Trailing whitespace on retained lines is removed, and the final result is trimmed.
 	/// </summary>
 	/// <param name="text">The text to normalize.</param>
-	/// <returns>The normalized text, or <see langword="null"/> when the input is blank.</returns>
+	/// <returns>The normalized text using <see cref="Environment.NewLine"/>, or <see langword="null"/> when the input or result is blank.</returns>
 	public static string? NormalizeForPlainText(string? text)
 	{
 		if (string.IsNullOrWhiteSpace(text))

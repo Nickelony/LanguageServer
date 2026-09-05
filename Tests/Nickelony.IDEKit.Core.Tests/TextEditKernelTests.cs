@@ -6,7 +6,7 @@ namespace Nickelony.IDEKit.Core.Editing.Tests;
 public sealed class TextEditKernelTests
 {
 	[TestMethod]
-	public void Prepare_DescendingNonOverlappingEdits_ReturnsDescendingOperations()
+	public void Prepare_NonOverlappingEdits_ReturnsDescendingOperations()
 	{
 		TextEditPreparationResult result = TextEditKernel.Prepare(
 			new StringTextSnapshot("abcdef"),

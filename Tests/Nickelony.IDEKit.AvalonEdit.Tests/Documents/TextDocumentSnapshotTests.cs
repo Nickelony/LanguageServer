@@ -5,8 +5,8 @@ using Nickelony.IDEKit.Core.Text;
 namespace Nickelony.IDEKit.AvalonEdit.Tests;
 
 /// <summary>
-/// Tests proving that <see cref="TextDocumentSnapshot"/> captures an immutable snapshot
-/// that does not change when the underlying AvalonEdit document is edited.
+/// Tests that <see cref="TextDocumentSnapshot"/> captures document content, line information,
+/// and file name without observing later edits to the AvalonEdit document.
 /// </summary>
 [TestClass]
 public sealed class TextDocumentSnapshotTests

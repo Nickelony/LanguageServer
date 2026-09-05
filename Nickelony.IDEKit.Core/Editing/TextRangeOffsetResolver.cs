@@ -4,6 +4,11 @@ namespace Nickelony.IDEKit.Core.Editing;
 /// Resolves stable offset ranges from line-map positions, including fallback anchors for empty or
 /// otherwise unusable ranges.
 /// </summary>
+/// <remarks>
+/// When the requested range is empty or reversed, the resolver first tries the word at the start
+/// position, then the non-whitespace content of that line, and finally a single character. For
+/// an empty line it searches forward for a non-empty line before searching backward.
+/// </remarks>
 public static class TextRangeOffsetResolver
 {
 	/// <summary>
@@ -21,6 +26,8 @@ public static class TextRangeOffsetResolver
 		int startLineIndex, int startCharacter, int endLineIndex, int endCharacter,
 		out int startOffset, out int endOffset)
 	{
+		ArgumentNullException.ThrowIfNull(lineMap);
+
 		startOffset = 0;
 		endOffset = 0;
 

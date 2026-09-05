@@ -20,10 +20,11 @@ public static class SidecarLineFile
 	/// <param name="sidecarExtension">The sidecar file extension, or <see langword="null"/> to use the default <c>.sidecar</c>.</param>
 	/// <returns>
 	/// <see langword="true"/> when the sidecar file was written or deleted, or when there was nothing to persist;
-	/// <see langword="false"/> when saving failed or an invalid file path was supplied.
+	/// <see langword="false"/> when the file path is blank or the file operation fails with an I/O or authorization error.
 	/// </returns>
 	public static bool Save(string filePath, IEnumerable<int> lineNumbers, string? sidecarExtension = null)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
 		ArgumentNullException.ThrowIfNull(lineNumbers);
 
 		if (string.IsNullOrWhiteSpace(filePath))
@@ -57,13 +58,15 @@ public static class SidecarLineFile
 
 	/// <summary>
 	/// Restores the line numbers persisted in the sidecar file for the supplied document path.
-	/// Unparseable entries are skipped; a missing or unreadable sidecar yields an empty set.
+	/// Unparseable entries are skipped; a missing or unreadable sidecar yields an empty list.
 	/// </summary>
 	/// <param name="filePath">The path of the document the sidecar belongs to.</param>
 	/// <param name="sidecarExtension">The sidecar file extension, or <see langword="null"/> to use the default <c>.sidecar</c>.</param>
 	/// <returns>The restored one-based line numbers.</returns>
 	public static IReadOnlyList<int> Restore(string filePath, string? sidecarExtension = null)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
 		var lineNumbers = new List<int>();
 
 		if (string.IsNullOrWhiteSpace(filePath))
@@ -100,6 +103,9 @@ public static class SidecarLineFile
 	/// <param name="filePath">The path of the document the sidecar belongs to.</param>
 	/// <param name="sidecarExtension">The sidecar file extension, or <see langword="null"/> to use the default <c>.sidecar</c>.</param>
 	/// <returns>The sidecar file path.</returns>
-	public static string GetSidecarPath(string filePath, string? sidecarExtension = null)
-		=> filePath + (sidecarExtension ?? ".sidecar");
+	public static string GetSidecarPath(string filePath, string sidecarExtension = ".sidecar")
+	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		return filePath + sidecarExtension;
+	}
 }

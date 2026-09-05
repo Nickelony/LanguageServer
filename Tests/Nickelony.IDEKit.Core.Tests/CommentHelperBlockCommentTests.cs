@@ -3,13 +3,12 @@ using Nickelony.IDEKit.Core.Text;
 namespace Nickelony.IDEKit.Core.Comments.Tests;
 
 /// <summary>
-/// Tests block-comment detection, masking, and removal by <see cref="CommentHelper"/>
-/// using explicit block-comment syntax.
+/// Tests block-comment detection, removal, and masking by <see cref="CommentHelper"/>.
 /// </summary>
 [TestClass]
 public sealed class CommentHelperBlockCommentTests
 {
-	// Each test supplies the comment syntax explicitly.
+	// Comment syntax used by the tests.
 	private static readonly StringLiteralStyle s_cStyle = StringLiteralStyle.DoubleQuoted | StringLiteralStyle.TripleDoubleQuoted;
 	private static readonly CommentSyntax s_cStyleSyntax = new("//", "/*", "*/", s_cStyle);
 	private static readonly CommentSyntax s_luaSyntax = new("--", "--[[", "]]", StringLiteralStyle.None);
@@ -81,7 +80,7 @@ public sealed class CommentHelperBlockCommentTests
 	}
 
 	[TestMethod]
-	public void FindBlockCommentStart_LuaDelimiter_WithoutStringAwarenessFindsDelimiter()
+	public void FindBlockCommentStart_LuaBlockDelimiter_WithoutStringAwareness_FindsDelimiter()
 	{
 		// Without long-bracket string awareness, `--[[ ... ]]` is treated as a block comment.
 		int result = FindBlockCommentStart("'x --[[ c ]]", s_luaSyntax);
@@ -90,7 +89,7 @@ public sealed class CommentHelperBlockCommentTests
 	}
 
 	[TestMethod]
-	public void FindBlockCommentStart_LuaDelimiterInSingleQuotedString_ReturnsNegative()
+	public void FindBlockCommentStart_LuaBlockDelimiter_InSingleQuotedString_ReturnsNegative()
 	{
 		int result = FindBlockCommentStart("'x --[[ c ]]", new CommentSyntax("--", "--[[", "]]", StringLiteralStyle.SingleQuoted));
 
@@ -162,7 +161,7 @@ public sealed class CommentHelperBlockCommentTests
 		TextRange range = GetCodeRange("code /* comment */", s_cStyleSyntax);
 
 		Assert.AreEqual(0, range.Offset);
-		Assert.AreEqual(5, range.Length); // The code range ends where the comment opener begins.
+		Assert.AreEqual(5, range.Length);
 
 		Assert.AreEqual("code ", range.GetText("code /* comment */"));
 	}
@@ -236,11 +235,9 @@ public sealed class CommentHelperBlockCommentTests
 	}
 
 	[TestMethod]
-	public void RemoveBlockComment_NullString_ReturnsEmpty()
+	public void RemoveBlockComment_NullString_ThrowsArgumentNullException()
 	{
-		string result = RemoveBlockComment(null!, s_cStyleSyntax);
-
-		Assert.AreEqual(string.Empty, result);
+		Assert.ThrowsExactly<ArgumentNullException>(() => RemoveBlockComment(null!, s_luaSyntax));
 	}
 
 	[TestMethod]
@@ -262,8 +259,7 @@ public sealed class CommentHelperBlockCommentTests
 	[TestMethod]
 	public void RemoveBlockComment_AdjacentComments_RemovesBoth()
 	{
-		// The second opener immediately follows the first closer, so the closer residue
-		// must not hide it.
+		// Both adjacent block comments should be removed.
 		string result = RemoveBlockComment("a /* one *//* two */ b", s_cStyleSyntax);
 
 		Assert.AreEqual("a  b", result);
@@ -361,11 +357,9 @@ public sealed class CommentHelperBlockCommentTests
 	}
 
 	[TestMethod]
-	public void MaskBlockComment_NullString_ReturnsEmpty()
+	public void MaskBlockComment_NullString_ThrowsArgumentNullException()
 	{
-		string result = MaskBlockComment(null!, s_cStyleSyntax);
-
-		Assert.AreEqual(string.Empty, result);
+		Assert.ThrowsExactly<ArgumentNullException>(() => MaskBlockComment(null!, s_luaSyntax));
 	}
 
 	[TestMethod]
@@ -445,8 +439,7 @@ public sealed class CommentHelperBlockCommentTests
 	[TestMethod]
 	public void RemoveBlockComment_TripleQuotedString_CommentDirectlyAfterCloser()
 	{
-		// The real comment begins immediately after the raw-string closer with no space,
-		// so the closer residue must not hide its opener.
+		// A comment immediately after the raw string is still removed.
 		string result = RemoveBlockComment("\"\"\"a\"\"\"/* real */", s_cStyleSyntax);
 
 		Assert.AreEqual("\"\"\"a\"\"\"", result);

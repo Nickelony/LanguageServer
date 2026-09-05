@@ -5,7 +5,7 @@ namespace Nickelony.LanguageServer.Client.Tests;
 public partial class LanguageServerClientTests
 {
 	[TestMethod]
-	public void FreshClient_ExposesConservativeCapabilitiesBeforeStartup()
+	public void FreshClient_ExposesNoServerCapabilitiesBeforeStartup()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 
@@ -23,7 +23,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void ActiveSessionBeforeHandshake_ExposesConservativeCapabilities()
+	public void ActiveSessionBeforeHandshake_ExposesNoServerCapabilities()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 		object session = CreateTransportSession(client, 3, process: null, Stream.Null, Stream.Null);
@@ -196,7 +196,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void DeserializeInitializeResponse_UnsupportedCapabilityShapesDegradePredictably()
+	public void DeserializeInitializeResponse_TreatsUnsupportedCapabilityShapesAsUnsupported()
 	{
 		InitializeResponse response = DeserializeInitializeResponse(
 			"""
@@ -231,7 +231,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void DeserializeInitializeResponse_BooleanTextDocumentSyncDegradesToNone()
+	public void DeserializeInitializeResponse_TreatsBooleanTextDocumentSyncAsUnsupported()
 	{
 		InitializeResponse response = DeserializeInitializeResponse(
 			"""
@@ -247,7 +247,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void SemanticTokenCapabilityLists_CannotBeMutatedThroughCollectionCasts()
+	public void SemanticTokenCapabilityLists_AreReadOnly()
 	{
 		using var client = new LanguageServerClient(@"C:\Workspace", "lua-language-server.exe", s_defaultClientOptions);
 

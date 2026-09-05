@@ -132,9 +132,10 @@ public sealed class TextWorkspaceEditTargetResult
 		TextWorkspaceEditTargetStatus status,
 		TextWorkspaceEditFailure? failure = null)
 	{
+		ArgumentNullException.ThrowIfNull(targetId);
 		ArgumentOutOfRangeException.ThrowIfNegative(preparedOperationCount);
 
-		TargetId = targetId ?? string.Empty;
+		TargetId = targetId;
 		ExpectedVersion = expectedVersion;
 		ActualVersion = actualVersion;
 		PreparedOperationCount = preparedOperationCount;
@@ -143,7 +144,7 @@ public sealed class TextWorkspaceEditTargetResult
 	}
 
 	/// <summary>
-	/// Gets the stable target identifier, currently the normalized edit path.
+	/// Gets the stable target identifier supplied for this target.
 	/// </summary>
 	public string TargetId { get; }
 

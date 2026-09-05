@@ -21,8 +21,7 @@ public sealed class FindReplaceItem
 	public string MatchSegmentText { get; }
 
 	/// <summary>
-	/// Gets the zero-based index of this match among the matches of <see cref="MatchSegmentText"/>
-	/// on the line.
+	/// Gets the zero-based index of this match in the search match collection for its line.
 	/// </summary>
 	public int MatchSegmentIndex { get; }
 
@@ -35,6 +34,9 @@ public sealed class FindReplaceItem
 	/// <param name="matchSegmentIndex">The zero-based index of this match on its line.</param>
 	public FindReplaceItem(int lineNumber, string lineText, string matchSegmentText, int matchSegmentIndex)
 	{
+		ArgumentNullException.ThrowIfNull(lineText);
+		ArgumentNullException.ThrowIfNull(matchSegmentText);
+
 		LineNumber = lineNumber;
 		LineText = lineText;
 		MatchSegmentText = matchSegmentText;

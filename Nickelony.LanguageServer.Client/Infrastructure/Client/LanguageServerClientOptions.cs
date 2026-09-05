@@ -7,6 +7,14 @@ namespace Nickelony.LanguageServer.Client;
 /// The payload factories may be invoked from background transport threads and should be thread-safe,
 /// non-blocking, and cheap to execute.
 /// </remarks>
+/// <example>
+/// <code>
+/// var options = new LanguageServerClientOptions(() =&gt; new { maxPreload = 10 })
+/// {
+///     InitializeTimeout = TimeSpan.FromSeconds(20)
+/// };
+/// </code>
+/// </example>
 public sealed class LanguageServerClientOptions
 {
 	private TimeSpan _initializeTimeout = TimeSpan.FromSeconds(20.0);
@@ -18,7 +26,10 @@ public sealed class LanguageServerClientOptions
 	/// </summary>
 	/// <param name="settingsProvider">Produces the current settings payload for <c>workspace/didChangeConfiguration</c>.</param>
 	public LanguageServerClientOptions(Func<object> settingsProvider)
-		=> SettingsProvider = settingsProvider;
+	{
+		ArgumentNullException.ThrowIfNull(settingsProvider);
+		SettingsProvider = settingsProvider;
+	}
 
 	/// <summary>
 	/// Gets the settings payload factory for <c>workspace/didChangeConfiguration</c>.

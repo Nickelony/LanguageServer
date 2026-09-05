@@ -4,9 +4,8 @@ namespace Nickelony.IDEKit.Core.Comments;
 /// Provides comment-aware line-level syntax helpers driven by a <see cref="CommentSyntax"/>.
 /// </summary>
 /// <remarks>
-/// This is the shared base for language line services that strip, mask, or detect line-comment
-/// lines. The comment delimiter, string-literal awareness, and block-comment delimiters are
-/// supplied by the <see cref="CommentSyntax"/>; the helpers themselves are syntax-agnostic.
+/// The configured comment delimiter, string-literal awareness, and block-comment delimiters are
+/// supplied by <see cref="CommentSyntax"/>; the helpers themselves are syntax-agnostic.
 /// </remarks>
 public class TextLineSyntaxService
 {
@@ -30,7 +29,10 @@ public class TextLineSyntaxService
 	/// <param name="lineText">The line text to process.</param>
 	/// <returns>The line text with comment content removed.</returns>
 	public string RemoveComments(string lineText)
-		=> CommentHelper.RemoveComments(lineText, Syntax);
+	{
+		ArgumentNullException.ThrowIfNull(lineText);
+		return CommentHelper.RemoveComments(lineText, Syntax);
+	}
 
 	/// <summary>
 	/// Masks comments in the supplied line text so comment delimiters do not interfere with
@@ -39,13 +41,17 @@ public class TextLineSyntaxService
 	/// <param name="lineText">The line text to process.</param>
 	/// <returns>The line text with comment content masked.</returns>
 	public string EscapeComments(string lineText)
-		=> CommentHelper.MaskComments(lineText, Syntax);
+	{
+		ArgumentNullException.ThrowIfNull(lineText);
+		return CommentHelper.MaskComments(lineText, Syntax);
+	}
 
 	/// <summary>
-	/// Returns whether the supplied line is empty or starts with the configured line-comment delimiter.
+	/// Returns whether the supplied line is empty or, after leading whitespace is removed, starts with the configured
+	/// line-comment delimiter.
 	/// </summary>
 	/// <param name="lineText">The line text to inspect, or <see langword="null"/>.</param>
-	/// <returns><see langword="true"/> when the line is blank or a comment; otherwise, <see langword="false"/>.</returns>
+	/// <returns><see langword="true"/> when the line is blank or its first non-whitespace content is a line-comment delimiter; otherwise, <see langword="false"/>.</returns>
 	public bool IsEmptyOrComments(string? lineText)
 	{
 		if (string.IsNullOrWhiteSpace(lineText))

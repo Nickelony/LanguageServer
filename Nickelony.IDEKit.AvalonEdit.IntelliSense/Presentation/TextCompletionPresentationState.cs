@@ -14,7 +14,7 @@ public readonly record struct TextCompletionPresentationState(
 	object? ToolTipContent)
 {
 	/// <summary>
-	/// Gets the empty presentation state with no window, request, tooltip or content.
+	/// Gets the empty presentation state with no window, scheduled request, tooltip, or content.
 	/// </summary>
 	public static TextCompletionPresentationState Empty { get; } = new(false, false, false, null);
 }

@@ -16,9 +16,9 @@ public readonly record struct SemanticTokensWireResponse(
 /// <summary>
 /// Represents a semantic token edit payload as returned on the wire by the language server.
 /// </summary>
-/// <param name="Start">The start index of the edit in the token stream.</param>
-/// <param name="DeleteCount">The number of tokens to delete at the start index.</param>
-/// <param name="Data">The replacement token data to insert.</param>
+/// <param name="Start">The start index of the edit in the semantic-token integer stream.</param>
+/// <param name="DeleteCount">The number of integers to delete at the start index.</param>
+/// <param name="Data">The replacement integer data to insert.</param>
 public readonly record struct SemanticTokensEditPayload(
 	[property: JsonPropertyName("start")] int? Start,
 	[property: JsonPropertyName("deleteCount")] int? DeleteCount,

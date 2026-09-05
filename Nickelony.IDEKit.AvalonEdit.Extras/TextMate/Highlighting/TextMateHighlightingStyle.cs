@@ -49,18 +49,21 @@ public sealed class TextMateHighlightingStyle
 	public TextDecorationCollection? TextDecorations { get; }
 
 	/// <summary>
-	/// Gets a value indicating whether the style contains any formatting.
+	/// Gets a value indicating whether the style requests any formatting.
 	/// </summary>
 	public bool HasFormatting
 		=> Foreground is not null || IsBold || IsItalic || TextDecorations is not null;
 
 	/// <summary>
 	/// Creates a typeface by applying this style's bold and italic settings to a base typeface.
+	/// A disabled setting preserves the corresponding weight or style from the base typeface.
 	/// </summary>
 	/// <param name="baseTypeface">The base typeface to derive from.</param>
 	/// <returns>The derived typeface.</returns>
 	public Typeface CreateTypeface(Typeface baseTypeface)
 	{
+		ArgumentNullException.ThrowIfNull(baseTypeface);
+
 		FontStyle fontStyle = IsItalic ? FontStyles.Italic : baseTypeface.Style;
 		FontWeight fontWeight = IsBold ? FontWeights.Bold : baseTypeface.Weight;
 

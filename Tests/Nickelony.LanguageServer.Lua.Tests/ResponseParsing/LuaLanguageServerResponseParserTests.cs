@@ -153,7 +153,7 @@ public partial class LuaLanguageServerResponseParserTests
 			],
 			"text");
 
-		// "Value" and "value" are distinct Lua symbols, while the duplicate "Value" item is removed.
+		// Case-sensitive deduplication keeps "Value" and "value" as separate items and removes the repeated "Value" item.
 		Assert.AreEqual(2, items.Count);
 		Assert.AreEqual("Value", items[0].Label);
 		Assert.AreEqual("value", items[1].Label);

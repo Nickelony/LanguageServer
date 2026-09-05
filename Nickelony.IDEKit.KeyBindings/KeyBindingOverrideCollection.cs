@@ -4,14 +4,23 @@ using System.Xml.Serialization;
 namespace Nickelony.IDEKit.KeyBindings;
 
 /// <summary>
-/// Versioned, XML-serializable collection of key binding overrides.
-/// A host can store an instance as part of its workspace settings document.
+/// XML-serializable collection of key binding overrides with a schema version.
+/// A host can include an instance in its workspace settings document.
 /// </summary>
+/// <example>
+/// <code><![CDATA[
+/// <KeyBindingOverrideCollection Version="1">
+///   <Command Id="Save">
+///     <Binding Key="S" Modifiers="2" />
+///   </Command>
+/// </KeyBindingOverrideCollection>
+/// ]]></code>
+/// </example>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "The type is the persisted collection model and its public name is part of the settings API.")]
 public sealed class KeyBindingOverrideCollection
 {
 	/// <summary>
-	/// Creates an empty override collection at schema version 1.
+	/// Creates an empty override collection with schema version 1.
 	/// </summary>
 	public KeyBindingOverrideCollection()
 	{
@@ -20,14 +29,14 @@ public sealed class KeyBindingOverrideCollection
 	}
 
 	/// <summary>
-	/// Persisted schema version marker.
+	/// Schema version marker written as the <c>Version</c> XML attribute.
 	/// </summary>
 	[XmlAttribute("Version")]
 	public int Version { get; set; }
 
 	/// <summary>
 	/// Per-command override entries. An empty <see cref="KeyBindingOverrideEntry.Bindings"/>
-	/// list means the user explicitly unbound the command.
+	/// list explicitly unbinds the matching command.
 	/// </summary>
 	[XmlElement("Command")]
 	public List<KeyBindingOverrideEntry> Overrides { get; set; }
@@ -48,22 +57,21 @@ public sealed class KeyBindingOverrideEntry
 	}
 
 	/// <summary>
-	/// Stable serialized command identifier used to match a catalog descriptor (for example, "Save").
+	/// Stable command identifier used to match a catalog descriptor. Matching is case-sensitive.
 	/// </summary>
 	[XmlAttribute("Id")]
 	public string CommandId { get; set; }
 
 	/// <summary>
-	/// The binding entries for this command.
-	/// An empty list means the command is explicitly unbound.
+	/// The binding entries for this command. An empty list explicitly unbinds the command.
 	/// </summary>
 	[XmlElement("Binding")]
 	public List<KeyBindingSettings> Bindings { get; set; }
 }
 
 /// <summary>
-/// A single key binding in the persisted key binding settings.
-/// Never contains display text - that is calculated at runtime.
+/// Key and modifier values for one persisted binding.
+/// Display text is calculated at runtime.
 /// </summary>
 public sealed class KeyBindingSettings
 {
@@ -76,7 +84,8 @@ public sealed class KeyBindingSettings
 	}
 
 	/// <summary>
-	/// The <see cref="System.Windows.Input.Key"/> enum name (e.g. "S", "F9", "OemQuestion").
+	/// The <see cref="System.Windows.Input.Key"/> enum name, such as <c>S</c>, <c>F9</c>, or
+	/// <c>OemQuestion</c>.
 	/// </summary>
 	[XmlAttribute("Key")]
 	public string KeyName { get; set; }

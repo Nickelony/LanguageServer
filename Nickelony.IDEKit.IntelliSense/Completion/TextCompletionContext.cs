@@ -6,7 +6,8 @@ namespace Nickelony.IDEKit.IntelliSense.Completion;
 /// <remarks>
 /// The shared completion contract uses an editor offset for the request point and leaves
 /// protocol-specific line and column conversion at the provider boundary.
-/// Construct the context with the current document snapshot rather than using the record's default value.
+/// Construct the context with the current document snapshot; the record's default value is
+/// <see langword="null"/> and does not represent a valid request.
 /// </remarks>
 public sealed record TextCompletionContext
 {
@@ -18,8 +19,7 @@ public sealed record TextCompletionContext
 	/// <param name="trigger">The reason the completion request was raised.</param>
 	/// <param name="argumentIndex">
 	/// The active argument index for contextual completion scenarios, or <c>-1</c> to indicate
-	/// that the provider should resolve it from the caret position. A default context must not be used
-	/// because it would treat <c>0</c> as the active argument instead of resolving it from the caret.
+	/// that the provider should resolve it from the caret position.
 	/// </param>
 	/// <exception cref="ArgumentOutOfRangeException">
 	/// <paramref name="caretOffset"/> is negative or greater than the length of <paramref name="documentText"/>,
@@ -31,6 +31,8 @@ public sealed record TextCompletionContext
 		TextCompletionTrigger trigger = TextCompletionTrigger.Automatic,
 		int argumentIndex = -1)
 	{
+		ArgumentNullException.ThrowIfNull(documentText);
+
 		if (caretOffset < 0 || caretOffset > documentText.Length)
 			throw new ArgumentOutOfRangeException(nameof(caretOffset));
 

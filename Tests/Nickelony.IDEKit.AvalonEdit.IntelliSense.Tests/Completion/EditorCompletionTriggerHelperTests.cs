@@ -6,7 +6,7 @@ namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests;
 public class EditorCompletionTriggerHelperTests
 {
 	[TestMethod]
-	public void IsCtrlSpaceInput_ReturnsTrueOnlyForCtrlSpace()
+	public void IsCtrlSpaceInput_RequiresSpaceAndCtrlModifier()
 	{
 		Assert.IsTrue(EditorCompletionTriggerHelper.IsCtrlSpaceInput(" ", true));
 		Assert.IsTrue(EditorCompletionTriggerHelper.IsCtrlSpaceInput(" ", true));
@@ -15,7 +15,7 @@ public class EditorCompletionTriggerHelperTests
 	}
 
 	[TestMethod]
-	public void IsSingleCharacterLine_HandlesGeneralAndPredicateChecks()
+	public void IsSingleCharacterLine_ValidatesLengthAndCharacterPredicate()
 	{
 		Assert.IsTrue(EditorCompletionTriggerHelper.IsSingleCharacterLine("a"));
 		Assert.IsFalse(EditorCompletionTriggerHelper.IsSingleCharacterLine(string.Empty));

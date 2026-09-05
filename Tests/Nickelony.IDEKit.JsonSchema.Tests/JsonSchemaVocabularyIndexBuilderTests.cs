@@ -33,7 +33,7 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		// The unreferenced $defs entry is included even though no property references it.
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "only_in_defs"));
 
-		// $defs content reachable through a $ref from the root and from a definition.
+		// The path schema is reached through a $ref from the root and the legacy definition.
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "file"));
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "file_type"));
 
@@ -165,7 +165,7 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		Assert.IsTrue(result.Succeeded);
 		JsonSchemaVocabularyIndex index = result.Index!;
 
-		// External-reference content is reachable through the resolved $ref.
+		// The resolver supplies the referenced schema, whose properties and enum values are indexed.
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "file"));
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "file_type"));
 		Assert.IsTrue(index.Constants.Contains("level"));
@@ -195,13 +195,13 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 	}
 
 	[TestMethod]
-	public void Build_MalformedDefinitionEntry_IsSkippedWithDiagnostic()
+	public void Build_MalformedDefinitionEntry_ReportsDiagnostic()
 	{
 		JsonSchemaVocabularyIndexResult result = s_builder.Build(JSchema.Parse(MalformedDefinitionFixture));
 
 		Assert.IsTrue(result.Succeeded);
 
-		// The valid root property is still indexed, and the malformed definition produces one diagnostic.
+		// The valid root property remains indexed while the build reports one diagnostic.
 		Assert.IsTrue(result.Index!.Properties.Any(p => p.Name == "name"));
 		Assert.AreEqual(1, result.Diagnostics.Count);
 	}
@@ -246,9 +246,8 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		Assert.IsTrue(result.Succeeded);
 		JsonSchemaVocabularyIndex index = result.Index!;
 
-		// The root declares "shared" as a string with a root description; a reachable $defs
-		// declares the same name as an array with a different description. The root declaration
-		// is included because it appears first in the traversal.
+		// The root declaration is encountered before the same-named declaration in $defs, so its
+		// type and description are retained.
 		JsonSchemaVocabularyPropertyDescriptor descriptor = index.Properties.Single(p => p.Name == "shared");
 
 		Assert.AreEqual(1, index.Properties.Count(p => p.Name == "shared"));
@@ -264,9 +263,8 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		Assert.IsTrue(result.Succeeded);
 		JsonSchemaVocabularyIndex index = result.Index!;
 
-		// Properties declared at different nesting depths all appear flat in the single global
-		// vocabulary; the public result carries no path or location information. The container
-		// property is itself a vocabulary entry like any other.
+		// Nested properties are included in the flat vocabulary without their schema paths, and the
+		// container property is included as its own entry.
 		Assert.AreEqual(3, index.Properties.Count);
 		Assert.AreEqual("Root-level property.", index.Properties.Single(p => p.Name == "root_name").Description);
 		Assert.AreEqual("Nested property.", index.Properties.Single(p => p.Name == "nested_name").Description);
@@ -593,7 +591,7 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		""";
 
 	/// <summary>
-	/// Resolves external schema references from an in-memory URI-to-text map.
+	/// Supplies external schema text from an in-memory URI-to-text map.
 	/// </summary>
 	private sealed class InMemorySchemaResolver : JSchemaResolver
 	{

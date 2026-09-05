@@ -62,7 +62,7 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// Allows derived stores to react after a tracked document rename has completed.
 	/// </summary>
 	protected virtual void OnTrackedDocumentRenamed(TTrackedDocumentState state, bool contentChanged)
-	{ }
+		=> ArgumentNullException.ThrowIfNull(state);
 
 	private long GetNextAccessStamp() => ++_nextAccessStamp;
 }

@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
-/// Normalizes, compares, and rebases workspace document paths and identity keys.
+/// Normalizes, compares, and rebases workspace document paths.
 /// </summary>
 /// <remarks>
 /// The normalized full path is the store's document id. Path comparison and dictionary equality are

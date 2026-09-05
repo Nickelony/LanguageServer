@@ -1,28 +1,31 @@
 namespace Nickelony.IDEKit.AvalonEdit.Bookmarks;
 
 /// <summary>
-/// Persists the bookmarked line numbers of a document to a host-chosen store.
+/// Provides persistence operations for bookmarked line numbers.
 /// </summary>
 /// <remarks>
-/// The store contract is storage-agnostic: implementations may write a sidecar file next to the
-/// document (see <see cref="BookmarkSidecarStore"/>), a settings file, a workspace store, or a
-/// database. The <see cref="BookmarkCoordinator"/> itself performs no persistence; hosts supply
-/// a store when saving or restoring.
+/// The <see cref="BookmarkCoordinator"/> keeps bookmarks in memory; implementations decide how they are persisted.
 /// </remarks>
 public interface IBookmarkStore
 {
 	/// <summary>
-	/// Saves the bookmarked one-based line numbers for the document at the supplied path.
+	/// Saves one-based bookmark line numbers for the document at <paramref name="filePath"/>.
 	/// </summary>
-	/// <param name="filePath">The path of the document the bookmarks belong to.</param>
-	/// <param name="bookmarkedLineNumbers">The one-based line numbers to persist.</param>
-	/// <returns><see langword="true"/> when the bookmarks were persisted; otherwise, <see langword="false"/>.</returns>
+	/// <param name="filePath">The document path.</param>
+	/// <param name="bookmarkedLineNumbers">The one-based line numbers to save.</param>
+	/// <returns><see langword="true"/> if the save operation succeeds; otherwise, <see langword="false"/>.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/> or <paramref name="bookmarkedLineNumbers"/> is <see langword="null"/>.
+	/// </exception>
 	bool Save(string filePath, IReadOnlyList<int> bookmarkedLineNumbers);
 
 	/// <summary>
-	/// Restores the bookmarked one-based line numbers for the document at the supplied path.
+	/// Restores one-based bookmark line numbers for the document at <paramref name="filePath"/>.
 	/// </summary>
-	/// <param name="filePath">The path of the document the bookmarks belong to.</param>
-	/// <returns>The restored line numbers, or an empty list when none are stored.</returns>
+	/// <param name="filePath">The document path.</param>
+	/// <returns>The stored one-based line numbers, or an empty list if none are available.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/> is <see langword="null"/>.
+	/// </exception>
 	IReadOnlyList<int> Restore(string filePath);
 }

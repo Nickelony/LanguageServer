@@ -12,22 +12,23 @@ namespace Nickelony.LanguageServer.Abstractions;
 /// <remarks>
 /// This interface contains document lifecycle operations and IntelliSense features that are not specific to any
 /// single language. Language-specific concerns such as semantic tokens can be layered on top through narrower
-/// interfaces such as <c>ILuaIntelliSenseProvider</c>.
+/// interfaces.
 ///
 /// Implementations may raise callbacks from background threads. Consumers that access UI controls must marshal
-/// those callbacks to the UI thread. Once disposal begins, no further provider callbacks are raised.
-/// Implementations must make <see cref="IDisposable.Dispose"/> idempotent. A callback that was already admitted before
-/// disposal began may finish, but disposal closes callback admission before releasing provider-owned resources.
-/// <see cref="StartupFailed"/> reports when the provider cannot establish a usable server session, including a
-/// terminal missing-executable configuration; caller cancellation and provider disposal are not startup failures.
-/// <see cref="WorkspaceWatcherFailed"/> reports only watcher startup or recovery failures that leave external
-/// workspace forwarding unavailable. Transient watcher failures that recover automatically are intentionally silent.
+/// those callbacks to the UI thread. Disposal stops new callbacks from being admitted. A handler that is already
+/// running may finish, but disposal may stop delivery before all handlers in an admitted invocation have run.
+/// Event handlers for one invocation run serially on the raising thread; a failing handler is isolated from later
+/// handlers.
+/// Implementations must make <see cref="IDisposable.Dispose"/> idempotent. Disposal closes callback admission before
+/// releasing provider-owned resources.
+/// <see cref="StartupFailed"/> reports startup failures classified by the provider; caller cancellation and provider
+/// disposal are not startup failures. <see cref="WorkspaceWatcherFailed"/> reports watcher failures that leave
+/// external workspace forwarding unavailable; failures that recover automatically may be silent.
 ///
 /// For asynchronous request members, cancellation from the caller's <see cref="CancellationToken"/> propagates as
 /// <see cref="OperationCanceledException"/> and never becomes an ordinary empty or <see langword="null"/> result.
-/// Provider disposal, provider-enforced timeouts, and internal transport cancellation or failure use each member's
-/// documented fallback result instead. Unsupported capabilities likewise use their documented normal fallback and do
-/// not report caller cancellation.
+/// Provider disposal and provider-enforced timeouts use each member's documented fallback result. Unsupported
+/// capabilities likewise use their documented normal fallback and do not report caller cancellation.
 /// </remarks>
 public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditProvider, ITextReferencesProvider
 {
@@ -47,13 +48,10 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	LanguageServerProviderState State { get; }
 
 	/// <summary>
-	/// Occurs when diagnostics for a document have changed.
+	/// Occurs when the provider's cached diagnostics for a document are updated.
 	/// </summary>
 	/// <remarks>
-	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
-	/// controls. Handlers for one event invocation run serially on the raising thread; a failing handler is isolated from
-	/// later handlers. The diagnostics list is an owned immutable snapshot that remains valid after the callback returns.
-	/// Once disposal begins, this event will not be raised again.
+	/// The diagnostics list is an owned immutable snapshot that remains valid after the callback returns.
 	/// </remarks>
 	event Action<string, IReadOnlyList<TextEditorDiagnostic>>? DiagnosticsUpdated;
 
@@ -61,10 +59,8 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// Occurs when lazy startup, restart, or transport loss may have changed the negotiated capabilities.
 	/// </summary>
 	/// <remarks>
-	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before
-	/// touching controls. Handlers for one event invocation run serially on the raising thread and a failing handler is
-	/// isolated from later handlers. Consumers should reread <see cref="IsAvailable"/> and capability properties after
-	/// this event rather than caching capability values. Once disposal begins, this event will not be raised again.
+	/// Consumers should reread <see cref="IsAvailable"/> and capability properties after this event rather than caching
+	/// capability values.
 	/// </remarks>
 	event Action? CapabilitiesChanged;
 
@@ -72,9 +68,6 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// Occurs when the provider reports a language-server startup failure.
 	/// </summary>
 	/// <remarks>
-	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
-	/// controls. Handlers for one event invocation run serially on the raising thread and a failing handler is isolated
-	/// from later handlers. Once disposal begins, this event will not be raised again.
 	/// The event is raised at most once for each transient failure period and once for a terminal failure period. A
 	/// successful start clears the failure-notification suppression state.
 	/// </remarks>
@@ -84,12 +77,10 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// Occurs when the workspace file watcher cannot be started or recovered and external changes may no longer be forwarded.
 	/// </summary>
 	/// <remarks>
-	/// This callback may be raised from a background thread. UI consumers must marshal to the UI thread before touching
-	/// controls. Handlers for one event invocation run serially on the raising thread and a failing handler is isolated
-	/// from later handlers. Once disposal begins, this event will not be raised again.
-	/// Automatic watcher recovery is attempted first. A successful recovery does not raise this event; a missing workspace
-	/// root is treated as temporarily unavailable; an unresolved startup or recovery failure raises it once until a later
-	/// successful watcher recovery resets the notification state.
+	/// When a running watcher fails, automatic recovery is attempted first. Initial watcher startup reports an unresolved
+	/// startup failure directly because there is no existing watcher to recover. A successful recovery does not raise this
+	/// event; a missing workspace root is treated as temporarily unavailable; an unresolved startup or recovery failure
+	/// raises it once until a later successful watcher recovery resets the notification state.
 	/// </remarks>
 	event Action<WorkspaceWatcherFailure>? WorkspaceWatcherFailed;
 
@@ -106,8 +97,9 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <param name="content">The initial document content.</param>
 	/// <remarks>
-	/// Each valid call acquires one editor-open reference; repeated calls for the same path require matching calls to
-	/// <see cref="CloseDocument"/>. The provider normalizes the path and serializes operations for that document.
+	/// Each open request that reaches document synchronization acquires one editor-open reference. Repeated opens for
+	/// the same path require matching calls to <see cref="CloseDocument"/>. The provider normalizes the path and
+	/// serializes operations for that document.
 	/// </remarks>
 	void OpenDocument(string filePath, string content);
 
@@ -118,9 +110,9 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="content">The updated document content.</param>
 	/// <remarks>
 	/// This operation does not acquire an editor-open or request reference. When the language service is available,
-	/// an update may create a tracked, server-open document with no active references; that idle state is eligible for
-	/// request-only trimming. Updates after a close or rename are serialized against the affected path and can reopen
-	/// or update the resulting tracked document.
+	/// an update may cause the provider to track a document even when no editor has it open; that document can later be
+	/// removed automatically. Updates after a close or rename are serialized against the affected path and can reopen or
+	/// update the resulting tracked document.
 	/// </remarks>
 	void UpdateDocument(string filePath, string content);
 
@@ -130,9 +122,9 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <remarks>
 	/// Each call releases one editor-open reference when one exists. A repeated call after the state has already been
-	/// removed is a no-op; an explicitly idle, server-open record created by an update may also be cleaned up by close.
-	/// The document remains tracked while a request reference is active; otherwise the final cleanup removes the local
-	/// state, cached results, pending document work, and mirrored server document when it is safe to send the close.
+	/// removed is a no-op; a document tracked only by an update may also be cleaned up by close. The document remains
+	/// tracked while an IntelliSense request is using it; otherwise the final cleanup removes the local state, cached
+	/// results, pending document work, and mirrored server document when it is safe to send the close.
 	/// </remarks>
 	void CloseDocument(string filePath);
 
@@ -144,8 +136,8 @@ public interface ILanguageServerIntelliSenseProvider : IDisposable, ITextEditPro
 	/// <param name="content">The current document content.</param>
 	/// <remarks>
 	/// Unknown source paths, equivalent paths, and occupied destination paths are no-ops; they do not create or move
-	/// destination state. A successful rename preserves references and the tracked content. Cached language results are
-	/// preserved when the supplied content is unchanged and invalidated when the content changes.
+	/// destination state. A successful rename preserves references and uses the supplied content. Cached language
+	/// results are preserved when that content is unchanged and invalidated when it changes.
 	/// </remarks>
 	void RenameDocument(string oldFilePath, string newFilePath, string content);
 

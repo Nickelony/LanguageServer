@@ -43,7 +43,7 @@ public sealed class CompletionWindowCoordinator
 	public CompletionWindow? ActiveWindow => _window;
 
 	/// <summary>
-	/// Gets a value indicating whether a completion window is currently tracked.
+	/// Gets a value indicating whether a completion window is currently tracked, whether or not it is visible.
 	/// </summary>
 	public bool IsWindowOpen => _window is not null;
 

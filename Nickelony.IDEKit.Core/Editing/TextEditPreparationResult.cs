@@ -24,7 +24,7 @@ public sealed class TextEditPreparationResult
 	}
 
 	/// <summary>
-	/// Gets the prepared operations. This collection is empty when diagnostics exist.
+	/// Gets the prepared operations supplied to this result.
 	/// </summary>
 	public IReadOnlyList<TextEditOperation> Operations { get; }
 

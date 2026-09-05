@@ -4,8 +4,8 @@ namespace Nickelony.LanguageServer.Abstractions;
 /// Represents a single text replacement inside a document.
 /// </summary>
 /// <remarks>
-/// Text edits intentionally use <see cref="TextDocumentRange"/> rather than editor-specific segment types.
-/// They can be grouped by file in a <see cref="TextWorkspaceEdit"/> without carrying UI dependencies.
+/// The range uses line and column numbers so the edit can be passed between components without depending on a
+/// specific editor.
 /// </remarks>
 public sealed class TextEdit
 {
@@ -16,6 +16,9 @@ public sealed class TextEdit
 	/// <param name="newText">The replacement text.</param>
 	public TextEdit(TextDocumentRange range, string newText)
 	{
+		ArgumentNullException.ThrowIfNull(range);
+		ArgumentNullException.ThrowIfNull(newText);
+
 		Range = range;
 		NewText = newText;
 	}

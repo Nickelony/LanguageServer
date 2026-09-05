@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Core.Persistence.Tests;
 
 /// <summary>
-/// Tests for <see cref="SidecarLineFile"/> line-number persistence.
+/// Tests persisting and restoring line numbers with <see cref="SidecarLineFile"/>.
 /// </summary>
 [TestClass]
 public sealed class SidecarLineFileTests
@@ -16,7 +16,7 @@ public sealed class SidecarLineFileTests
 	[TestCleanup]
 	public void Cleanup()
 	{
-		// Best-effort removal of any temp directories created by the tests.
+		// Best-effort removal of test temporary directories.
 		foreach (string dir in Directory.GetDirectories(Path.GetTempPath(), "SidecarLineFileTests-*"))
 		{
 			try
@@ -93,7 +93,7 @@ public sealed class SidecarLineFileTests
 
 		IReadOnlyList<int> restored = SidecarLineFile.Restore(filePath);
 
-		// Non-numeric and non-positive entries are skipped; 1 and 2 are kept.
+		// Invalid and non-positive entries are ignored.
 		CollectionAssert.AreEqual(new[] { 1, 2 }, restored.ToArray());
 	}
 

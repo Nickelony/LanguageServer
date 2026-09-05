@@ -9,7 +9,10 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <returns>The current snapshot, or <see langword="null"/> when the document is not tracked.</returns>
 	public DocumentSnapshot? GetDocumentSnapshot(string filePath)
-		=> WithTrackedDocument(filePath, static state => state.CreateSnapshot(), default);
+	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		return WithTrackedDocument(filePath, static state => state.CreateSnapshot(), default);
+	}
 
 	/// <summary>
 	/// Gets snapshots for all documents that are currently considered open.
@@ -53,6 +56,9 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <returns>The callback result, or <paramref name="defaultValue"/> when no document is tracked.</returns>
 	protected TResult WithTrackedDocument<TResult>(string filePath, Func<TTrackedDocumentState, TResult> accessTrackedDocument, TResult defaultValue)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(accessTrackedDocument);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)
@@ -70,6 +76,9 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="mutateTrackedDocument">The callback to execute when the document exists.</param>
 	protected void WithTrackedDocument(string filePath, Action<TTrackedDocumentState> mutateTrackedDocument)
 	{
+		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentNullException.ThrowIfNull(mutateTrackedDocument);
+
 		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
 
 		lock (_syncRoot)

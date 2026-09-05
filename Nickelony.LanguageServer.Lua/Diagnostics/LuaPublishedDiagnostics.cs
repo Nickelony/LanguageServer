@@ -3,7 +3,7 @@ using Nickelony.IDEKit.IntelliSense.Diagnostics;
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Represents a diagnostics payload published by LuaLS for a specific document version.
+/// Represents a diagnostics payload published by LuaLS for a document, optionally associated with a document version.
 /// </summary>
 internal sealed class LuaPublishedDiagnostics
 {

@@ -1,19 +1,19 @@
 namespace Nickelony.IDEKit.AvalonEdit.Diagnostics;
 
 /// <summary>
-/// Describes the severity of a diagnostic segment rendered by <see cref="DiagnosticsRenderer"/>.
+/// Specifies the severity and underline style of a diagnostic segment.
 /// </summary>
 public enum TextDiagnosticSeverity
 {
-	/// <summary>The segment represents an error.</summary>
+	/// <summary>Uses the error underline style.</summary>
 	Error = 0,
 
-	/// <summary>The segment represents a warning.</summary>
+	/// <summary>Uses the warning underline style.</summary>
 	Warning = 1,
 
-	/// <summary>The segment represents informational content.</summary>
+	/// <summary>Uses the informational underline style.</summary>
 	Information = 2,
 
-	/// <summary>The segment represents a hint.</summary>
+	/// <summary>Uses the dashed hint underline style.</summary>
 	Hint = 3
 }

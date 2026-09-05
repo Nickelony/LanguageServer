@@ -491,7 +491,7 @@ public partial class LanguageServerClientTests
 	}
 
 	[TestMethod]
-	public void LanguageServerClientOptions_RejectsNonPositiveTimeouts()
+	public void LanguageServerClientOptions_RejectsInvalidTimeoutValues()
 	{
 		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new LanguageServerClientOptions(static () => new { })
 		{

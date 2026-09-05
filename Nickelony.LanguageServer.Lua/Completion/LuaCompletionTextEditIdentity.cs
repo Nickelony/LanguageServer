@@ -4,7 +4,7 @@ using Nickelony.IDEKit.IntelliSense.Completion;
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Normalizes the visible insert and replace ranges that participate in completion-item duplicate detection.
+/// Normalizes the text-edit ranges used for completion-item duplicate detection.
 /// </summary>
 /// <param name="InsertRange">The insert range, when present.</param>
 /// <param name="ReplaceRange">The replace range, when present.</param>

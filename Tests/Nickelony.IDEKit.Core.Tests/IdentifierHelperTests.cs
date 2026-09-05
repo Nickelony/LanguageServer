@@ -44,7 +44,7 @@ public sealed class IdentifierHelperTests
 	}
 
 	[TestMethod]
-	public void GetPrefix_OutOfRangeOrStartCaret_ReturnsEmpty()
+	public void GetPrefix_PastEndOrAtStart_ReturnsEmpty()
 	{
 		Assert.AreEqual(string.Empty, IdentifierHelper.GetPrefix("Beta", 5));
 		Assert.AreEqual(string.Empty, IdentifierHelper.GetPrefix("Beta", 0));

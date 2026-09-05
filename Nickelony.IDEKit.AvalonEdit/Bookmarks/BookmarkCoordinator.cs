@@ -4,9 +4,10 @@ using Nickelony.IDEKit.AvalonEdit.Documents;
 namespace Nickelony.IDEKit.AvalonEdit.Bookmarks;
 
 /// <summary>
-/// Tracks bookmarks as document anchors and resolves adjacent bookmarked lines for navigation.
-/// Persistence of the bookmark set is a host concern and is not performed by this coordinator.
+/// Manages bookmarks within an AvalonEdit <see cref="TextDocument"/>,
+/// allowing toggling, navigation, and restoration of bookmarks.
 /// </summary>
+/// <remarks>Bookmark persistence is the host's responsibility.</remarks>
 public sealed class BookmarkCoordinator
 {
 	private readonly Func<TextDocument> _documentProvider;
@@ -16,27 +17,31 @@ public sealed class BookmarkCoordinator
 	/// <summary>
 	/// Initializes a new instance of the <see cref="BookmarkCoordinator"/> class.
 	/// </summary>
-	/// <param name="documentProvider">Provides the document the bookmarks belong to.</param>
+	/// <param name="documentProvider">Provides the AvalonEdit <see cref="TextDocument"/> used for bookmark operations.</param>
 	/// <param name="onBookmarksChanged">
-	/// The callback invoked when the bookmark set changes, or <see langword="null"/> for none.
+	/// Invoked after <see cref="ToggleBookmark"/> changes a bookmark or <see cref="Clear"/> is called.
+	/// Passing <see langword="null"/> disables the callback.
 	/// </param>
+	/// <exception cref="ArgumentNullException"><paramref name="documentProvider"/> is <see langword="null"/>.</exception>
 	public BookmarkCoordinator(Func<TextDocument> documentProvider, Action? onBookmarksChanged = null)
 	{
+		ArgumentNullException.ThrowIfNull(documentProvider);
+
 		_documentProvider = documentProvider;
 		_onBookmarksChanged = onBookmarksChanged;
 	}
 
 	/// <summary>
-	/// Gets the bookmarked lines, sorted by line number.
+	/// Gets the bookmarked document lines in ascending line-number order.
 	/// </summary>
 	public IReadOnlyList<DocumentLine> GetBookmarkedLines()
 		=> CollectBookmarkedLines(GetDocument());
 
 	/// <summary>
-	/// Toggles a bookmark on the line containing the supplied offset.
+	/// Adds or removes the bookmark on the line containing the specified offset.
 	/// </summary>
 	/// <param name="caretOffset">
-	/// The document offset whose line is toggled. Values outside the document are clamped.
+	/// The zero-based document offset used to locate the line. Values outside the document are clamped.
 	/// </param>
 	public void ToggleBookmark(int caretOffset)
 	{
@@ -57,22 +62,31 @@ public sealed class BookmarkCoordinator
 	}
 
 	/// <summary>
-	/// Gets the first bookmarked line after the line containing the supplied offset, wrapping to the first bookmark.
+	/// Gets the first bookmarked line after the line containing the offset,
+	/// wrapping to the first bookmark in the document when necessary.
 	/// </summary>
-	/// <param name="caretOffset">The document offset of the current position.</param>
+	/// <param name="caretOffset">
+	/// The zero-based document offset whose containing line is the starting point. Values outside the document are clamped.
+	/// </param>
+	/// <returns>The next bookmarked line, or <see langword="null"/> if none exist.</returns>
 	public DocumentLine? GetNextBookmarkLine(int caretOffset)
 		=> GetAdjacentBookmarkLine(caretOffset, findNext: true);
 
 	/// <summary>
-	/// Gets the last bookmarked line before the line containing the supplied offset, wrapping to the last bookmark.
+	/// Gets the last bookmarked line before the line containing the offset,
+	/// wrapping to the last bookmark in the document when necessary.
 	/// </summary>
-	/// <param name="caretOffset">The document offset of the current position.</param>
+	/// <param name="caretOffset">
+	/// The zero-based document offset whose containing line is the starting point. Values outside the document are clamped.
+	/// </param>
+	/// <returns>The previous bookmarked line, or <see langword="null"/> if none exist.</returns>
 	public DocumentLine? GetPreviousBookmarkLine(int caretOffset)
 		=> GetAdjacentBookmarkLine(caretOffset, findNext: false);
 
 	/// <summary>
 	/// Removes all bookmarks.
 	/// </summary>
+	/// <remarks>Invokes the change callback when supplied, even when no bookmarks exist.</remarks>
 	public void Clear()
 	{
 		_bookmarkAnchors.Clear();
@@ -80,15 +94,16 @@ public sealed class BookmarkCoordinator
 	}
 
 	/// <summary>
-	/// Replaces the current bookmarks with the bookmarks at the supplied one-based line numbers.
-	/// Line numbers outside the document are ignored.
+	/// Replaces the current bookmarks with bookmarks for the supplied one-based line numbers.
+	/// Line numbers outside the document and duplicate entries are ignored.
 	/// </summary>
-	/// <remarks>
-	/// Restoring bookmarks does not invoke the <c>onBookmarksChanged</c> callback supplied to the constructor.
-	/// </remarks>
+	/// <remarks>Does not invoke the change callback.</remarks>
 	/// <param name="lineNumbers">The one-based line numbers to bookmark.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="lineNumbers"/> is <see langword="null"/>.</exception>
 	public void Restore(IEnumerable<int> lineNumbers)
 	{
+		ArgumentNullException.ThrowIfNull(lineNumbers);
+
 		_bookmarkAnchors.Clear();
 
 		TextDocument document = GetDocument();

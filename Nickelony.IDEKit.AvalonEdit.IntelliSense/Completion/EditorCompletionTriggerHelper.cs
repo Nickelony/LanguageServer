@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Completion;
 
 /// <summary>
-/// Provides the shared heuristics used to decide when completion should trigger.
+/// Provides predicates for common editor completion triggers.
 /// </summary>
 public static class EditorCompletionTriggerHelper
 {
@@ -29,5 +29,8 @@ public static class EditorCompletionTriggerHelper
 	/// <param name="characterPredicate">The predicate the single character must satisfy.</param>
 	/// <returns><see langword="true"/> when the line is a single matching character; otherwise, <see langword="false"/>.</returns>
 	public static bool IsSingleCharacterLine(string? currentLineText, Func<char, bool> characterPredicate)
-		=> currentLineText?.Length == 1 && characterPredicate(currentLineText[0]);
+	{
+		ArgumentNullException.ThrowIfNull(characterPredicate);
+		return currentLineText?.Length == 1 && characterPredicate(currentLineText[0]);
+	}
 }

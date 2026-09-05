@@ -72,20 +72,20 @@ public interface ILanguageServerClient : IDisposable, IAsyncDisposable
 	bool SupportsSemanticTokensDelta { get; }
 
 	/// <summary>
-	/// Occurs when the server publishes diagnostics for a tracked document.
-	/// Each subscribed handler is queued independently on the thread pool. Reentrant notifications for the same handler
+	/// Occurs when the server publishes diagnostics for a document URI.
+	/// Each subscribed handler runs independently on the thread pool. Reentrant notifications for the same handler
 	/// are serialized, and repeated pending diagnostics for the same document may coalesce to the latest payload while a handler is still busy.
 	/// Different handlers may run concurrently, handler failures are isolated, and each handler receives an owned detached
-	/// diagnostics snapshot. The event may be raised on a background thread; consumers must marshal to a UI thread when required.
+	/// diagnostics snapshot. Handlers run on background threads; consumers must marshal to a UI thread when required.
 	/// </summary>
 	event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
 
 	/// <summary>
 	/// Occurs when the server requests a semantic token refresh for open documents.
-	/// Each subscribed handler is queued independently on the thread pool. Reentrant notifications for the same handler
+	/// Each subscribed handler runs independently on the thread pool. Reentrant notifications for the same handler
 	/// are serialized, and repeated pending refresh requests may coalesce while a handler is still busy.
-	/// Different handlers may run concurrently, and handler failures are isolated. The event may be raised on a background
-	/// thread; consumers must marshal to a UI thread when required.
+	/// Different handlers may run concurrently, and handler failures are isolated. Handlers run on background threads;
+	/// consumers must marshal to a UI thread when required.
 	/// </summary>
 	event Action? SemanticTokensRefreshRequested;
 

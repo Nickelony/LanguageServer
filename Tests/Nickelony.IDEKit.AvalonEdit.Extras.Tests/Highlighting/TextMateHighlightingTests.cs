@@ -5,7 +5,7 @@ using System.Windows.Media;
 namespace Nickelony.IDEKit.AvalonEdit.Extras.Tests;
 
 /// <summary>
-/// Tests for TextMate line tracking and theme style resolution.
+/// Tests line tracking through document changes and theme foreground colors from selectors.
 /// </summary>
 [TestClass]
 public class TextMateHighlightingTests

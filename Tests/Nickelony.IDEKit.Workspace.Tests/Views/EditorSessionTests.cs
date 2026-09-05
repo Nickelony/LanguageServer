@@ -4,6 +4,14 @@ using Nickelony.IDEKit.Workspace.Views;
 
 namespace Nickelony.IDEKit.Workspace.Tests;
 
+/// <summary>
+/// Tests <see cref="EditorSession"/> disposal, identity, view ownership, and editor restoration
+/// behavior.
+/// </summary>
+/// <remarks>
+/// Callback counters and return values make view closing and previous-editor activation observable
+/// without creating a real editor view.
+/// </remarks>
 [TestClass]
 public sealed class EditorSessionTests
 {

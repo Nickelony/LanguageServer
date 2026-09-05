@@ -10,7 +10,7 @@ public enum EditorSessionMode
 	/// <summary>The leased view stays open after the session ends.</summary>
 	Persistent,
 
-	/// <summary>The leased view is closed when the session ends.</summary>
+	/// <summary>An acquired view is closed when the session ends.</summary>
 	Transient
 }
 
@@ -70,8 +70,8 @@ public enum EditorSessionOpenStatus
 /// Opens and leases an editor view for a workspace document snapshot.
 /// </summary>
 /// <remarks>
-/// Implementations may reuse an existing view. The returned session records whether the view was
-/// newly acquired so transient disposal does not close a view owned by another caller.
+/// Implementations may reuse an existing view. The returned session ensures that transient disposal
+/// closes only a view newly acquired for that session, not a view owned by another caller.
 /// </remarks>
 public interface IEditorViewHost
 {
@@ -114,10 +114,15 @@ public sealed class EditorSession : IEditorSession
 		Func<bool> closeView,
 		Action activateEditor)
 	{
+		ArgumentNullException.ThrowIfNull(snapshot);
+		ArgumentNullException.ThrowIfNull(closeView);
+		ArgumentNullException.ThrowIfNull(activateEditor);
+
 		_snapshot = snapshot;
 		_acquiredView = acquiredView;
 		_closeView = closeView;
 		_activateEditor = activateEditor;
+
 		Mode = mode;
 	}
 

@@ -1,8 +1,7 @@
 namespace Nickelony.IDEKit.KeyBindings.Tests;
 
 /// <summary>
-/// Command identifiers used to exercise key binding dispatch and service
-/// behavior with a representative set of commands.
+/// Command identifiers used by the key binding tests.
 /// </summary>
 public enum TestCommand
 {

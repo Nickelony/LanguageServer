@@ -9,9 +9,12 @@ public abstract partial class TrackedDocumentStore<TTrackedDocumentState>
 	/// <param name="oldFilePath">The current local file path.</param>
 	/// <param name="newFilePath">The replacement local file path.</param>
 	/// <param name="content">The latest editor content.</param>
-	/// <returns>The rename request that should be mirrored to the server, or <see langword="null"/> when no document was tracked.</returns>
+	/// <returns>The rename request that should be mirrored to the server, or <see langword="null"/> when the paths are equivalent, the source is not tracked, or the destination is already tracked.</returns>
 	public DocumentRenameRequest? Rename(string oldFilePath, string newFilePath, string? content = null)
 	{
+		ArgumentNullException.ThrowIfNull(oldFilePath);
+		ArgumentNullException.ThrowIfNull(newFilePath);
+
 		string normalizedOldFilePath = LanguageServerPathHelper.NormalizeLocalPath(oldFilePath);
 		string normalizedNewFilePath = LanguageServerPathHelper.NormalizeLocalPath(newFilePath);
 

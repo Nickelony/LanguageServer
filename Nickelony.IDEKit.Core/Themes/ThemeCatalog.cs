@@ -4,10 +4,10 @@ namespace Nickelony.IDEKit.Core.Themes;
 
 /// <summary>
 /// Resolves named themes from a preloaded collection, supporting name and alias lookups, a
-/// configured default selection, and deterministic ordering with malformed-entry isolation.
-/// Themes whose names match the configured default are ordered first; the remainder are ordered
-/// by name. Every usable theme is resolvable by its name, and aliases are also indexed, using an
-/// ordinal, case-insensitive comparison.
+/// configured default selection, and deterministic ordering. Themes with blank names are skipped;
+/// a theme whose name matches the configured default is ordered first, and the remainder are
+/// ordered by name. Names and nonblank aliases are indexed with an ordinal, case-insensitive
+/// comparison; the first theme wins when lookup names collide.
 /// </summary>
 /// <typeparam name="TTheme">The theme type carried by the catalog.</typeparam>
 public sealed class ThemeCatalog<TTheme>
@@ -28,7 +28,7 @@ public sealed class ThemeCatalog<TTheme>
 	/// <paramref name="defaultThemeName"/> is null.
 	/// </exception>
 	/// <exception cref="ArgumentException">
-	/// No theme with a usable name remains after malformed entries are isolated.
+	/// No theme with a nonblank name remains after filtering.
 	/// </exception>
 	public ThemeCatalog(
 		IEnumerable<TTheme> themes,
@@ -84,8 +84,8 @@ public sealed class ThemeCatalog<TTheme>
 	public IReadOnlyDictionary<string, TTheme> ThemesByLookupName => _themesByLookupName;
 
 	/// <summary>
-	/// Gets the theme selected by the configured default name, or the first ordered theme when
-	/// the configured selection does not exist.
+	/// Gets the theme selected by the configured default name or alias, or the first ordered theme
+	/// when the configured selection does not exist.
 	/// </summary>
 	public TTheme DefaultTheme => _defaultTheme;
 
@@ -95,7 +95,7 @@ public sealed class ThemeCatalog<TTheme>
 	/// <param name="nameOrAlias">The theme name or alias to resolve.</param>
 	/// <param name="theme">The resolved theme when found.</param>
 	/// <returns><see langword="true"/> when a theme matched; otherwise, <see langword="false"/>.</returns>
-	public bool TryGetTheme(string nameOrAlias, [MaybeNullWhen(false)] out TTheme theme)
+	public bool TryGetTheme(string? nameOrAlias, [MaybeNullWhen(false)] out TTheme? theme)
 	{
 		if (string.IsNullOrWhiteSpace(nameOrAlias))
 		{
@@ -112,7 +112,10 @@ public sealed class ThemeCatalog<TTheme>
 	/// <param name="nameOrAlias">The theme name or alias to resolve.</param>
 	/// <returns>The resolved theme, or the default theme.</returns>
 	public TTheme GetTheme(string nameOrAlias)
-		=> TryGetTheme(nameOrAlias, out TTheme? theme) && theme is not null ? theme : DefaultTheme;
+	{
+		ArgumentNullException.ThrowIfNull(nameOrAlias);
+		return TryGetTheme(nameOrAlias, out TTheme? theme) && theme is not null ? theme : DefaultTheme;
+	}
 
 	private static void AddLookupName(Dictionary<string, TTheme> themesByLookupName, string lookupName, TTheme theme)
 	{

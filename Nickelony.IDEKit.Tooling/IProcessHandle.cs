@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Tooling;
 
 /// <summary>
-/// Represents a started external process and provides operations for waiting, termination, and output access.
+/// Represents a started external process and provides operations for waiting, requesting termination, and reading output.
 /// </summary>
 /// <remarks>
 /// The caller owns the handle and must dispose it when it is no longer needed. Disposing the handle releases
@@ -60,10 +60,10 @@ public interface IProcessHandle : IDisposable
 	void Kill();
 
 	/// <summary>
-	/// Requests termination of the process and its child process tree.
+	/// Requests termination of the process and its descendants.
 	/// </summary>
 	/// <remarks>
-	/// This method does not wait for the process to exit. Tree termination may not be supported for every process.
+	/// This method does not wait for the process to exit. Terminating descendants may not be supported for every process.
 	/// </remarks>
 	void KillEntireProcessTree();
 }
