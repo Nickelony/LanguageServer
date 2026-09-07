@@ -29,7 +29,7 @@ internal static class ProcessJobObject
 		=> s_logger = logger ?? NullLogger.Instance;
 
 	/// <summary>
-	/// Attempts to assign the supplied process to the shared kill-on-close Windows job object.
+	/// Tries to assign the supplied process to the shared kill-on-close Windows job object.
 	/// </summary>
 	/// <param name="process">The process to attach.</param>
 	public static void TryAssignProcess(Process process)

@@ -66,6 +66,8 @@ public sealed class UnsavedChangesTracker : IChangeMarkerSource
 	public IReadOnlyList<DocumentLine> GetMarkedLines()
 	{
 		TextDocument document = _documentProvider();
+		ArgumentNullException.ThrowIfNull(document);
+
 		string currentText = document.Text;
 
 		if (_cachedLines is not null && string.Equals(_cachedText, currentText, StringComparison.Ordinal))

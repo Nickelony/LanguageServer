@@ -4,10 +4,6 @@ using Nickelony.IDEKit.Core.Text;
 
 namespace Nickelony.IDEKit.AvalonEdit.Tests;
 
-/// <summary>
-/// Tests that <see cref="TextDocumentSnapshot"/> captures document content, line information,
-/// and file name without observing later edits to the AvalonEdit document.
-/// </summary>
 [TestClass]
 public sealed class TextDocumentSnapshotTests
 {
@@ -55,8 +51,10 @@ public sealed class TextDocumentSnapshotTests
 	[TestMethod]
 	public void Snapshot_CapturesFileNameAtConstruction()
 	{
-		var document = new TextDocument("text");
-		document.FileName = @"C:\path\original.txt";
+		var document = new TextDocument("text")
+		{
+			FileName = @"C:\path\original.txt"
+		};
 
 		var snapshot = new TextDocumentSnapshot(document);
 

@@ -127,7 +127,7 @@ public sealed class UnsavedChangesTrackerTests
 
 		IReadOnlyList<DocumentLine> lines = tracker.GetMarkedLines();
 
-		Assert.AreEqual(2, lines.Count);
+		Assert.HasCount(2, lines);
 		Assert.AreEqual(2, lines[0].LineNumber);
 		Assert.AreEqual(4, lines[1].LineNumber);
 	}
@@ -148,7 +148,7 @@ public sealed class UnsavedChangesTrackerTests
 
 	private static void AssertLineNumbers(UnsavedChangesTracker tracker, int[] expected)
 	{
-		int[] actual = tracker.GetMarkedLines().Select(line => line.LineNumber).ToArray();
-		CollectionAssert.AreEqual(expected, actual);
+		int[] actual = [.. tracker.GetMarkedLines().Select(line => line.LineNumber)];
+		Assert.AreSequenceEqual(expected, actual);
 	}
 }

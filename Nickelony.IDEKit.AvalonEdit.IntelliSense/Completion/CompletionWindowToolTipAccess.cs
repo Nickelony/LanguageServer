@@ -16,7 +16,7 @@ public static class CompletionWindowToolTipAccess
 		typeof(CompletionWindow).GetField("toolTip", BindingFlags.NonPublic | BindingFlags.Instance));
 
 	/// <summary>
-	/// Attempts to retrieve the tooltip associated with the completion window.
+	/// Tries to retrieve the tooltip associated with the completion window.
 	/// </summary>
 	/// <param name="completionWindow">The completion window whose tooltip is requested.</param>
 	/// <param name="toolTip">The resolved tooltip when available.</param>

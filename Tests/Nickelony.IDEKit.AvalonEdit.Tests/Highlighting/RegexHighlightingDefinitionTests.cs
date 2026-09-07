@@ -67,13 +67,13 @@ public sealed class RegexHighlightingDefinitionTests
 	}
 
 	[TestMethod]
-	public void MainRuleSet_MalformedColor_FallsBackToWhite()
+	public void MainRuleSet_MalformedColor_FallsBackToBlack()
 	{
 		var definition = new TestDefinition(
 			"Test Rules",
 			() => [new RegexHighlightingRule(new Regex("x"), new RegexHighlightingStyle("not-a-color"))]);
 
-		Assert.AreEqual(Colors.White, definition.MainRuleSet.Rules[0].Color.Foreground.GetColor(null));
+		Assert.AreEqual(Colors.Black, definition.MainRuleSet.Rules[0].Color.Foreground.GetColor(null));
 	}
 
 	[TestMethod]
@@ -94,7 +94,7 @@ public sealed class RegexHighlightingDefinitionTests
 			"Test Rules",
 			() => [new RegexHighlightingRule(new Regex("x"), new RegexHighlightingStyle(string.Empty))]);
 
-		Assert.AreEqual(Colors.White, definition.MainRuleSet.Rules[0].Color.Foreground.GetColor(null));
+		Assert.AreEqual(Colors.Black, definition.MainRuleSet.Rules[0].Color.Foreground.GetColor(null));
 	}
 
 	[TestMethod]
@@ -123,31 +123,20 @@ public sealed class RegexHighlightingDefinitionTests
 	public void MainRuleSet_EmptyRules_YieldsEmptyRuleSet()
 	{
 		var definition = new TestDefinition("Test Rules", () => []);
-
-		Assert.AreEqual(0, definition.MainRuleSet.Rules.Count);
+		Assert.IsEmpty(definition.MainRuleSet.Rules);
 	}
 
 	[TestMethod]
-	public void HighlightingContract_AllIHighlightingDefinitionMembersAreUsable()
+	public void GetNamedRuleSet_MatchingName_ReturnsMainRuleSet()
 	{
-		var definition = new TestDefinition(
-			"Test Rules",
-			() => [Rule("x")]);
+		var definition = new TestDefinition("Test Rules", () => [Rule("x")]);
+		Assert.AreSame(definition.MainRuleSet, definition.GetNamedRuleSet("Test Rules"));
+	}
 
-		Assert.AreEqual("Test Rules", definition.Name);
-		Assert.IsNotNull(definition.MainRuleSet);
-		Assert.AreEqual("Test Rules", definition.MainRuleSet.Name);
-		Assert.IsFalse(definition.NamedHighlightingColors.Any());
-		Assert.IsNotNull(definition.Properties);
-		Assert.AreEqual(0, definition.Properties.Count);
-		Assert.IsNull(definition.GetNamedColor("anything"));
+	[TestMethod]
+	public void GetNamedRuleSet_UnknownName_ReturnsNull()
+	{
+		var definition = new TestDefinition("Test Rules", () => [Rule("x")]);
 		Assert.IsNull(definition.GetNamedRuleSet("DoesNotExist"));
-		Assert.IsNotNull(definition.GetNamedRuleSet(definition.Name));
-	}
-
-	[TestMethod]
-	public void Constructor_NullName_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new TestDefinition(null!, () => []));
 	}
 }

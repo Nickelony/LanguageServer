@@ -14,9 +14,9 @@ public static class TextSegmentFactory
 	/// </summary>
 	/// <remarks>
 	/// For a non-empty document, empty or reversed ranges become a segment of length <c>1</c> at the
-	/// nearest valid character offset. A <see langword="null"/> or empty document produces no segment.
+	/// nearest valid character offset. An empty document produces no segment.
 	/// </remarks>
-	/// <param name="document">The document whose character range constrains the offsets, or <see langword="null"/>.</param>
+	/// <param name="document">The document whose character range constrains the offsets.</param>
 	/// <param name="startOffset">The zero-based inclusive start offset before clamping.</param>
 	/// <param name="endOffset">The zero-based exclusive end offset before clamping.</param>
 	/// <param name="segment">
@@ -24,24 +24,24 @@ public static class TextSegmentFactory
 	/// </param>
 	/// <returns>
 	/// <see langword="true"/> when a segment is created;
-	/// <see langword="false"/> for a <see langword="null"/> or empty document.
+	/// <see langword="false"/> when the document is empty.
 	/// </returns>
+	/// <exception cref="ArgumentNullException"><paramref name="document"/> is <see langword="null"/>.</exception>
 	public static bool TryCreate(
-		TextDocument? document,
+		TextDocument document,
 		int startOffset,
 		int endOffset,
 		[NotNullWhen(true)] out TextSegment? segment)
 	{
+		ArgumentNullException.ThrowIfNull(document);
+
 		segment = null;
 
-		if (document is null || document.TextLength == 0)
+		if (document.TextLength == 0)
 			return false;
 
 		int safeStartOffset = Math.Max(0, Math.Min(startOffset, document.TextLength - 1));
 		int safeEndOffset = Math.Max(safeStartOffset + 1, Math.Min(endOffset, document.TextLength));
-
-		if (safeEndOffset <= safeStartOffset)
-			return false;
 
 		segment = new TextSegment
 		{

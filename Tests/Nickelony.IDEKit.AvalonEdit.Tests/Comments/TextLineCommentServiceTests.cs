@@ -24,6 +24,7 @@ public sealed class TextLineCommentServiceTests
 			out TextLineCommentEdit edit);
 
 		Assert.IsTrue(success);
+
 		document.Replace(edit.ReplaceOffset, edit.ReplaceLength, edit.ReplacementText);
 		Assert.AreEqual("//first" + Environment.NewLine + "  //second" + Environment.NewLine, document.Text);
 	}
@@ -43,6 +44,7 @@ public sealed class TextLineCommentServiceTests
 			out TextLineCommentEdit edit);
 
 		Assert.IsTrue(success);
+
 		document.Replace(edit.ReplaceOffset, edit.ReplaceLength, edit.ReplacementText);
 		Assert.AreEqual("first" + Environment.NewLine + "  second" + Environment.NewLine, document.Text);
 	}
@@ -62,7 +64,9 @@ public sealed class TextLineCommentServiceTests
 			out TextLineCommentEdit edit);
 
 		Assert.IsTrue(success);
+
 		document.Replace(edit.ReplaceOffset, edit.ReplaceLength, edit.ReplacementText);
+
 		Assert.AreEqual(
 			"//first" + Environment.NewLine + "   " + Environment.NewLine + "//third" + Environment.NewLine,
 			document.Text);
@@ -83,6 +87,7 @@ public sealed class TextLineCommentServiceTests
 			out TextLineCommentEdit edit);
 
 		Assert.IsTrue(success);
+
 		document.Replace(edit.ReplaceOffset, edit.ReplaceLength, edit.ReplacementText);
 		Assert.AreEqual("first" + Environment.NewLine + "second" + Environment.NewLine, document.Text);
 	}
@@ -137,6 +142,7 @@ public sealed class TextLineCommentServiceTests
 			out TextLineCommentEdit edit);
 
 		Assert.IsTrue(success);
+
 		Assert.AreEqual(0, edit.ReplaceOffset);
 		Assert.AreEqual(document.TextLength, edit.ReplaceLength);
 		Assert.AreEqual("//first" + Environment.NewLine + "//second" + Environment.NewLine, edit.ReplacementText);
@@ -156,6 +162,7 @@ public sealed class TextLineCommentServiceTests
 			service.ApplyEdit(editor, s_doubleSlashSyntax, TextLineCommentAction.Comment);
 
 			string expected = "//first" + Environment.NewLine + "  //second" + Environment.NewLine;
+
 			Assert.AreEqual(expected, editor.Text);
 			Assert.AreEqual(0, editor.SelectionStart);
 			Assert.AreEqual(expected.TrimEnd('\r', '\n'), editor.SelectedText);

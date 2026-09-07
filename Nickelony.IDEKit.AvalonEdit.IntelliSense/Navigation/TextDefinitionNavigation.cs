@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.IntelliSense.Hover;
@@ -6,7 +7,7 @@ using Nickelony.IDEKit.IntelliSense.Navigation;
 namespace Nickelony.IDEKit.AvalonEdit.IntelliSense.Navigation;
 
 /// <summary>
-/// Executes go-to-definition navigation for AvalonEdit editors using IntelliSense hover and
+/// Executes go-to-definition navigation for AvalonEdit <see cref="TextEditor"/> instances using IntelliSense hover and
 /// definition providers.
 /// </summary>
 public static class TextDefinitionNavigation
@@ -20,7 +21,7 @@ public static class TextDefinitionNavigation
 	/// <param name="offset">The zero-based document offset to resolve, including the offset at the end of the document.</param>
 	/// <returns><see langword="true"/> when a definition location was found and its line was selected; otherwise, <see langword="false"/>.</returns>
 	public static bool TryGoToDefinition(
-		this ICSharpCode.AvalonEdit.TextEditor textEditor,
+		this TextEditor textEditor,
 		ITextDefinitionProvider definitionProvider,
 		ITextHoverProvider hoverProvider,
 		int offset)
@@ -49,7 +50,7 @@ public static class TextDefinitionNavigation
 	/// <param name="identifyingObject">The optional discriminator for resolving the symbol's definition.</param>
 	/// <returns><see langword="true"/> when a definition location was found and its line was selected; otherwise, <see langword="false"/>.</returns>
 	public static bool TryGoToObject(
-		this ICSharpCode.AvalonEdit.TextEditor textEditor,
+		this TextEditor textEditor,
 		ITextDefinitionProvider definitionProvider,
 		string? objectName,
 		TextDefinitionDiscriminator? identifyingObject)

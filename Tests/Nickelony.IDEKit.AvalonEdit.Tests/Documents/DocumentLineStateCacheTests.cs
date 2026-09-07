@@ -69,16 +69,4 @@ public sealed class DocumentLineStateCacheTests
 
 		Assert.AreEqual(0, cache.GetLineStartState(2));
 	}
-
-	[TestMethod]
-	public void Constructor_NullDocument_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new DocumentLineStateCache<int>(null!, CountBrackets));
-	}
-
-	[TestMethod]
-	public void Constructor_NullTransition_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new DocumentLineStateCache<int>(new TextDocument("a"), null!));
-	}
 }

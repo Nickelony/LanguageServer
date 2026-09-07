@@ -26,7 +26,7 @@ public interface IWorkspaceDocumentStore : IAsyncDisposable
 	/// <remarks>The result is ordered by normalized document id and is empty for an invalid directory path.</remarks>
 	IReadOnlyList<WorkspaceDocumentSnapshot> GetSnapshotsUnderDirectory(string directoryPath);
 
-	/// <summary>Attempts to get a tracked document snapshot by path.</summary>
+	/// <summary>Tries to get a tracked document snapshot by path.</summary>
 	/// <returns><see langword="true"/> and the current snapshot when the path is tracked; otherwise <see langword="false"/> and <see langword="null"/>.</returns>
 	bool TryGetSnapshot(string? filePath, out WorkspaceDocumentSnapshot? snapshot);
 

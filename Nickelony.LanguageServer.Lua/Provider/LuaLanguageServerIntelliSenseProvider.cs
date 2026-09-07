@@ -284,9 +284,9 @@ public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliS
 	private static WorkspaceFileWatcher CreateWorkspaceFileWatcher(
 		string workspaceRootDirectoryPath,
 		Func<FileChangeBatch, CancellationToken, Task> dispatchAsync,
-		Action<WorkspaceFileWatcher, Exception?> watcherFailed)
+		Action<WorkspaceFileWatcher, Exception?> onWatcherFailed)
 	{
-		return new(workspaceRootDirectoryPath, dispatchAsync, WorkspaceWatchSpecifications, watcherFailed);
+		return new(workspaceRootDirectoryPath, dispatchAsync, WorkspaceWatchSpecifications, onWatcherFailed);
 	}
 
 	/// <inheritdoc/>

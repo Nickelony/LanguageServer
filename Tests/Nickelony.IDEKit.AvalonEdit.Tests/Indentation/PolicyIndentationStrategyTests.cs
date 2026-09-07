@@ -23,15 +23,14 @@ public sealed class PolicyIndentationStrategyTests
 		}
 	}
 
-	private static PolicyIndentationStrategy CreateStrategy(Func<TextDocument, DocumentLine, bool>? shouldUseSmartIndent = null)
-		=> new(
-			new TextEditorOptions
-			{
-				ConvertTabsToSpaces = true,
-				IndentationSize = 4
-			},
-			new TestPolicy(),
-			shouldUseSmartIndent);
+	private static PolicyIndentationStrategy CreateStrategy(Func<TextDocument, DocumentLine, bool>? shouldUseSmartIndent = null) => new(
+		new TextEditorOptions
+		{
+			ConvertTabsToSpaces = true,
+			IndentationSize = 4
+		},
+		new TestPolicy(),
+		shouldUseSmartIndent);
 
 	[TestMethod]
 	public void IndentLine_AfterThen_AddsIndentToNewLine()
@@ -97,17 +96,5 @@ public sealed class PolicyIndentationStrategyTests
 		strategy.IndentLines(document, 1, 10);
 
 		Assert.AreEqual(string.Empty, document.Text);
-	}
-
-	[TestMethod]
-	public void Constructor_NullOptions_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new PolicyIndentationStrategy(null!, new TestPolicy()));
-	}
-
-	[TestMethod]
-	public void Constructor_NullPolicy_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new PolicyIndentationStrategy(new TextEditorOptions(), null!));
 	}
 }

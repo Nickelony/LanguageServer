@@ -65,7 +65,7 @@ public static class IdentifierHelper
 	}
 
 	/// <summary>
-	/// Attempts to locate an identifier or token span using the specified offset as a probe.
+	/// Tries to locate an identifier or token span using the specified offset as a probe.
 	/// </summary>
 	/// <remarks>
 	/// The offset is clamped to the document bounds. With

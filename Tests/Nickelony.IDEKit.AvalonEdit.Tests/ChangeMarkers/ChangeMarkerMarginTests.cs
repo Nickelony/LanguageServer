@@ -71,7 +71,6 @@ public sealed class ChangeMarkerMarginTests
 
 	private sealed class EmptyMarkerSource : IChangeMarkerSource
 	{
-		public IReadOnlyList<DocumentLine> GetMarkedLines()
-			=> [];
+		public IReadOnlyList<DocumentLine> GetMarkedLines() => [];
 	}
 }

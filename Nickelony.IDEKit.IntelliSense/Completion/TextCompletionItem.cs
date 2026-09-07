@@ -36,7 +36,7 @@ public sealed class TextCompletionItem
 	/// <param name="requestGeneration">
 	/// The originating request generation associated with the item for staleness checks.
 	/// </param>
-	/// <param name="insertCaretOffset">An optional caret position to use after commit.</param>
+	/// <param name="insertCaretOffset">An optional zero-based caret offset to use after commit.</param>
 	public TextCompletionItem(
 		string label,
 		string? insertText = null,
@@ -130,7 +130,7 @@ public sealed class TextCompletionItem
 	public int? RequestGeneration { get; }
 
 	/// <summary>
-	/// Gets the optional caret offset to place after commit.
+	/// Gets the optional zero-based caret offset to place after commit.
 	/// </summary>
 	public int? InsertCaretOffset { get; }
 
@@ -148,7 +148,7 @@ public sealed class TextCompletionItem
 	{
 		return _resolveAsync is null
 			? Task.FromResult(this)
-			: _resolveAsync(cancellationToken);
+			: ResolveRequiredAsync(cancellationToken);
 	}
 
 	/// <summary>
@@ -179,7 +179,7 @@ public sealed class TextCompletionItem
 			? null
 			: async cancellationToken =>
 			{
-				TextCompletionItem resolvedItem = await _resolveAsync(cancellationToken).ConfigureAwait(false);
+				TextCompletionItem resolvedItem = await ResolveRequiredAsync(cancellationToken).ConfigureAwait(false);
 				return resolvedItem.WithRequestContext(requestDocumentVersion, requestGeneration);
 			};
 
@@ -209,7 +209,7 @@ public sealed class TextCompletionItem
 			? null
 			: async cancellationToken =>
 			{
-				TextCompletionItem resolvedItem = await _resolveAsync(cancellationToken).ConfigureAwait(false);
+				TextCompletionItem resolvedItem = await ResolveRequiredAsync(cancellationToken).ConfigureAwait(false);
 				return resolvedItem.WithFilteredCommitContext(requestDocumentVersion, requestGeneration);
 			};
 
@@ -246,5 +246,16 @@ public sealed class TextCompletionItem
 			requestDocumentVersion: RequestDocumentVersion,
 			requestGeneration: RequestGeneration,
 			insertCaretOffset: InsertCaretOffset);
+	}
+
+	private async Task<TextCompletionItem> ResolveRequiredAsync(CancellationToken cancellationToken)
+	{
+		Task<TextCompletionItem> resolveTask = _resolveAsync!(cancellationToken);
+		ArgumentNullException.ThrowIfNull(resolveTask);
+
+		TextCompletionItem resolvedItem = await resolveTask.ConfigureAwait(false);
+		ArgumentNullException.ThrowIfNull(resolvedItem);
+
+		return resolvedItem;
 	}
 }

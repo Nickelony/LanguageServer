@@ -16,6 +16,8 @@ namespace Nickelony.IDEKit.AvalonEdit.Diagnostics;
 /// </remarks>
 public sealed class DiagnosticsRenderer : IBackgroundRenderer
 {
+	private const double MinimumRenderableRectangleWidth = 2.0;
+
 	private static SolidColorBrush s_errorBrush = BrushHelpers.CreateFrozenBrush(Color.FromArgb(224, 220, 76, 60));
 	private static SolidColorBrush s_warningBrush = BrushHelpers.CreateFrozenBrush(Color.FromArgb(224, 226, 165, 44));
 	private static SolidColorBrush s_informationBrush = BrushHelpers.CreateFrozenBrush(Color.FromArgb(224, 88, 170, 255));
@@ -94,19 +96,19 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 		}
 	}
 
-	private readonly Func<TextDocument?> _documentProvider;
+	private readonly Func<TextDocument> _documentProvider;
 	private readonly Func<IReadOnlyList<TextDiagnosticSegment>> _segmentsProvider;
 
 	/// <summary>
 	/// Initializes a renderer with providers for the document and diagnostic segments.
 	/// </summary>
-	/// <param name="documentProvider">Provides the document used to clamp ranges; may return <see langword="null"/>.</param>
+	/// <param name="documentProvider">Provides the document used to clamp ranges.</param>
 	/// <param name="segmentsProvider">Provides the diagnostic segments to render.</param>
 	/// <exception cref="ArgumentNullException">
 	/// <paramref name="documentProvider"/> or <paramref name="segmentsProvider"/> is <see langword="null"/>.
 	/// </exception>
 	public DiagnosticsRenderer(
-		Func<TextDocument?> documentProvider,
+		Func<TextDocument> documentProvider,
 		Func<IReadOnlyList<TextDiagnosticSegment>> segmentsProvider)
 	{
 		ArgumentNullException.ThrowIfNull(documentProvider);
@@ -120,14 +122,23 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 	public KnownLayer Layer => KnownLayer.Caret;
 
 	/// <inheritdoc/>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="textView"/> or <paramref name="drawingContext"/> is <see langword="null"/>,
+	/// or a provider returns <see langword="null"/>.
+	/// </exception>
 	public void Draw(TextView textView, DrawingContext drawingContext)
 	{
+		ArgumentNullException.ThrowIfNull(textView);
+		ArgumentNullException.ThrowIfNull(drawingContext);
+
 		IReadOnlyList<TextDiagnosticSegment> segments = _segmentsProvider();
+		ArgumentNullException.ThrowIfNull(segments);
 
 		if (segments.Count == 0)
 			return;
 
-		TextDocument? document = _documentProvider();
+		TextDocument document = _documentProvider();
+		ArgumentNullException.ThrowIfNull(document);
 
 		foreach (TextDiagnosticSegment segment in segments)
 		{
@@ -136,7 +147,7 @@ public sealed class DiagnosticsRenderer : IBackgroundRenderer
 
 			foreach (Rect rect in BackgroundGeometryBuilder.GetRectsForSegment(textView, textSegment, false))
 			{
-				if (rect.Width < 2.0)
+				if (rect.Width < MinimumRenderableRectangleWidth)
 					continue; // Skip very narrow rectangles
 
 				switch (segment.Severity)

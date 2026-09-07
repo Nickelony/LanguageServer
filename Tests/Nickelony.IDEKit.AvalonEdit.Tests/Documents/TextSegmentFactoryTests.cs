@@ -88,13 +88,4 @@ public sealed class TextSegmentFactoryTests
 		Assert.IsFalse(success);
 		Assert.IsNull(segment);
 	}
-
-	[TestMethod]
-	public void TryCreate_NullDocument_ReturnsFalse()
-	{
-		bool success = TextSegmentFactory.TryCreate(null, 0, 1, out TextSegment? segment);
-
-		Assert.IsFalse(success);
-		Assert.IsNull(segment);
-	}
 }

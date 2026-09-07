@@ -14,7 +14,7 @@ public sealed class BookmarkCoordinatorTests
 
 		coordinator.ToggleBookmark(GetLineOffset(document, 2));
 
-		Assert.AreEqual(1, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(1, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 	}
 
@@ -27,7 +27,7 @@ public sealed class BookmarkCoordinatorTests
 		coordinator.ToggleBookmark(GetLineOffset(document, 2));
 		coordinator.ToggleBookmark(GetLineOffset(document, 2));
 
-		Assert.AreEqual(0, coordinator.GetBookmarkedLines().Count);
+		Assert.IsEmpty(coordinator.GetBookmarkedLines());
 	}
 
 	[TestMethod]
@@ -48,6 +48,7 @@ public sealed class BookmarkCoordinatorTests
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
 		var coordinator = new BookmarkCoordinator(() => document);
+
 		coordinator.ToggleBookmark(GetLineOffset(document, 1));
 		coordinator.ToggleBookmark(GetLineOffset(document, 3));
 
@@ -62,6 +63,7 @@ public sealed class BookmarkCoordinatorTests
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
 		var coordinator = new BookmarkCoordinator(() => document);
+
 		coordinator.ToggleBookmark(GetLineOffset(document, 1));
 		coordinator.ToggleBookmark(GetLineOffset(document, 3));
 
@@ -85,14 +87,16 @@ public sealed class BookmarkCoordinatorTests
 	public void Clear_RemovesAllBookmarksAndRaisesChanged()
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
+
 		int changedCalls = 0;
 		var coordinator = new BookmarkCoordinator(() => document, () => changedCalls++);
+
 		coordinator.ToggleBookmark(GetLineOffset(document, 1));
 		coordinator.ToggleBookmark(GetLineOffset(document, 2));
 
 		coordinator.Clear();
 
-		Assert.AreEqual(0, coordinator.GetBookmarkedLines().Count);
+		Assert.IsEmpty(coordinator.GetBookmarkedLines());
 		Assert.AreEqual(3, changedCalls);
 	}
 
@@ -100,6 +104,7 @@ public sealed class BookmarkCoordinatorTests
 	public void ToggleBookmark_RaisesChangedCallback()
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
+
 		int changedCalls = 0;
 		var coordinator = new BookmarkCoordinator(() => document, () => changedCalls++);
 
@@ -117,7 +122,7 @@ public sealed class BookmarkCoordinatorTests
 
 		coordinator.Restore([2, 99, -1]);
 
-		Assert.AreEqual(1, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(1, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 	}
 
@@ -126,11 +131,11 @@ public sealed class BookmarkCoordinatorTests
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
 		var coordinator = new BookmarkCoordinator(() => document);
-		coordinator.ToggleBookmark(GetLineOffset(document, 1));
 
+		coordinator.ToggleBookmark(GetLineOffset(document, 1));
 		coordinator.Restore([2]);
 
-		Assert.AreEqual(1, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(1, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 	}
 
@@ -138,6 +143,7 @@ public sealed class BookmarkCoordinatorTests
 	public void Restore_DoesNotRaiseChangedCallback()
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
+
 		int changedCalls = 0;
 		var coordinator = new BookmarkCoordinator(() => document, () => changedCalls++);
 
@@ -151,11 +157,12 @@ public sealed class BookmarkCoordinatorTests
 	{
 		var document = new TextDocument("one\r\ntwo\r\nthree");
 		var coordinator = new BookmarkCoordinator(() => document);
+
 		coordinator.ToggleBookmark(GetLineOffset(document, 2));
 
 		document.Insert(0, "X");
 
-		Assert.AreEqual(1, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(1, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 	}
 

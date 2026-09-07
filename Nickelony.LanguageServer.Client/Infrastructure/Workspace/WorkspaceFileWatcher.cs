@@ -22,7 +22,7 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 	private readonly Func<string, WorkspaceWatchSpecification, FileSystemWatcher> _fileSystemWatcherFactory;
 	private readonly List<FileSystemWatcher> _watchers = [];
 	private readonly object _watchersSyncRoot = new();
-	private readonly Action<WorkspaceFileWatcher, Exception?>? _watcherFailed;
+	private readonly Action<WorkspaceFileWatcher, Exception?>? _onWatcherFailed;
 	private int _watcherFailureReported;
 
 	// Dispatch and disposal lifecycle state. The completion source lets sync and async disposal
@@ -77,14 +77,14 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 	/// <param name="workspaceRootDirectoryPath">The workspace root directory to watch.</param>
 	/// <param name="dispatchAsync">The callback that forwards coalesced changes to the owner.</param>
 	/// <param name="watchSpecifications">The explicit file patterns that should be watched under the workspace root.</param>
-	/// <param name="watcherFailed">The callback that reports a watcher failure to the owner.</param>
+	/// <param name="onWatcherFailed">The callback that reports a watcher failure to the owner.</param>
 	/// <param name="fileSystemWatcherFactory">Creates one file-system watcher for a watch specification.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
 	public WorkspaceFileWatcher(
 		string workspaceRootDirectoryPath,
 		Func<FileChangeBatch, CancellationToken, Task> dispatchAsync,
 		IReadOnlyList<WorkspaceWatchSpecification> watchSpecifications,
-		Action<WorkspaceFileWatcher, Exception?>? watcherFailed = null,
+		Action<WorkspaceFileWatcher, Exception?>? onWatcherFailed = null,
 		Func<string, WorkspaceWatchSpecification, FileSystemWatcher>? fileSystemWatcherFactory = null,
 		ILogger<WorkspaceFileWatcher>? logger = null)
 	{
@@ -100,7 +100,7 @@ public sealed partial class WorkspaceFileWatcher : IDisposable, IAsyncDisposable
 		_workspaceRootDirectoryPath = workspaceRootDirectoryPath;
 		_dispatchAsync = dispatchAsync;
 		_watchSpecifications = watchSpecifications;
-		_watcherFailed = watcherFailed;
+		_onWatcherFailed = onWatcherFailed;
 		_fileSystemWatcherFactory = fileSystemWatcherFactory ?? CreateFileSystemWatcher;
 
 		_pendingChanges = new WorkspaceChangeDebouncer(s_dispatchDebounce, () => _ = DispatchPendingChangesAsync());

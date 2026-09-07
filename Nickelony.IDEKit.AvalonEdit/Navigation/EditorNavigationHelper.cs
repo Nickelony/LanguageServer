@@ -198,7 +198,7 @@ public static class EditorNavigationHelper
 	/// <param name="textEditor">The editor to update.</param>
 	/// <param name="location">The location to apply.</param>
 	/// <exception cref="ArgumentNullException"><paramref name="textEditor"/> is <see langword="null"/>.</exception>
-	public static void ApplyLocation(TextEditor textEditor, NavigationLocation location)
+	public static void ApplyLocation(this TextEditor textEditor, NavigationLocation location)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 

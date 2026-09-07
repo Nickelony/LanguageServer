@@ -14,7 +14,7 @@ public static class TextEditorEditHelper
 {
 	/// <summary>
 	/// Inserts <paramref name="newText"/> at <paramref name="insertOffset"/> as a single edit operation
-	/// and places the caret at <paramref name="caretOffset"/>, or just after the inserted text when omitted.
+	/// and places the caret at <paramref name="caretOffsetAfterEdit"/>, or just after the inserted text when omitted.
 	/// With no workspace target, the default AvalonEdit target records the edit as one undo step.
 	/// </summary>
 	/// <param name="textEditor">
@@ -22,8 +22,8 @@ public static class TextEditorEditHelper
 	/// </param>
 	/// <param name="insertOffset">The zero-based offset at which to insert the text.</param>
 	/// <param name="newText">The text to insert.</param>
-	/// <param name="caretOffset">
-	/// The optional zero-based caret offset after the edit.
+	/// <param name="caretOffsetAfterEdit">
+	/// The optional desired zero-based caret offset after the edit.
 	/// Values above the current editor document length are capped.
 	/// When omitted, the caret is placed just after the inserted text.
 	/// </param>
@@ -39,22 +39,22 @@ public static class TextEditorEditHelper
 	/// <paramref name="textEditor"/> or <paramref name="newText"/> is <see langword="null"/>.
 	/// </exception>
 	public static void InsertText(
-		TextEditor textEditor,
+		this TextEditor textEditor,
 		int insertOffset,
 		string newText,
-		int? caretOffset = null,
+		int? caretOffsetAfterEdit = null,
 		ITextEditTarget? workspaceEditTarget = null,
 		Action? onContentChanged = null)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(newText);
 
-		ApplyEdit(textEditor, insertOffset, 0, newText, caretOffset, workspaceEditTarget, onContentChanged);
+		ApplyEdit(textEditor, insertOffset, 0, newText, caretOffsetAfterEdit, workspaceEditTarget, onContentChanged);
 	}
 
 	/// <summary>
 	/// Replaces the range starting at <paramref name="startOffset"/> with <paramref name="newText"/>
-	/// as a single edit operation and places the caret at <paramref name="caretOffset"/>, or just after
+	/// as a single edit operation and places the caret at <paramref name="caretOffsetAfterEdit"/>, or just after
 	/// the replacement text when omitted. With no workspace target, the default AvalonEdit target records
 	/// the edit as one undo step.
 	/// </summary>
@@ -64,8 +64,8 @@ public static class TextEditorEditHelper
 	/// <param name="startOffset">The zero-based start offset of the replaced range.</param>
 	/// <param name="length">The length of the replaced range.</param>
 	/// <param name="newText">The replacement text.</param>
-	/// <param name="caretOffset">
-	/// The optional zero-based caret offset after the edit.
+	/// <param name="caretOffsetAfterEdit">
+	/// The optional desired zero-based caret offset after the edit.
 	/// Values above the current editor document length are capped.
 	/// When omitted, the caret is placed just after the replacement text.
 	/// </param>
@@ -81,18 +81,18 @@ public static class TextEditorEditHelper
 	/// <paramref name="textEditor"/> or <paramref name="newText"/> is <see langword="null"/>.
 	/// </exception>
 	public static void ReplaceText(
-		TextEditor textEditor,
+		this TextEditor textEditor,
 		int startOffset,
 		int length,
 		string newText,
-		int? caretOffset = null,
+		int? caretOffsetAfterEdit = null,
 		ITextEditTarget? workspaceEditTarget = null,
 		Action? onContentChanged = null)
 	{
 		ArgumentNullException.ThrowIfNull(textEditor);
 		ArgumentNullException.ThrowIfNull(newText);
 
-		ApplyEdit(textEditor, startOffset, length, newText, caretOffset, workspaceEditTarget, onContentChanged);
+		ApplyEdit(textEditor, startOffset, length, newText, caretOffsetAfterEdit, workspaceEditTarget, onContentChanged);
 	}
 
 	private static void ApplyEdit(
@@ -100,7 +100,7 @@ public static class TextEditorEditHelper
 		int startOffset,
 		int length,
 		string newText,
-		int? caretOffset,
+		int? caretOffsetAfterEdit,
 		ITextEditTarget? workspaceEditTarget,
 		Action? onContentChanged)
 	{
@@ -108,7 +108,7 @@ public static class TextEditorEditHelper
 		editTarget.Apply([new TextEditOperation(startOffset, startOffset + length, newText, 0)]);
 
 		textEditor.CaretOffset = Math.Min(
-			caretOffset ?? (startOffset + newText.Length),
+			caretOffsetAfterEdit ?? (startOffset + newText.Length),
 			textEditor.Document.TextLength);
 
 		if (workspaceEditTarget is null)

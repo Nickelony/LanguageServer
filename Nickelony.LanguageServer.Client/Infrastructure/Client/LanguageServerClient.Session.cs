@@ -723,7 +723,7 @@ public sealed partial class LanguageServerClient
 	}
 
 	/// <summary>
-	/// Attempts to read the exit code for a process that may already be disposed.
+	/// Tries to read the exit code for a process that may already be disposed.
 	/// </summary>
 	/// <param name="process">The process to inspect.</param>
 	/// <returns>The exit code, or <see langword="null"/> when unavailable.</returns>

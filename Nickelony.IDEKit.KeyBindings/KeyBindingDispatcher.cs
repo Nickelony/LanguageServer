@@ -31,7 +31,7 @@ public sealed class KeyBindingDispatcher<TCommandId>
 	}
 
 	/// <summary>
-	/// Attempts to dispatch <paramref name="e"/> to the command bound to the pressed key combo.
+	/// Tries to dispatch <paramref name="e"/> to the command bound to the pressed key combo.
 	/// Returns <see langword="true"/> only when a key combo was recognized, the command can
 	/// execute, and the command was invoked; the caller should mark the event handled in that case.
 	/// Returns <see langword="false"/> for modifier-only keystrokes, unbound key combos,

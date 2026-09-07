@@ -85,6 +85,8 @@ public sealed partial class WorkspaceFileWatcher
 	private FileSystemWatcher CreateWatcher(WorkspaceWatchSpecification specification)
 	{
 		FileSystemWatcher watcher = _fileSystemWatcherFactory(_workspaceRootDirectoryPath, specification);
+		ArgumentNullException.ThrowIfNull(watcher);
+
 		watcher.IncludeSubdirectories = specification.IncludeSubdirectories;
 		watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.DirectoryName;
 		watcher.InternalBufferSize = 64 * 1024;
@@ -130,7 +132,7 @@ public sealed partial class WorkspaceFileWatcher
 
 		try
 		{
-			_watcherFailed?.Invoke(this, exception);
+			_onWatcherFailed?.Invoke(this, exception);
 		}
 		catch (Exception callbackException)
 		{

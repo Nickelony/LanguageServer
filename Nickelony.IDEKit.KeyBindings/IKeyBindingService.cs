@@ -45,7 +45,7 @@ public interface IKeyBindingService<TCommandId> : IDisposable
 	KeyBindingValidationResult Validate(TCommandId command, IReadOnlyList<KeyCombo> bindings);
 
 	/// <summary>
-	/// Attempts to replace a command's current binding set. Reserved, non-remappable,
+	/// Tries to replace a command's current binding set. Reserved, non-remappable,
 	/// and duplicate proposals are rejected; conflicts are rejected unless replacement
 	/// is explicitly requested.
 	/// When <paramref name="replaceConflicts"/> is <see langword="true"/>, matching

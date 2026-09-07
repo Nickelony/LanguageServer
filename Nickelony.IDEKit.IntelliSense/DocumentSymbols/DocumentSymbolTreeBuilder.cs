@@ -64,6 +64,8 @@ public static class DocumentSymbolTreeBuilder
 		foreach (TGroup group in groups)
 		{
 			IReadOnlyList<TNode> nodes = nodesSelector(group);
+			ArgumentNullException.ThrowIfNull(nodes);
+
 			var children = new List<TextDocumentSymbol>(nodes.Count);
 
 			foreach (TNode node in nodes)

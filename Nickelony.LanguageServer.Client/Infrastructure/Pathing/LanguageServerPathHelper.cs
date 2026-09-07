@@ -95,7 +95,7 @@ public static class LanguageServerPathHelper
 	}
 
 	/// <summary>
-	/// Attempts to normalize a local path without throwing for invalid input.
+	/// Tries to normalize a local path without throwing for invalid input.
 	/// </summary>
 	/// <param name="filePath">The path to normalize.</param>
 	/// <param name="normalizedFilePath">The normalized absolute path when successful.</param>
@@ -121,7 +121,7 @@ public static class LanguageServerPathHelper
 	}
 
 	/// <summary>
-	/// Attempts to extract and normalize a local file path from a file URI.
+	/// Tries to extract and normalize a local file path from a file URI.
 	/// </summary>
 	/// <param name="uriText">The file URI text.</param>
 	/// <param name="filePath">The normalized local file path when successful.</param>

@@ -14,5 +14,6 @@ public interface ITextEditTarget
 	/// Applies operations ordered from highest to lowest source offset.
 	/// </summary>
 	/// <param name="operations">The validated operations to apply.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="operations"/> is <see langword="null"/>.</exception>
 	void Apply(IReadOnlyList<TextEditOperation> operations);
 }

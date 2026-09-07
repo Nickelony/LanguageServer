@@ -150,7 +150,7 @@ public sealed partial class WorkspaceFileWatcher
 	}
 
 	/// <summary>
-	/// Attempts to start asynchronous disposal finalization once disposal is active and all in-flight dispatch operations have quiesced.
+	/// Tries to start asynchronous disposal finalization once disposal is active and all in-flight dispatch operations have quiesced.
 	/// </summary>
 	private void TryStartDisposeFinalization()
 	{

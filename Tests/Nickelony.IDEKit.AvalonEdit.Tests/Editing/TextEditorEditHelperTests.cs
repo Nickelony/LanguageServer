@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.Core.Text;
@@ -14,7 +15,7 @@ public sealed class TextEditorEditHelperTests
 		{
 			var editor = CreateEditor("ab");
 
-			TextEditorEditHelper.InsertText(editor, 1, "XY");
+			editor.InsertText(1, "XY");
 
 			Assert.AreEqual("aXYb", editor.Text);
 			Assert.AreEqual(3, editor.CaretOffset);
@@ -22,13 +23,13 @@ public sealed class TextEditorEditHelperTests
 	}
 
 	[TestMethod]
-	public void InsertText_WithCaretOffset_PlacesCaretAtRequestedOffset()
+	public void InsertText_WithCaretOffsetAfterEdit_PlacesCaretAtRequestedOffset()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
 			var editor = CreateEditor("ab");
 
-			TextEditorEditHelper.InsertText(editor, 1, "X", caretOffset: 1);
+			editor.InsertText(1, "X", caretOffsetAfterEdit: 1);
 
 			Assert.AreEqual("aXb", editor.Text);
 			Assert.AreEqual(1, editor.CaretOffset);
@@ -42,7 +43,7 @@ public sealed class TextEditorEditHelperTests
 		{
 			var editor = CreateEditor("abcdef");
 
-			TextEditorEditHelper.ReplaceText(editor, 1, 3, "X");
+			editor.ReplaceText(1, 3, "X");
 
 			Assert.AreEqual("aXef", editor.Text);
 			Assert.AreEqual(2, editor.CaretOffset);
@@ -58,12 +59,11 @@ public sealed class TextEditorEditHelperTests
 			var target = new RecordingTarget();
 			int contentChangedCalls = 0;
 
-			TextEditorEditHelper.InsertText(
-				editor,
+			editor.InsertText(
 				1,
 				"X",
 				workspaceEditTarget: target,
-				contentChanged: () => contentChangedCalls++);
+				onContentChanged: () => contentChangedCalls++);
 
 			Assert.AreEqual(1, target.ApplyCalls);
 			Assert.AreEqual(0, contentChangedCalls);
@@ -78,7 +78,7 @@ public sealed class TextEditorEditHelperTests
 			var editor = CreateEditor("ab");
 			int contentChangedCalls = 0;
 
-			TextEditorEditHelper.InsertText(editor, 1, "X", contentChanged: () => contentChangedCalls++);
+			editor.InsertText(1, "X", onContentChanged: () => contentChangedCalls++);
 
 			Assert.AreEqual(1, contentChangedCalls);
 			Assert.AreEqual("aXb", editor.Text);
@@ -86,27 +86,19 @@ public sealed class TextEditorEditHelperTests
 	}
 
 	[TestMethod]
-	public void InsertText_CaretOffsetBeyondDocument_ClampsToTextLength()
+	public void InsertText_CaretOffsetAfterEditBeyondDocument_ClampsToTextLength()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
 			var editor = CreateEditor("ab");
 
-			TextEditorEditHelper.InsertText(editor, 1, "X", caretOffset: 100);
+			editor.InsertText(1, "X", caretOffsetAfterEdit: 100);
 
 			Assert.AreEqual(3, editor.CaretOffset);
 		});
 	}
 
-	[TestMethod]
-	public void InsertText_NullEditor_Throws()
-	{
-		ICSharpCode.AvalonEdit.TextEditor editor = null!;
-
-		Assert.ThrowsExactly<ArgumentNullException>(() => TextEditorEditHelper.InsertText(editor, 0, "X"));
-	}
-
-	private static ICSharpCode.AvalonEdit.TextEditor CreateEditor(string text)
+	private static TextEditor CreateEditor(string text)
 		=> new() { Document = new TextDocument(text) };
 
 	private sealed class RecordingTarget : ITextEditTarget

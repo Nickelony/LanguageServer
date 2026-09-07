@@ -43,8 +43,7 @@ are supplied as optional parameters, so the generic helpers stay reusable while
 a host wires them exactly where it needs them:
 
 ```csharp
-TextEditorEditHelper.InsertText(
-    editor,
+editor.InsertText(
     insertOffset,
     newText,
     workspaceEditTarget: editor.WorkspaceEditTarget,

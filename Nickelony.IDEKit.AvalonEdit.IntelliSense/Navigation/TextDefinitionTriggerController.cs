@@ -29,7 +29,7 @@ public sealed class TextDefinitionTriggerController : IDisposable
 	/// </summary>
 	/// <param name="owner">The element pointer positions are resolved against.</param>
 	/// <param name="getOffsetFromPoint">Resolves the zero-based document offset for a point in the owner.</param>
-	/// <param name="tryNavigateAsync">Attempts to resolve and navigate to a definition asynchronously.</param>
+	/// <param name="tryNavigateAsync">Tries to resolve and navigate to a definition asynchronously.</param>
 	/// <param name="logger">An optional logger for navigation failures.</param>
 	public TextDefinitionTriggerController(
 		FrameworkElement owner,
@@ -51,7 +51,7 @@ public sealed class TextDefinitionTriggerController : IDisposable
 	/// Handles an F12 key press for definition navigation.
 	/// </summary>
 	/// <param name="e">The key event to inspect.</param>
-	/// <param name="caretOffset">The current zero-based document caret offset.</param>
+	/// <param name="caretOffset">The zero-based document caret offset.</param>
 	/// <param name="cancellationToken">An optional caller cancellation token.</param>
 	/// <returns><see langword="true"/> when the input was handled as a navigation; otherwise, <see langword="false"/>.</returns>
 	public async Task<bool> TryHandleKeyDownAsync(KeyEventArgs e, int caretOffset, CancellationToken cancellationToken = default)

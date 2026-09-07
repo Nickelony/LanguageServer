@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.CodeCompletion;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -75,7 +76,7 @@ public sealed class TextCompletionController : IDisposable
 		"Failed to resolve completion tooltip content.");
 
 	private readonly ILogger _logger;
-	private readonly ICSharpCode.AvalonEdit.TextEditor _editor;
+	private readonly TextEditor _editor;
 	private readonly CompletionWindowCoordinator _windowCoordinator;
 	private readonly TextCompletionControllerOptions _options;
 	private readonly Action<TextCompletionPresentationState>? _applyPresentationState;
@@ -109,7 +110,7 @@ public sealed class TextCompletionController : IDisposable
 	/// <param name="toolTipBorder">The optional completion tooltip border brush.</param>
 	/// <param name="logger">An optional logger for request failures.</param>
 	public TextCompletionController(
-		ICSharpCode.AvalonEdit.TextEditor editor,
+		TextEditor editor,
 		CompletionWindowCoordinator windowCoordinator,
 		TextCompletionControllerOptions? options = null,
 		Action<TextCompletionPresentationState>? applyPresentationState = null,
@@ -349,7 +350,16 @@ public sealed class TextCompletionController : IDisposable
 		if (mapItem is null)
 			return false;
 
-		ICompletionData[] items = decision.Items.Select(mapItem).ToArray();
+		var items = new ICompletionData[decision.Items.Count];
+
+		for (int i = 0; i < decision.Items.Count; i++)
+		{
+			ICompletionData item = mapItem(decision.Items[i]);
+			ArgumentNullException.ThrowIfNull(item);
+
+			items[i] = item;
+		}
+
 		return OpenOrRefresh(items, decision.StartOffset.Value, decision.EndOffset.Value);
 	}
 

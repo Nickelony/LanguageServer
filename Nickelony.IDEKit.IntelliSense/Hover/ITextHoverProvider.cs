@@ -6,7 +6,7 @@ namespace Nickelony.IDEKit.IntelliSense.Hover;
 public interface ITextHoverProvider
 {
 	/// <summary>
-	/// Attempts to resolve hover information for the supplied request.
+	/// Tries to resolve hover information for the supplied request.
 	/// </summary>
 	/// <param name="request">The current document and hover-position request.</param>
 	/// <returns>The resolved hover information, or <see langword="null"/> when none is available.</returns>

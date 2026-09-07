@@ -110,7 +110,7 @@ public sealed class NavigationHistory<TLocation>
 	}
 
 	/// <summary>
-	/// Attempts to navigate to the previous position, recording <paramref name="currentLocation"/>
+	/// Tries to navigate to the previous position, recording <paramref name="currentLocation"/>
 	/// on the forward stack.
 	/// </summary>
 	/// <param name="currentLocation">The position to record on the forward stack.</param>
@@ -130,7 +130,7 @@ public sealed class NavigationHistory<TLocation>
 	}
 
 	/// <summary>
-	/// Attempts to navigate to the next position, recording <paramref name="currentLocation"/>
+	/// Tries to navigate to the next position, recording <paramref name="currentLocation"/>
 	/// on the back stack.
 	/// </summary>
 	/// <param name="currentLocation">The position to record on the back stack.</param>

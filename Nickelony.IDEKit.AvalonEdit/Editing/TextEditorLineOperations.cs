@@ -124,7 +124,7 @@ public static class TextEditorLineOperations
 	/// <paramref name="textEditor"/> or <paramref name="replacementSelector"/> is <see langword="null"/>.
 	/// </exception>
 	public static bool TryReplaceFirstMatchingLine(
-		TextEditor textEditor,
+		this TextEditor textEditor,
 		Func<string, string?> replacementSelector,
 		bool scrollToLine = true,
 		ITextEditTarget? workspaceEditTarget = null,
@@ -179,8 +179,8 @@ public static class TextEditorLineOperations
 	/// <paramref name="textEditor"/>, <paramref name="lineRegex"/>, <paramref name="nameExtractor"/>,
 	/// <paramref name="oldName"/>, or <paramref name="newName"/> is <see langword="null"/>.
 	/// </exception>
-	public static bool TryReplaceNameInFirstMatchingLine(
-		TextEditor textEditor,
+	public static bool TryRenameInFirstMatchingLine(
+		this TextEditor textEditor,
 		Regex lineRegex,
 		Func<string, Regex, string> nameExtractor,
 		string oldName,

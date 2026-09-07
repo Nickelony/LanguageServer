@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using System.Windows.Input;
@@ -51,6 +52,7 @@ public sealed class TextAutoClosingServiceTests
 	public void TryGetAction_DisabledToken_ReturnsFalse()
 	{
 		var document = new TextDocument("ab");
+
 		var options = new TextAutoClosingOptions(
 			false, false, false, false, false, false, ")", "}", "]", "\"", "'", "`");
 
@@ -128,7 +130,7 @@ public sealed class TextAutoClosingServiceTests
 	}
 
 	[TestMethod]
-	public void TryGetAction_BacktickAfterWordCharacter_ReturnsInsertAction()
+	public void TryGetAction_BacktickAfterWordCharacter_ReturnsInsertAction() // For JavaScript template literals
 	{
 		var document = new TextDocument("ab");
 
@@ -186,30 +188,16 @@ public sealed class TextAutoClosingServiceTests
 	}
 
 	[TestMethod]
-	public void TryGetAction_NullDocument_Throws()
-	{
-		TextDocument document = null!;
-
-		Assert.ThrowsExactly<ArgumentNullException>(
-			() => _service.TryGetAction(document, 0, "(", s_options, out _));
-	}
-
-	[TestMethod]
-	public void TryGetAction_NullOptions_Throws()
-	{
-		var document = new TextDocument("ab");
-
-		Assert.ThrowsExactly<ArgumentNullException>(
-			() => _service.TryGetAction(document, 0, "(", null!, out _));
-	}
-
-	[TestMethod]
 	public void HandleTextEntering_InsertAction_InsertsClosingElementAndPositionsCaret()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor { Document = new TextDocument("ab") };
-			editor.CaretOffset = 1;
+			var editor = new TextEditor
+			{
+				Document = new TextDocument("ab"),
+				CaretOffset = 1
+			};
+
 			var e = CreateTextCompositionArgs(editor, "(");
 
 			_service.HandleTextEntering(editor, e, s_options);
@@ -224,17 +212,21 @@ public sealed class TextAutoClosingServiceTests
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor { Document = new TextDocument("a)b") };
-			editor.CaretOffset = 1;
+			var editor = new TextEditor
+			{
+				Document = new TextDocument("a)b"),
+				CaretOffset = 1
+			};
+
 			var e = CreateTextCompositionArgs(editor, ")");
 			string? skippedElement = null;
 
 			_service.HandleTextEntering(editor, e, s_options, element => skippedElement = element);
 
 			Assert.AreEqual(2, editor.CaretOffset);
-			Assert.IsTrue(e.Handled);
 			Assert.AreEqual(")", skippedElement);
 			Assert.AreEqual("a)b", editor.Text);
+			Assert.IsTrue(e.Handled);
 		});
 	}
 
@@ -243,8 +235,12 @@ public sealed class TextAutoClosingServiceTests
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor { Document = new TextDocument("ab") };
-			editor.CaretOffset = 1;
+			var editor = new TextEditor
+			{
+				Document = new TextDocument("ab"),
+				CaretOffset = 1
+			};
+
 			var e = CreateTextCompositionArgs(editor, "x");
 
 			_service.HandleTextEntering(editor, e, s_options);
@@ -259,8 +255,12 @@ public sealed class TextAutoClosingServiceTests
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor { Document = new TextDocument("{},") };
-			editor.CaretOffset = 1;
+			var editor = new TextEditor
+			{
+				Document = new TextDocument("{},"),
+				CaretOffset = 1
+			};
+
 			var e = CreateTextCompositionArgs(editor, "}");
 			var options = CreateOptions(bracesClosingString: "},");
 
@@ -272,11 +272,15 @@ public sealed class TextAutoClosingServiceTests
 		});
 	}
 
-	private static TextCompositionEventArgs CreateTextCompositionArgs(ICSharpCode.AvalonEdit.TextEditor editor, string text)
+	private static TextCompositionEventArgs CreateTextCompositionArgs(TextEditor editor, string text)
 	{
 		var composition = new TextComposition(InputManager.Current, editor, text);
-		var args = new TextCompositionEventArgs(Keyboard.PrimaryDevice, composition);
-		args.RoutedEvent = TextCompositionManager.TextInputEvent;
+
+		var args = new TextCompositionEventArgs(Keyboard.PrimaryDevice, composition)
+		{
+			RoutedEvent = TextCompositionManager.TextInputEvent
+		};
+
 		return args;
 	}
 

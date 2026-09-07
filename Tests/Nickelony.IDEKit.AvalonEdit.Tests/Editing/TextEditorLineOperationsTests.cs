@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.Core.Text;
@@ -15,8 +16,7 @@ public sealed class TextEditorLineOperationsTests
 		{
 			var editor = CreateEditor("one\r\ntwo\r\nthree");
 
-			bool replaced = TextEditorLineOperations.TryReplaceFirstMatchingLine(
-				editor,
+			bool replaced = editor.TryReplaceFirstMatchingLine(
 				lineText => lineText == "two" ? "2" : null,
 				scrollToLine: false);
 
@@ -43,15 +43,14 @@ public sealed class TextEditorLineOperationsTests
 	}
 
 	[TestMethod]
-	public void TryReplaceFirstMatchingLine_RegexOverload_ReplacesMatchingName()
+	public void TryRenameInFirstMatchingLine_RenamesMatchingName()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
 			var editor = CreateEditor("Level = old\r\nother");
 			var regex = new Regex(@"^Level\s*=\s*");
 
-			bool replaced = TextEditorLineOperations.TryReplaceFirstMatchingLine(
-				editor,
+			bool replaced = editor.TryRenameInFirstMatchingLine(
 				regex,
 				(lineText, pattern) => pattern.Replace(lineText, string.Empty).Trim(),
 				"old",
@@ -72,12 +71,11 @@ public sealed class TextEditorLineOperationsTests
 			var target = new RecordingTarget();
 			int contentChangedCalls = 0;
 
-			bool replaced = TextEditorLineOperations.TryReplaceFirstMatchingLine(
-				editor,
+			bool replaced = editor.TryReplaceFirstMatchingLine(
 				lineText => lineText == "one" ? "1" : null,
 				scrollToLine: false,
 				workspaceEditTarget: target,
-				contentChanged: () => contentChangedCalls++);
+				onContentChanged: () => contentChangedCalls++);
 
 			Assert.IsTrue(replaced);
 			Assert.AreEqual(1, target.ApplyCalls);
@@ -93,11 +91,10 @@ public sealed class TextEditorLineOperationsTests
 			var editor = CreateEditor("one\r\ntwo");
 			int contentChangedCalls = 0;
 
-			bool replaced = TextEditorLineOperations.TryReplaceFirstMatchingLine(
-				editor,
+			bool replaced = editor.TryReplaceFirstMatchingLine(
 				lineText => lineText == "one" ? "1" : null,
 				scrollToLine: false,
-				contentChanged: () => contentChangedCalls++);
+				onContentChanged: () => contentChangedCalls++);
 
 			Assert.IsTrue(replaced);
 			Assert.AreEqual(1, contentChangedCalls);
@@ -105,19 +102,7 @@ public sealed class TextEditorLineOperationsTests
 		});
 	}
 
-	[TestMethod]
-	public void TryReplaceFirstMatchingLine_NullSelector_Throws()
-	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("one\r\ntwo");
-
-			Assert.ThrowsExactly<ArgumentNullException>(
-				() => TextEditorLineOperations.TryReplaceFirstMatchingLine(editor, null!, scrollToLine: false));
-		});
-	}
-
-	private static ICSharpCode.AvalonEdit.TextEditor CreateEditor(string text)
+	private static TextEditor CreateEditor(string text)
 		=> new() { Document = new TextDocument(text) };
 
 	private sealed class RecordingTarget : ITextEditTarget

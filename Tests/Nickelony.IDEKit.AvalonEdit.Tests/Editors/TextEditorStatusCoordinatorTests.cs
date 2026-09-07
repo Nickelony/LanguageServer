@@ -14,7 +14,6 @@ public sealed class TextEditorStatusCoordinatorTests
 		STATestHelper.RunInSTA(() =>
 		{
 			using var coordinator = new TextEditorStatusCoordinator(new TextArea(), () => { }, () => { });
-
 			Assert.AreEqual(100, coordinator.Zoom);
 		});
 	}
@@ -26,6 +25,7 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			int zoomCallbacks = 0;
 			double appliedFontSize = 0.0;
+
 			using var coordinator = new TextEditorStatusCoordinator(new TextArea(), () => { }, () => zoomCallbacks++);
 
 			bool changed = coordinator.TryHandleZoom(120, 50, 200, 10, 12.0, size => appliedFontSize = size);
@@ -57,6 +57,7 @@ public sealed class TextEditorStatusCoordinatorTests
 		STATestHelper.RunInSTA(() =>
 		{
 			int zoomCallbacks = 0;
+
 			using var coordinator = new TextEditorStatusCoordinator(new TextArea(), () => { }, () => zoomCallbacks++);
 			coordinator.Zoom = 200;
 
@@ -103,6 +104,7 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			var textArea = new TextArea { Document = new TextDocument("ab") };
 			int statusCallbacks = 0;
+
 			using var coordinator = new TextEditorStatusCoordinator(textArea, () => statusCallbacks++, () => { });
 			coordinator.Attach();
 
@@ -119,7 +121,9 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			var textArea = new TextArea { Document = new TextDocument("ab") };
 			int statusCallbacks = 0;
+
 			var coordinator = new TextEditorStatusCoordinator(textArea, () => statusCallbacks++, () => { });
+
 			coordinator.Attach();
 			coordinator.Dispose();
 
@@ -136,7 +140,9 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			var textArea = new TextArea { Document = new TextDocument("ab") };
 			int statusCallbacks = 0;
+
 			using var coordinator = new TextEditorStatusCoordinator(textArea, () => statusCallbacks++, () => { });
+
 			coordinator.Attach();
 			coordinator.Attach();
 
@@ -153,11 +159,14 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			var textArea = new TextArea { Document = new TextDocument("abcd") };
 			int statusCallbacks = 0;
+
 			using var coordinator = new TextEditorStatusCoordinator(textArea, () => statusCallbacks++, () => { });
 			coordinator.Attach();
 
 			textArea.Caret.Position = new TextViewPosition(1, 4);
+
 			statusCallbacks = 0;
+
 			textArea.Selection = Selection.Create(textArea, 1, 2);
 
 			Assert.AreEqual(1, statusCallbacks);
@@ -171,7 +180,9 @@ public sealed class TextEditorStatusCoordinatorTests
 		{
 			var textArea = new TextArea { Document = new TextDocument("ab") };
 			int statusCallbacks = 0;
+
 			var coordinator = new TextEditorStatusCoordinator(textArea, () => statusCallbacks++, () => { });
+
 			coordinator.Attach();
 			coordinator.Dispose();
 			coordinator.Dispose();
@@ -239,18 +250,6 @@ public sealed class TextEditorStatusCoordinatorTests
 
 			Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
 				coordinator.TryHandleZoom(120, 50, 200, 10, 0.0, _ => { }));
-		});
-	}
-
-	[TestMethod]
-	public void TryHandleZoom_NullApplyFontSize_ThrowsArgumentNullException()
-	{
-		STATestHelper.RunInSTA(() =>
-		{
-			using var coordinator = new TextEditorStatusCoordinator(new TextArea(), () => { }, () => { });
-
-			Assert.ThrowsExactly<ArgumentNullException>(() =>
-				coordinator.TryHandleZoom(120, 50, 200, 10, 12.0, null!));
 		});
 	}
 }

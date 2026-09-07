@@ -132,6 +132,8 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 				DispatchWorkspaceFileChangesAsync,
 				HandleWorkspaceWatcherFailed);
 
+			ArgumentNullException.ThrowIfNull(watcher);
+
 			WorkspaceWatcherStartStatus startStatus = watcher.Start(out startupException);
 
 			if (startStatus is not (WorkspaceWatcherStartStatus.Started or WorkspaceWatcherStartStatus.AlreadyRunning))
@@ -301,7 +303,7 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 	}
 
 	/// <summary>
-	/// Attempts to restart a failed workspace file watcher.
+	/// Tries to restart a failed workspace file watcher.
 	/// </summary>
 	private bool TryRestartWorkspaceFileWatcher(WorkspaceFileWatcher failedWatcher)
 		=> RecoverWorkspaceFileWatcher(failedWatcher) == WorkspaceWatcherRecoveryResult.Recovered;
@@ -340,6 +342,8 @@ internal sealed class LuaWorkspaceChangeCoordinator : IDisposable
 					_workspaceRootDirectoryPath,
 					DispatchWorkspaceFileChangesAsync,
 					HandleWorkspaceWatcherFailed);
+
+				ArgumentNullException.ThrowIfNull(replacementWatcher);
 
 				WorkspaceWatcherStartStatus startStatus = replacementWatcher.Start(out startupException);
 

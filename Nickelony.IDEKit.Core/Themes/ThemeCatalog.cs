@@ -21,7 +21,7 @@ public sealed class ThemeCatalog<TTheme>
 	/// </summary>
 	/// <param name="themes">The themes to include in the catalog.</param>
 	/// <param name="getName">Gets the display name of a theme.</param>
-	/// <param name="getAliases">Gets the additional lookup names of a theme.</param>
+	/// <param name="getAliases">Gets the optional additional lookup names of a theme.</param>
 	/// <param name="defaultThemeName">The name or alias of the default theme selection.</param>
 	/// <exception cref="ArgumentNullException">
 	/// <paramref name="themes"/>, <paramref name="getName"/>, <paramref name="getAliases"/>, or
@@ -33,7 +33,7 @@ public sealed class ThemeCatalog<TTheme>
 	public ThemeCatalog(
 		IEnumerable<TTheme> themes,
 		Func<TTheme, string> getName,
-		Func<TTheme, IReadOnlyList<string>> getAliases,
+		Func<TTheme, IReadOnlyList<string>?> getAliases,
 		string defaultThemeName)
 	{
 		ArgumentNullException.ThrowIfNull(themes);
@@ -56,7 +56,7 @@ public sealed class ThemeCatalog<TTheme>
 		{
 			AddLookupName(themesByLookupName, getName(theme), theme);
 
-			IReadOnlyList<string> aliases = getAliases(theme);
+			IReadOnlyList<string>? aliases = getAliases(theme);
 
 			if (aliases is null)
 				continue;
@@ -90,7 +90,7 @@ public sealed class ThemeCatalog<TTheme>
 	public TTheme DefaultTheme => _defaultTheme;
 
 	/// <summary>
-	/// Attempts to resolve a theme by its name or alias using a case-insensitive comparison.
+	/// Tries to resolve a theme by its name or alias using a case-insensitive comparison.
 	/// </summary>
 	/// <param name="nameOrAlias">The theme name or alias to resolve.</param>
 	/// <param name="theme">The resolved theme when found.</param>

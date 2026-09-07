@@ -189,7 +189,7 @@ public sealed partial class LanguageServerClient
 	}
 
 	/// <summary>
-	/// Attempts to send a graceful shutdown request to the server.
+	/// Tries to send a graceful shutdown request to the server.
 	/// </summary>
 	/// <param name="session">The session being shut down.</param>
 	private async Task TrySendShutdownAsync(LanguageServerTransportSession session)
@@ -254,7 +254,7 @@ public sealed partial class LanguageServerClient
 	}
 
 	/// <summary>
-	/// Attempts to queue the exit notification to the server as a best-effort local dispatch.
+	/// Tries to queue the exit notification to the server as a best-effort local dispatch.
 	/// </summary>
 	/// <param name="session">The session being shut down.</param>
 	private async Task TrySendExitNotificationAsync(LanguageServerTransportSession session)

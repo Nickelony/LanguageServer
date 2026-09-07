@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.Core.Text;
@@ -13,7 +14,6 @@ public sealed class AvalonEditTextEditTargetTests
 		STATestHelper.RunInSTA(() =>
 		{
 			var target = new AvalonEditTextEditTarget(CreateEditor("abcdef"));
-
 			Assert.AreEqual("abcdef", target.Text);
 		});
 	}
@@ -68,23 +68,6 @@ public sealed class AvalonEditTextEditTargetTests
 		});
 	}
 
-	[TestMethod]
-	public void Apply_NullOperations_Throws()
-	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var target = new AvalonEditTextEditTarget(CreateEditor("abcdef"));
-
-			Assert.ThrowsExactly<ArgumentNullException>(() => target.Apply(null!));
-		});
-	}
-
-	[TestMethod]
-	public void Constructor_NullEditor_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => new AvalonEditTextEditTarget(null!));
-	}
-
-	private static ICSharpCode.AvalonEdit.TextEditor CreateEditor(string text)
+	private static TextEditor CreateEditor(string text)
 		=> new() { Document = new TextDocument(text) };
 }

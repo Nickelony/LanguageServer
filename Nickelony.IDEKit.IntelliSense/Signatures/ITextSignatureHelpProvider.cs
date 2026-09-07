@@ -6,7 +6,7 @@ namespace Nickelony.IDEKit.IntelliSense.Signatures;
 public interface ITextSignatureHelpProvider
 {
 	/// <summary>
-	/// Attempts to resolve signature help information for the supplied request.
+	/// Tries to resolve signature help information for the supplied request.
 	/// </summary>
 	/// <param name="request">The current document and caret-position request.</param>
 	/// <returns>The resolved signature help information, or <see langword="null"/> when none is available.</returns>

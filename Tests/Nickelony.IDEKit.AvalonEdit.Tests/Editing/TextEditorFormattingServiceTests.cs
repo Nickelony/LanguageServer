@@ -1,3 +1,4 @@
+using ICSharpCode.AvalonEdit;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.Core.Formatting;
 using System.Windows;
@@ -14,7 +15,8 @@ public sealed class TextEditorFormattingServiceTests
 		STATestHelper.RunInSTA(() =>
 		{
 			string original = string.Join("\r\n", Enumerable.Range(1, 200).Select(i => "Line " + i + "   "));
-			var editor = new ICSharpCode.AvalonEdit.TextEditor
+
+			var editor = new TextEditor
 			{
 				Text = original
 			};
@@ -25,8 +27,10 @@ public sealed class TextEditorFormattingServiceTests
 			{
 				editor.Document.UndoStack.ClearAll();
 				editor.CaretOffset = editor.Document.GetOffset(2, 3);
+
 				editor.ScrollToVerticalOffset(100.0);
 				editor.ScrollToHorizontalOffset(5.0);
+
 				WPFTestHost.PumpDispatcher(editor.Dispatcher, DispatcherPriority.Background);
 
 				Vector scrollBefore = editor.TextArea.TextView.ScrollOffset;
@@ -62,7 +66,7 @@ public sealed class TextEditorFormattingServiceTests
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor
+			var editor = new TextEditor
 			{
 				Text = "No changes here"
 			};
@@ -92,11 +96,11 @@ public sealed class TextEditorFormattingServiceTests
 	}
 
 	[TestMethod]
-	public void FormatDocument_TrimOnly_OnlyRemovesTrailingWhitespace()
+	public void FormatDocument_AppliesSuppliedFormatter()
 	{
 		STATestHelper.RunInSTA(() =>
 		{
-			var editor = new ICSharpCode.AvalonEdit.TextEditor
+			var editor = new TextEditor
 			{
 				Text = "Customize= CUST_BAR,foo   \r\nLegend =1\t"
 			};
@@ -106,9 +110,9 @@ public sealed class TextEditorFormattingServiceTests
 			try
 			{
 				var service = new TextEditorFormattingService();
-				service.FormatDocument(editor, new EqualsSpacingFormatter(), trimOnly: true);
+				service.FormatDocument(editor, TrimTrailingWhitespaceFormatter.Instance);
 
-				// Trim-only removes trailing whitespace without applying the formatter's spacing changes.
+				// The host selects the trim formatter explicitly, so no other formatting policy is applied.
 				Assert.AreEqual("Customize= CUST_BAR,foo" + Environment.NewLine + "Legend =1", editor.Text);
 			}
 			finally
@@ -130,11 +134,5 @@ public sealed class TextEditorFormattingServiceTests
 	private sealed class IdentityFormatter : ITextDocumentFormatter
 	{
 		public string FormatDocument(string content) => content;
-	}
-
-	private sealed class EqualsSpacingFormatter : ITextDocumentFormatter
-	{
-		public string FormatDocument(string content)
-			=> content.Replace("=", " = ");
 	}
 }

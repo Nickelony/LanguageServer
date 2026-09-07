@@ -136,7 +136,10 @@ public sealed class CompletionSessionKernel
 		IReadOnlyList<TextCompletionItem> items,
 		CompletionWordInfo wordInfo)
 	{
+		ArgumentNullException.ThrowIfNull(items);
+
 		IReadOnlyList<TextCompletionItem> filtered = _filter(items, wordInfo.Word);
+		ArgumentNullException.ThrowIfNull(filtered);
 
 		return filtered.Count == 0
 			? TextCompletionSessionDecision.None

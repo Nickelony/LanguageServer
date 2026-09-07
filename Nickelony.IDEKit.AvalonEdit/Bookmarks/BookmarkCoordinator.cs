@@ -139,7 +139,12 @@ public sealed class BookmarkCoordinator
 	}
 
 	private TextDocument GetDocument()
-		=> _documentProvider();
+	{
+		TextDocument document = _documentProvider();
+		ArgumentNullException.ThrowIfNull(document);
+
+		return document;
+	}
 
 	private List<DocumentLine> CollectBookmarkedLines(TextDocument document)
 	{

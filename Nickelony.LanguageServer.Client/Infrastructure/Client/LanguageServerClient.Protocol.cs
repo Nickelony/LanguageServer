@@ -206,7 +206,12 @@ public sealed partial class LanguageServerClient
 	}
 
 	private CachedSettingsSnapshot RefreshCachedSettingsSnapshotFromProvider()
-		=> CacheSettingsSnapshot(_settingsProvider());
+	{
+		object settingsPayload = _settingsProvider();
+		ArgumentNullException.ThrowIfNull(settingsPayload);
+
+		return CacheSettingsSnapshot(settingsPayload);
+	}
 
 	private CachedSettingsSnapshot CacheSettingsSnapshot(object settingsPayload)
 	{

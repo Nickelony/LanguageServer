@@ -4,17 +4,15 @@ using System.IO;
 
 namespace Nickelony.IDEKit.AvalonEdit.Tests;
 
-/// <summary>
-/// Tests bookmark sidecar persistence and the <see cref="BookmarkStoreExtensions"/>
-/// methods that save and restore coordinator bookmarks.
-/// </summary>
 [TestClass]
 public sealed class BookmarkSidecarStoreTests
 {
 	private static string CreateTempPath(out string directory)
 	{
 		directory = Path.Combine(Path.GetTempPath(), "BookmarkSidecarStoreTests-" + Guid.NewGuid().ToString("N"));
+
 		Directory.CreateDirectory(directory);
+
 		return Path.Combine(directory, "script.txt");
 	}
 
@@ -45,7 +43,7 @@ public sealed class BookmarkSidecarStoreTests
 
 		IReadOnlyList<int> restored = store.Restore(filePath);
 
-		CollectionAssert.AreEqual(new[] { 2, 7 }, restored.ToArray());
+		Assert.AreSequenceEqual([2, 7], [.. restored]);
 	}
 
 	[TestMethod]
@@ -53,12 +51,12 @@ public sealed class BookmarkSidecarStoreTests
 	{
 		string filePath = CreateTempPath(out _);
 		var store = new BookmarkSidecarStore();
-		store.Save(filePath, [1]);
 
+		store.Save(filePath, [1]);
 		store.Save(filePath, []);
 
 		Assert.IsFalse(File.Exists(filePath + ".bkmrk"));
-		Assert.AreEqual(0, store.Restore(filePath).Count);
+		Assert.IsEmpty(store.Restore(filePath));
 	}
 
 	[TestMethod]
@@ -86,11 +84,12 @@ public sealed class BookmarkSidecarStoreTests
 
 		coordinator.SaveBookmarks(store, filePath);
 		coordinator.Clear();
-		Assert.AreEqual(0, coordinator.GetBookmarkedLines().Count);
+
+		Assert.IsEmpty(coordinator.GetBookmarkedLines());
 
 		coordinator.RestoreBookmarks(store, filePath);
 
-		Assert.AreEqual(2, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(2, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 		Assert.AreEqual(4, coordinator.GetBookmarkedLines()[1].LineNumber);
 	}
@@ -107,7 +106,7 @@ public sealed class BookmarkSidecarStoreTests
 
 		coordinator.RestoreBookmarks(store, filePath);
 
-		Assert.AreEqual(1, coordinator.GetBookmarkedLines().Count);
+		Assert.HasCount(1, coordinator.GetBookmarkedLines());
 		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
 	}
 
