@@ -20,7 +20,7 @@ namespace Nickelony.IDEKit.KeyBindings;
 public sealed class KeyBindingOverrideCollection
 {
 	/// <summary>
-	/// Creates an empty override collection with schema version 1.
+	/// Initializes a new instance of the <see cref="KeyBindingOverrideCollection"/> class.
 	/// </summary>
 	public KeyBindingOverrideCollection()
 	{
@@ -29,15 +29,15 @@ public sealed class KeyBindingOverrideCollection
 	}
 
 	/// <summary>
-	/// Schema version marker written as the <c>Version</c> XML attribute.
+	/// Gets or sets the schema version marker written as the <c>Version</c> XML attribute.
 	/// </summary>
 	[XmlAttribute("Version")]
 	public int Version { get; set; }
 
 	/// <summary>
-	/// Per-command override entries. An empty <see cref="KeyBindingOverrideEntry.Bindings"/>
-	/// list explicitly unbinds the matching command.
+	/// Gets or sets the per-command override entries.
 	/// </summary>
+	/// <remarks>An empty <see cref="KeyBindingOverrideEntry.Bindings"/> list explicitly unbinds the matching command.</remarks>
 	[XmlElement("Command")]
 	public List<KeyBindingOverrideEntry> Overrides { get; set; }
 }
@@ -48,7 +48,7 @@ public sealed class KeyBindingOverrideCollection
 public sealed class KeyBindingOverrideEntry
 {
 	/// <summary>
-	/// Creates an override entry with an empty command identifier and binding list.
+	/// Initializes a new instance of the <see cref="KeyBindingOverrideEntry"/> class.
 	/// </summary>
 	public KeyBindingOverrideEntry()
 	{
@@ -57,14 +57,16 @@ public sealed class KeyBindingOverrideEntry
 	}
 
 	/// <summary>
-	/// Stable command identifier used to match a catalog descriptor. Matching is case-sensitive.
+	/// Gets or sets the stable command identifier used to match a catalog descriptor.
 	/// </summary>
+	/// <remarks>Matching is case-sensitive.</remarks>
 	[XmlAttribute("Id")]
 	public string CommandId { get; set; }
 
 	/// <summary>
-	/// The binding entries for this command. An empty list explicitly unbinds the command.
+	/// Gets or sets the binding entries for this command.
 	/// </summary>
+	/// <remarks>An empty list explicitly unbinds the command.</remarks>
 	[XmlElement("Binding")]
 	public List<KeyBindingSettings> Bindings { get; set; }
 }
@@ -76,7 +78,7 @@ public sealed class KeyBindingOverrideEntry
 public sealed class KeyBindingSettings
 {
 	/// <summary>
-	/// Creates a binding setting with an empty key name.
+	/// Initializes a new instance of the <see cref="KeyBindingSettings"/> class.
 	/// </summary>
 	public KeyBindingSettings()
 	{
@@ -84,14 +86,14 @@ public sealed class KeyBindingSettings
 	}
 
 	/// <summary>
-	/// The <see cref="System.Windows.Input.Key"/> enum name, such as <c>S</c>, <c>F9</c>, or
+	/// Gets or sets the <see cref="System.Windows.Input.Key"/> enum name, such as <c>S</c>, <c>F9</c>, or
 	/// <c>OemQuestion</c>.
 	/// </summary>
 	[XmlAttribute("Key")]
 	public string KeyName { get; set; }
 
 	/// <summary>
-	/// The numeric value of the modifier flags represented by
+	/// Gets or sets the numeric value of the modifier flags represented by
 	/// <see cref="System.Windows.Input.ModifierKeys"/>.
 	/// </summary>
 	[XmlAttribute("Modifiers")]

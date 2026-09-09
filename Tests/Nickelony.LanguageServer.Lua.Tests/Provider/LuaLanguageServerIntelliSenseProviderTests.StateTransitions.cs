@@ -2,16 +2,16 @@ using Nickelony.IDEKit.IntelliSense.Hover;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntelliSenseProviderTests
+public sealed partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task HealthyFastPath_DoesNotPublishAdditionalCapabilitiesTransition()
 	{
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 		int capabilitiesChangedCount = 0;
 
-		provider.CapabilitiesChanged += () => capabilitiesChangedCount++;
+		provider.CapabilitiesChanged += (_, _) => capabilitiesChangedCount++;
 
 		await provider.GetHoverAsync(@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
 
@@ -32,9 +32,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		using var client = new FakeLanguageServerClient { IsReady = false };
 		client.BlockNextStartAsync();
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 		Task<TextHoverInfo?> request = provider.GetHoverAsync(@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
-		DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+		DateTime deadline = DateTime.UtcNow + TestPolling.DefaultTimeout;
 
 		while (client.StartCallCount == 0 && DateTime.UtcNow < deadline)
 			await Task.Delay(10).ConfigureAwait(false);
@@ -52,17 +52,18 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	public async Task ActiveTransportLossPublishesUnavailableCapabilitiesOnceAndRestartRecovers()
 	{
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 		int capabilitiesChangedCount = 0;
 
-		provider.CapabilitiesChanged += () => capabilitiesChangedCount++;
+		provider.CapabilitiesChanged += (_, _) => capabilitiesChangedCount++;
 
 		await provider.GetHoverAsync(@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
 
 		long activeGeneration = client.TransportGeneration;
 		client.PublishTransportUnavailable(activeGeneration);
 
-		Assert.AreEqual(0L, client.TransportGeneration);
+		// The unhealthy reset keeps the generation number, mirroring the real client contract.
+		Assert.AreEqual(activeGeneration, client.TransportGeneration);
 		Assert.AreEqual(LanguageServerProviderState.Unavailable, provider.State);
 		Assert.IsFalse(provider.IsAvailable);
 		Assert.IsFalse(provider.SupportsReferences);
@@ -77,20 +78,85 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
+	public async Task CapabilitySurface_MirrorsTheNegotiatedSnapshotAcrossTransportLossAndRestart()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+		const string content = "return 1";
+
+		using var client = new FakeLanguageServerClient
+		{
+			SupportsReferences = true,
+			SupportsRename = false,
+			SupportsFormatting = false,
+			SupportsSemanticTokensFull = true,
+			SemanticTokenTypes = ["variable"]
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		// Like the real client, the fake reports no optional capabilities before a successful startup.
+		Assert.IsFalse(client.SupportsReferences);
+		Assert.IsFalse(client.SupportsRename);
+		Assert.IsFalse(client.SupportsFormatting);
+		Assert.IsFalse(client.SupportsSemanticTokensFull);
+		Assert.IsFalse(client.SupportsCompletionResolve);
+		Assert.AreEqual(TextDocumentSyncKind.None, client.TextDocumentSyncKind);
+
+		await provider.GetHoverAsync(filePath, content, 0, 0);
+
+		// The post-negotiation surface mirrors the snapshot member by member.
+		Assert.IsTrue(provider.SupportsReferences);
+		Assert.IsFalse(provider.SupportsRename);
+		Assert.IsFalse(provider.SupportsFormatting);
+		Assert.IsTrue(client.SupportsReferences);
+		Assert.IsFalse(client.SupportsRename);
+		Assert.IsTrue(client.SupportsSemanticTokensFull);
+		Assert.AreEqual(TextDocumentSyncKind.Incremental, client.TextDocumentSyncKind);
+
+		// A capability the snapshot withholds is never exercised.
+		TextWorkspaceEdit? rename = await provider.RenameSymbolAsync(new TextRenameRequest(filePath, content, 0, 7, "renamed"));
+
+		Assert.IsNull(rename);
+		CollectionAssert.DoesNotContain(client.GetSentMethodNames(), "textDocument/rename");
+
+		// Transport loss clears the snapshot to the not-initialized values and the restart re-negotiates it.
+		client.PublishTransportUnavailable(client.TransportGeneration);
+
+		Assert.IsFalse(client.SupportsReferences);
+		Assert.IsFalse(client.SupportsSemanticTokensFull);
+		Assert.AreEqual(TextDocumentSyncKind.None, client.TextDocumentSyncKind);
+		Assert.IsFalse(provider.SupportsReferences);
+
+		await provider.GetHoverAsync(filePath, content, 0, 0);
+
+		Assert.IsTrue(provider.SupportsReferences);
+		Assert.IsTrue(client.SupportsSemanticTokensFull);
+		Assert.AreEqual(TextDocumentSyncKind.Incremental, client.TextDocumentSyncKind);
+	}
+
+	[TestMethod]
 	public async Task TransportLossBeforeReadyPublicationCannotBeOverwrittenByStartupCompletion()
 	{
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 		int capabilitiesChangedCount = 0;
+		long startedGeneration = 0;
 
-		provider.CapabilitiesChanged += () => capabilitiesChangedCount++;
-		client.BeforeReturningStartResult = () => client.PublishTransportUnavailable();
+		provider.CapabilitiesChanged += (_, _) => capabilitiesChangedCount++;
+		client.BeforeReturningStartResult = () =>
+		{
+			startedGeneration = client.TransportGeneration;
+			client.PublishTransportUnavailable();
+		};
 
 		TextHoverInfo? hover = await provider.GetHoverAsync(
 			@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
 
 		Assert.IsNull(hover);
-		Assert.AreEqual(0L, client.TransportGeneration);
+
+		// The unhealthy reset keeps the issued generation, mirroring the real client contract.
+		Assert.AreEqual(startedGeneration, client.TransportGeneration);
 		Assert.AreEqual(LanguageServerProviderState.Unavailable, provider.State);
 		Assert.IsFalse(provider.IsAvailable);
 		Assert.AreEqual(1, capabilitiesChangedCount);
@@ -100,7 +166,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	public async Task StaleTransportLossCannotChangeCurrentReadySession()
 	{
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 
 		await provider.GetHoverAsync(@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
 
@@ -121,12 +187,12 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	public async Task TransportLossRacingDispose_DoesNotPublishAfterDisposeOrOverwriteDisposedState()
 	{
 		using var client = new FakeLanguageServerClient();
-		var provider = new LuaLanguageServerIntelliSenseProvider(@"C:\Workspace", client);
+		var provider = new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace"], client);
 		using var transportCallbackCaptured = new ManualResetEventSlim();
 		using var releaseTransportCallback = new ManualResetEventSlim();
 		int capabilitiesChangedCount = 0;
 
-		provider.CapabilitiesChanged += () => capabilitiesChangedCount++;
+		provider.CapabilitiesChanged += (_, _) => capabilitiesChangedCount++;
 
 		await provider.GetHoverAsync(@"C:\Workspace\Scripts\test.lua", "return 1", 0, 0);
 
@@ -144,7 +210,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 		try
 		{
-			Assert.IsTrue(transportCallbackCaptured.Wait(TimeSpan.FromSeconds(1)));
+			Assert.IsTrue(transportCallbackCaptured.Wait(TestPolling.DefaultTimeout));
 		}
 		finally
 		{

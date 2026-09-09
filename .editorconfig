@@ -1,0 +1,28 @@
+# Root editor configuration for this repository.
+#
+# The conventions below match the verified tree state (2026-09-14): UTF-8 without a BOM, CRLF line
+# endings, one trailing newline, no trailing whitespace, tabs for C# source, and two-space indentation
+# for project and solution files.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown keeps meaningful trailing double spaces for hard line breaks.
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{cs,csx}]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+# using directives are sorted by full name, matching the existing files.
+dotnet_sort_system_directives_first = false
+
+[*.{csproj,props,targets,slnx}]
+indent_style = space
+indent_size = 2

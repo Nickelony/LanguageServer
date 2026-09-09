@@ -1,48 +1,77 @@
-using Microsoft.Extensions.Logging;
 using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense;
 using Nickelony.IDEKit.IntelliSense.Completion;
-using Nickelony.LanguageServer.Testing;
-using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 [TestClass]
-public partial class LuaLanguageServerResponseParserTests
+public sealed partial class LuaLanguageServerResponseParserTests
 {
 	[TestMethod]
-	public void ParseCompletionItem_RaisesPriorityForLocalUpvalueItem()
+	public void ParseCompletionItem_DetailProseDoesNotInfluenceKind()
 	{
-		CompletionItemPayload baselineElement = CreateCompletionItem("baseline", kind: 6, detail: "variable", documentation: "plain text");
-		CompletionItemPayload boostedElement = CreateCompletionItem("boosted", kind: 6, detail: "local variable", documentation: "upvalue");
-
-		TextCompletionItem? baselineItem = LuaLanguageServerResponseParser.ParseCompletionItem(baselineElement, 0, "text");
-		TextCompletionItem? boostedItem = LuaLanguageServerResponseParser.ParseCompletionItem(boostedElement, 0, "text");
-
-		Assert.IsNotNull(baselineItem);
-		Assert.IsNotNull(boostedItem);
-		Assert.AreEqual(35000.0, boostedItem.Priority - baselineItem.Priority);
-	}
-
-	[TestMethod]
-	public void ParseCompletionItem_UsesParameterIconWhenDetailContainsParameter()
-	{
-		CompletionItemPayload itemElement = CreateCompletionItem("arg", kind: 6, detail: "parameter", documentation: null);
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new { label = "arg", detail = "parameter" });
 
 		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
-		Assert.AreEqual(TextCompletionItemKind.Parameter, item.Kind);
+
+		// Kind inference is protocol-only: a payload without a kind keeps the presentation fallback
+		// even when its prose mentions a category.
+		Assert.AreSame(TextCompletionItemKind.Generic, item.Kind);
 	}
 
 	[TestMethod]
-	public void ParseCompletionItem_UnknownLuaKindFallsBackToGeneric()
+	public void ParseCompletionItem_OutOfRangeKind_UsesGenericFallback()
 	{
 		CompletionItemPayload itemElement = CreateCompletionItem("unknown", kind: 999, detail: null, documentation: null);
 
 		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
-		Assert.AreEqual(TextCompletionItemKind.Generic, item.Kind);
+
+		// A value outside the protocol range cannot be represented; it maps to the presentation
+		// fallback instead of masquerading as the real Text kind.
+		Assert.AreSame(TextCompletionItemKind.Generic, item.Kind);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_MissingKind_UsesGenericFallback()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new { label = "item" });
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
+
+		Assert.IsNotNull(item);
+		Assert.AreSame(TextCompletionItemKind.Generic, item.Kind);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_MapsProtocolKindsOneToOne()
+	{
+		// Every protocol kind must survive into the shared taxonomy unchanged. The protocol names are
+		// listed explicitly so an added or renamed protocol kind cannot silently collapse onto another
+		// member.
+		string[] protocolNames =
+		[
+			"Text", "Method", "Function", "Constructor", "Field", "Variable", "Class", "Interface",
+			"Module", "Property", "Unit", "Value", "Enum", "Keyword", "Snippet", "Color", "File",
+			"Reference", "Folder", "EnumMember", "Constant", "Struct", "Event", "Operator", "TypeParameter"
+		];
+
+		for (int protocolKind = 1; protocolKind <= protocolNames.Length; protocolKind++)
+		{
+			CompletionItemPayload itemElement = CreateCompletionItem($"item{protocolKind}", protocolKind, detail: null, documentation: null);
+
+			TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
+
+			Assert.IsNotNull(item);
+
+			TextCompletionItemKind expectedKind = TextCompletionItemKindConversion.FromLspKind(protocolKind);
+
+			Assert.AreEqual(protocolNames[protocolKind - 1], expectedKind.Identifier, $"Protocol kind {protocolKind} must have a library member with the protocol name.");
+			Assert.AreSame(expectedKind, item.Kind, $"Protocol kind {protocolKind} must map one-to-one.");
+		}
 	}
 
 	[TestMethod]
@@ -70,6 +99,112 @@ public partial class LuaLanguageServerResponseParserTests
 		Assert.IsNotNull(item.TextEdit);
 		Assert.AreEqual(new TextRange(4, 3), item.TextEdit.Value.InsertRange);
 		Assert.IsNull(item.TextEdit.Value.ReplaceRange);
+		Assert.AreEqual("print", item.TextEdit.Value.NewText);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_RejectsUnusableTextEditRange()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
+		{
+			label = "print",
+			kind = 3,
+			textEdit = new
+			{
+				newText = "print",
+				range = new
+				{
+					start = new { line = 5, character = 2 },
+					end = new { line = 1, character = 5 }
+				}
+			}
+		});
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "a\nprint");
+
+		// A range that cannot be mapped against the snapshot is rejected instead of producing a
+		// partial edit; the label remains the commit fallback.
+		Assert.IsNotNull(item);
+		Assert.IsNull(item.TextEdit);
+		Assert.AreEqual("print", item.InsertText);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_TextEditNewTextSupersedesInsertText()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
+		{
+			label = "print",
+			kind = 3,
+			insertText = "fallback",
+			textEdit = new
+			{
+				newText = "replacement",
+				range = new
+				{
+					start = new { line = 0, character = 0 },
+					end = new { line = 0, character = 5 }
+				}
+			}
+		});
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "print");
+
+		Assert.IsNotNull(item);
+
+		// The edit carries the commit text; the plain insertion text stays available as the fallback.
+		Assert.AreEqual("fallback", item.InsertText);
+		Assert.AreEqual("replacement", item.TextEdit?.NewText);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_WhitespaceTextEditNewText_IsPreserved()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
+		{
+			label = "print",
+			kind = 3,
+			textEdit = new
+			{
+				newText = " ",
+				range = new
+				{
+					start = new { line = 0, character = 0 },
+					end = new { line = 0, character = 5 }
+				}
+			}
+		});
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "print");
+
+		Assert.IsNotNull(item);
+		Assert.AreEqual(" ", item.TextEdit?.NewText);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_SnippetTextEditNewText_PassesThroughWithSnippetFormat()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
+		{
+			label = "spawn",
+			kind = 3,
+			insertTextFormat = 2,
+			textEdit = new
+			{
+				newText = "spawn($0)",
+				range = new
+				{
+					start = new { line = 0, character = 0 },
+					end = new { line = 0, character = 5 }
+				}
+			}
+		});
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "spawn");
+
+		Assert.IsNotNull(item);
+		Assert.AreEqual("spawn($0)", item.TextEdit?.NewText);
+		Assert.AreEqual(TextCompletionInsertTextFormat.Snippet, item.InsertTextFormat);
 	}
 
 	[TestMethod]
@@ -107,7 +242,38 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
-	public void ParseCompletionItem_StripsSnippetAndPreservesFinalCaretOffset()
+	public void ParseCompletionItem_InsertReplaceEditWithMismatchedStarts_DegradesToReplaceRange()
+	{
+		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
+		{
+			label = "print",
+			kind = 3,
+			textEdit = new
+			{
+				newText = "print",
+				insert = new
+				{
+					start = new { line = 0, character = 2 },
+					end = new { line = 0, character = 3 }
+				},
+				replace = new
+				{
+					start = new { line = 0, character = 1 },
+					end = new { line = 0, character = 6 }
+				}
+			}
+		});
+
+		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "abcdef");
+
+		Assert.IsNotNull(item);
+		Assert.IsNotNull(item.TextEdit);
+		Assert.IsNull(item.TextEdit.Value.ReplaceRange);
+		Assert.AreEqual(new TextRange(1, 5), item.TextEdit.Value.InsertRange);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_SnippetInsertText_PassesThroughWithSnippetFormat()
 	{
 		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
 		{
@@ -120,12 +286,12 @@ public partial class LuaLanguageServerResponseParserTests
 		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
-		Assert.AreEqual("if condition then\r\n\t\r\nend", item.InsertText);
-		Assert.AreEqual("if condition then\r\n\t".Length, item.InsertCaretOffset);
+		Assert.AreEqual("if ${1:condition} then\r\n\t$0\r\nend", item.InsertText);
+		Assert.AreEqual(TextCompletionInsertTextFormat.Snippet, item.InsertTextFormat);
 	}
 
 	[TestMethod]
-	public void ParseCompletionItem_PreservesUnknownSnippetPlaceholdersAndPlacesCaretAfterDefaultText()
+	public void ParseCompletionItem_UnknownSnippetPlaceholders_PassThroughVerbatim()
 	{
 		CompletionItemPayload itemElement = DeserializeCompletionItemPayload(new
 		{
@@ -138,8 +304,25 @@ public partial class LuaLanguageServerResponseParserTests
 		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
-		Assert.AreEqual("call(${name}, done)", item.InsertText);
-		Assert.AreEqual("call(${name}, done".Length, item.InsertCaretOffset);
+		Assert.AreEqual("call(${name}, ${0:done})", item.InsertText);
+		Assert.AreEqual(TextCompletionInsertTextFormat.Snippet, item.InsertTextFormat);
+	}
+
+	[TestMethod]
+	public void ParseCompletionItem_AbsentOrUnknownInsertTextFormat_ReadsAsPlainText()
+	{
+		CompletionItemPayload plain = DeserializeCompletionItemPayload(new { label = "print", insertText = "print" });
+		CompletionItemPayload unknown = DeserializeCompletionItemPayload(new { label = "print", insertText = "print", insertTextFormat = 7 });
+
+		TextCompletionItem? plainItem = LuaLanguageServerResponseParser.ParseCompletionItem(plain, 0, "text");
+		TextCompletionItem? unknownItem = LuaLanguageServerResponseParser.ParseCompletionItem(unknown, 0, "text");
+
+		Assert.IsNotNull(plainItem);
+		Assert.IsNotNull(unknownItem);
+
+		// An absent format and a value outside the protocol range both read as plain text.
+		Assert.AreEqual(TextCompletionInsertTextFormat.PlainText, plainItem.InsertTextFormat);
+		Assert.AreEqual(TextCompletionInsertTextFormat.PlainText, unknownItem.InsertTextFormat);
 	}
 
 	[TestMethod]
@@ -203,165 +386,37 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
-	public void DeserializeCompletionResponse_PreservesCompletionListMetadata()
+	public void ParseCompletionItems_KeepsItemsThatDifferOnlyInFilterText()
 	{
-		CompletionResponse? response = DeserializeCompletionResponse(new
-		{
-			isIncomplete = true,
-			items = new object[]
-			{
-				new
-				{
-					label = "spawn",
-					kind = 3,
-					insertText = "spawn",
-					filterText = "spawn"
-				}
-			}
-		});
-
-		Assert.IsNotNull(response);
-		Assert.IsTrue(response.IsIncomplete);
-		Assert.IsNotNull(response.Items);
-		Assert.AreEqual(1, response.Items.Count);
-		Assert.AreEqual("spawn", response.Items[0].Label);
-	}
-
-	[TestMethod]
-	public void DeserializeCompletionResponse_ParsesArrayPayload()
-	{
-		CompletionResponse? response = DeserializeCompletionResponse(new object[]
-		{
-			new
-			{
-				label = "spawn",
-				kind = 3,
-				insertText = "spawn",
-				filterText = "spawn"
-			}
-		});
-
-		Assert.IsNotNull(response);
-		Assert.IsFalse(response.IsIncomplete);
-		Assert.IsNotNull(response.Items);
-		Assert.AreEqual(1, response.Items.Count);
-		Assert.AreEqual("spawn", response.Items[0].Label);
-	}
-
-	[TestMethod]
-	public void DeserializeCompletionResponse_IgnoresNonBooleanIncompleteFlag()
-	{
-		CompletionResponse? response = DeserializeCompletionResponse(new
-		{
-			isIncomplete = "yes",
-			items = new object[]
-			{
-				new
-				{
-					label = "spawn",
-					kind = 3,
-					insertText = "spawn",
-					filterText = "spawn"
-				}
-			}
-		});
-
-		Assert.IsNotNull(response);
-		Assert.IsFalse(response.IsIncomplete);
-		Assert.IsNotNull(response.Items);
-		Assert.AreEqual(1, response.Items.Count);
-	}
-
-	[TestMethod]
-	public void CompletionResponse_DefensivelyClonesItemList()
-	{
-		CompletionItemPayload[] items =
-		[
-			new CompletionItemPayload
-			{
-				Label = "spawn",
-				Kind = 3,
-				InsertText = "spawn"
-			}
-		];
-
-		var response = new CompletionResponse(items);
-		items[0] = new CompletionItemPayload
-		{
-			Label = "changed",
-			Kind = 14,
-			InsertText = "changed"
-		};
-
-		Assert.IsNotNull(response.Items);
-		Assert.AreEqual(1, response.Items.Count);
-		Assert.AreEqual("spawn", response.Items[0].Label);
-	}
-
-	[TestMethod]
-	public void DeserializeCompletionResponse_IgnoresMalformedCompletionListItemsShape()
-	{
-		using var logScope = new TestLoggerScope(LogLevel.Warning);
-
-		CompletionResponse? response = DeserializeCompletionResponse(new
-		{
-			isIncomplete = true,
-			items = new
-			{
-				label = "spawn"
-			}
-		}, new CompletionResponseJsonConverter(logScope));
-
-		Assert.IsNotNull(response);
-		Assert.IsNull(response.Items);
-		Assert.IsFalse(response.IsIncomplete);
-
-		Assert.IsTrue(logScope.Logs.Any(log => log.Contains("unsupported JSON kind", StringComparison.OrdinalIgnoreCase)
-			&& log.Contains("Object", StringComparison.Ordinal)),
-			string.Join(Environment.NewLine, logScope.Logs));
-	}
-
-	[TestMethod]
-	public void DeserializeCompletionResponse_LogsWhenCompletionListItemsPropertyIsMissing()
-	{
-		using var logScope = new TestLoggerScope(LogLevel.Warning);
-
-		CompletionResponse? response = DeserializeCompletionResponse(new
-		{
-			isIncomplete = true
-		}, new CompletionResponseJsonConverter(logScope));
-
-		Assert.IsNotNull(response);
-		Assert.IsNull(response.Items);
-		Assert.IsFalse(response.IsIncomplete);
-
-		Assert.IsTrue(logScope.Logs.Any(log => log.Contains("items' property was missing", StringComparison.OrdinalIgnoreCase)),
-			string.Join(Environment.NewLine, logScope.Logs));
-	}
-
-	[TestMethod]
-	public void SerializeCompletionResponse_WritesRoundTrippableCompletionListShape()
-	{
-		var response = new CompletionResponse(
+		IReadOnlyList<TextCompletionItem> items = LuaLanguageServerResponseParser.ParseCompletionItems(
 			[
-				new CompletionItemPayload
-				{
-					Label = "spawn",
-					Kind = 3,
-					InsertText = "spawn"
-				}
+				DeserializeCompletionItemPayload(new { label = "spawn", kind = 3, insertText = "spawn", filterText = "spawn" }),
+				DeserializeCompletionItemPayload(new { label = "spawn", kind = 3, insertText = "spawn", filterText = "spawn_object" })
 			],
-			isIncomplete: true);
+			"text");
 
-		string json = JsonSerializer.Serialize(response);
-		CompletionResponse? roundTripped = JsonSerializer.Deserialize<CompletionResponse>(json);
+		// FilterText is part of the duplicate identity: two suggestions that filter differently are both kept.
+		Assert.AreEqual(2, items.Count);
+		Assert.AreEqual("spawn", items[0].FilterText);
+		Assert.AreEqual("spawn_object", items[1].FilterText);
+	}
 
-		Assert.AreEqual("{\"isIncomplete\":true,\"items\":[{\"label\":\"spawn\",\"kind\":3,\"insertText\":\"spawn\"}]}", json);
-		Assert.IsNotNull(roundTripped);
-		Assert.IsTrue(roundTripped.IsIncomplete);
-		Assert.IsNotNull(roundTripped.Items);
-		Assert.AreEqual(1, roundTripped.Items.Count);
-		Assert.AreEqual("spawn", roundTripped.Items[0].Label);
+	[TestMethod]
+	public void ParseCompletionItems_MergesDuplicateVariantsInsteadOfDroppingFlags()
+	{
+		IReadOnlyList<TextCompletionItem> items = LuaLanguageServerResponseParser.ParseCompletionItems(
+			[
+				DeserializeCompletionItemPayload(new { label = "spawn", kind = 3, insertText = "spawn($1)", insertTextFormat = 1 }),
+				DeserializeCompletionItemPayload(new { label = "spawn", kind = 3, insertText = "spawn($1)", insertTextFormat = 2, preselect = true, sortText = "0002" })
+			],
+			"text");
+
+		// A duplicate is merged instead of discarded: the snippet format and the preselect flag from the
+		// later variant survive on the retained item, and its blank sort text adopts the non-blank value.
+		Assert.AreEqual(1, items.Count);
+		Assert.AreEqual(TextCompletionInsertTextFormat.Snippet, items[0].InsertTextFormat);
+		Assert.IsTrue(items[0].IsPreselected);
+		Assert.AreEqual("0002", items[0].SortText);
 	}
 
 	[TestMethod]
@@ -381,7 +436,7 @@ public partial class LuaLanguageServerResponseParserTests
 		TextCompletionItem? item = LuaLanguageServerResponseParser.ParseCompletionItem(itemElement, 0, "text");
 
 		Assert.IsNotNull(item);
-		Assert.AreEqual("    local value = 1", item.Description);
-		Assert.IsTrue(item.IsDescriptionMarkdown);
+		Assert.AreEqual("    local value = 1", item.Documentation);
+		Assert.AreEqual(TextMarkupKind.Markdown, item.DocumentationKind);
 	}
 }

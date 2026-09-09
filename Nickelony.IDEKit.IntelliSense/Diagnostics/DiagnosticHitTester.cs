@@ -1,140 +1,145 @@
 namespace Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 /// <summary>
-/// Selects and formats diagnostics for hover hit-testing without any editor or UI dependency.
+/// Selects diagnostics at a zero-based offset or within a range, independent of any editor or UI.
 /// </summary>
 /// <remarks>
-/// This helper is document- and presentation-agnostic: callers supply the diagnostic list and
-/// integer offsets, and receive the ordered selection or a formatted message. Severity labels
-/// are injectable so hosts can localize or customize the built-in severity prefixes.
+/// <para>
+/// This helper is document-agnostic: callers supply the diagnostic list and zero-based UTF-16
+/// offsets, and receive the selection ordered by start offset, then by end offset; diagnostics with
+/// identical spans keep no defined relative order. Selections apply no severity policy, so callers
+/// that want severity-first results copy and sort the returned list. Message formatting and severity
+/// labels are host presentation and live in editor host packages. A selection with no matches is a
+/// shared empty result that callers must not mutate, and elements of the supplied list must not be
+/// <see langword="null"/>.
+/// </para>
 /// </remarks>
 public static class DiagnosticHitTester
 {
+	private static readonly Comparison<TextDiagnostic> s_documentOrder = static (left, right) =>
+	{
+		int byStartOffset = left.StartOffset.CompareTo(right.StartOffset);
+
+		return byStartOffset != 0
+			? byStartOffset
+			: left.EndOffset.CompareTo(right.EndOffset);
+	};
+
 	/// <summary>
 	/// Gets the diagnostics whose span contains the supplied offset.
 	/// </summary>
 	/// <param name="diagnostics">The diagnostics to search.</param>
 	/// <param name="offset">The zero-based offset to test.</param>
-	/// <returns>The matching diagnostics, ordered by severity then start offset.</returns>
-	public static IReadOnlyList<TextEditorDiagnostic> GetDiagnosticsAtOffset(
-		IReadOnlyList<TextEditorDiagnostic> diagnostics,
+	/// <returns>
+	/// The matching diagnostics, ordered by start offset then end offset; a selection with no match
+	/// is a shared empty result.
+	/// </returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="diagnostics"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException">
+	/// <paramref name="diagnostics"/> contains a <see langword="null"/> element.
+	/// </exception>
+	/// <exception cref="ArgumentOutOfRangeException"><paramref name="offset"/> is negative.</exception>
+	public static IReadOnlyList<TextDiagnostic> GetDiagnosticsAtOffset(
+		IReadOnlyList<TextDiagnostic> diagnostics,
 		int offset)
 	{
 		ArgumentNullException.ThrowIfNull(diagnostics);
+		ValidateElements(diagnostics, nameof(diagnostics));
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
 
-		return diagnostics
-			.Where(diagnostic => diagnostic.ContainsOffset(offset))
-			.OrderBy(diagnostic => diagnostic.Severity)
-			.ThenBy(diagnostic => diagnostic.StartOffset)
-			.ToArray();
+		List<TextDiagnostic>? matches = null;
+
+		for (int i = 0; i < diagnostics.Count; i++)
+		{
+			TextDiagnostic diagnostic = diagnostics[i];
+
+			if (diagnostic.ContainsOffset(offset))
+				(matches ??= new List<TextDiagnostic>()).Add(diagnostic);
+		}
+
+		return Order(matches);
 	}
 
 	/// <summary>
 	/// Gets the diagnostics whose span intersects the supplied range.
 	/// </summary>
+	/// <remarks>
+	/// An empty or reversed range selects nothing. Offsets must not be negative: the selection entry
+	/// point validates its inputs, while <see cref="TextDiagnostic.Intersects"/> tolerates a
+	/// negative start for callers that compare ranges outside this helper.
+	/// </remarks>
 	/// <param name="diagnostics">The diagnostics to search.</param>
 	/// <param name="startOffset">The zero-based inclusive start offset of the range.</param>
 	/// <param name="endOffset">The zero-based exclusive end offset of the range.</param>
-	/// <returns>The matching diagnostics, ordered by severity then start offset.</returns>
-	public static IReadOnlyList<TextEditorDiagnostic> GetDiagnosticsForRange(
-		IReadOnlyList<TextEditorDiagnostic> diagnostics,
+	/// <returns>
+	/// The matching diagnostics, ordered by start offset then end offset; a selection with no match
+	/// is a shared empty result.
+	/// </returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="diagnostics"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException">
+	/// <paramref name="diagnostics"/> contains a <see langword="null"/> element.
+	/// </exception>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="startOffset"/> or <paramref name="endOffset"/> is negative.
+	/// </exception>
+	public static IReadOnlyList<TextDiagnostic> GetDiagnosticsForRange(
+		IReadOnlyList<TextDiagnostic> diagnostics,
 		int startOffset,
 		int endOffset)
 	{
 		ArgumentNullException.ThrowIfNull(diagnostics);
+		ValidateElements(diagnostics, nameof(diagnostics));
+		ArgumentOutOfRangeException.ThrowIfNegative(startOffset);
+		ArgumentOutOfRangeException.ThrowIfNegative(endOffset);
 
-		return diagnostics
-			.Where(diagnostic => diagnostic.Intersects(startOffset, endOffset))
-			.OrderBy(diagnostic => diagnostic.Severity)
-			.ThenBy(diagnostic => diagnostic.StartOffset)
-			.ToArray();
+		List<TextDiagnostic>? matches = null;
+
+		for (int i = 0; i < diagnostics.Count; i++)
+		{
+			TextDiagnostic diagnostic = diagnostics[i];
+
+			if (diagnostic.Intersects(startOffset, endOffset))
+				(matches ??= new List<TextDiagnostic>()).Add(diagnostic);
+		}
+
+		return Order(matches);
 	}
 
 	/// <summary>
-	/// Selects the diagnostics shown for a hover at the supplied offset, optionally falling back
-	/// to the diagnostics intersecting a containing line range when no diagnostic covers the
-	/// exact offset.
+	/// Returns the collected matches in document order, or the shared empty result when nothing matched.
 	/// </summary>
-	/// <param name="diagnostics">The diagnostics to search.</param>
-	/// <param name="hoveredOffset">The zero-based hovered offset.</param>
-	/// <param name="allowLineFallback">
-	/// Whether to fall back to a line-wide selection when the exact offset has no diagnostic.
-	/// </param>
-	/// <param name="lineStartOffset">
-	/// The zero-based inclusive start offset of the containing line, used for the fallback.
-	/// </param>
-	/// <param name="lineEndOffset">
-	/// The zero-based exclusive end offset of the containing line, used for the fallback.
-	/// </param>
-	/// <returns>The selected diagnostics, ordered by severity then start offset.</returns>
-	public static IReadOnlyList<TextEditorDiagnostic> SelectHoverDiagnostics(
-		IReadOnlyList<TextEditorDiagnostic> diagnostics,
-		int hoveredOffset,
-		bool allowLineFallback,
-		int lineStartOffset,
-		int lineEndOffset)
+	/// <param name="matches">The collected matches, or <see langword="null"/> when nothing matched.</param>
+	/// <returns>The ordered list, or the shared empty result when nothing matched.</returns>
+	private static IReadOnlyList<TextDiagnostic> Order(List<TextDiagnostic>? matches)
 	{
-		ArgumentNullException.ThrowIfNull(diagnostics);
+		if (matches is null)
+			return Array.Empty<TextDiagnostic>();
 
-		IReadOnlyList<TextEditorDiagnostic> hovered = GetDiagnosticsAtOffset(diagnostics, hoveredOffset);
-
-		if (hovered.Count == 0 && allowLineFallback)
-			hovered = GetDiagnosticsForRange(diagnostics, lineStartOffset, lineEndOffset);
-
-		return hovered;
+		matches.Sort(s_documentOrder);
+		return matches;
 	}
 
 	/// <summary>
-	/// Formats a diagnostic message, prefixing the supplied severity label when the message does
-	/// not already begin with a recognized built-in severity prefix. A <see langword="null"/>
-	/// label emits the raw message.
+	/// Validates that the diagnostics list contains no <see langword="null"/> element, so a violated
+	/// precondition fails at the entry point instead of as a null dereference mid-scan.
 	/// </summary>
-	/// <param name="diagnostic">The diagnostic to format.</param>
-	/// <param name="severityLabel">The severity label, or <see langword="null"/> to use the raw message.</param>
-	/// <returns>The formatted message.</returns>
-	public static string FormatMessage(
-		TextEditorDiagnostic diagnostic,
-		Func<TextEditorDiagnosticSeverity, string>? severityLabel = null)
+	/// <param name="diagnostics">The diagnostics to validate.</param>
+	/// <param name="paramName">The parameter name reported by the exception.</param>
+	/// <exception cref="ArgumentException">The list contains a <see langword="null"/> element.</exception>
+	private static void ValidateElements(IReadOnlyList<TextDiagnostic> diagnostics, string paramName)
 	{
-		ArgumentNullException.ThrowIfNull(diagnostic);
-
-		if (string.IsNullOrWhiteSpace(diagnostic.Message))
-			return string.Empty;
-
-		if (severityLabel is null || IsSeverityPrefixed(diagnostic.Message))
-			return diagnostic.Message;
-
-		return severityLabel(diagnostic.Severity) + ":\n" + diagnostic.Message;
+		for (int i = 0; i < diagnostics.Count; i++)
+		{
+			if (diagnostics[i] is null)
+			{
+				throw new ArgumentException(
+					$"The diagnostics collection contains a null element at index {i}.",
+					paramName);
+			}
+		}
 	}
-
-	/// <summary>
-	/// Builds a combined hover message from the supplied diagnostics, deduplicating identical
-	/// formatted messages and preserving their input order.
-	/// </summary>
-	/// <param name="diagnostics">The diagnostics to combine, in the order in which their messages should appear.</param>
-	/// <param name="severityLabel">The severity label, or <see langword="null"/> to use raw messages.</param>
-	/// <returns>The combined message, or <see langword="null"/> when no non-empty message remains.</returns>
-	public static string? BuildCombinedMessage(
-		IReadOnlyList<TextEditorDiagnostic> diagnostics,
-		Func<TextEditorDiagnosticSeverity, string>? severityLabel = null)
-	{
-		ArgumentNullException.ThrowIfNull(diagnostics);
-
-		string message = string.Join(
-			Environment.NewLine + Environment.NewLine,
-			diagnostics
-				.Select(diagnostic => FormatMessage(diagnostic, severityLabel))
-				.Where(text => !string.IsNullOrWhiteSpace(text))
-				.Distinct(StringComparer.Ordinal));
-
-		return string.IsNullOrWhiteSpace(message) ? null : message;
-	}
-
-	private static bool IsSeverityPrefixed(string message)
-		=> !string.IsNullOrWhiteSpace(message)
-			&& (message.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
-				|| message.StartsWith("Warning:", StringComparison.OrdinalIgnoreCase)
-				|| message.StartsWith("Information:", StringComparison.OrdinalIgnoreCase)
-				|| message.StartsWith("Hint:", StringComparison.OrdinalIgnoreCase)
-				|| message.StartsWith("Diagnostic:", StringComparison.OrdinalIgnoreCase));
 }

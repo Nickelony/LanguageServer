@@ -1,22 +1,24 @@
+using Nickelony.IDEKit.Core.Text;
+
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Represents a single text replacement inside a document.
 /// </summary>
 /// <remarks>
-/// The range uses line and column numbers so the edit can be passed between components without depending on a
-/// specific editor.
+/// The range uses zero-based line and character positions in LSP units: lines count line breaks,
+/// characters count UTF-16 code units within the line, and a tab counts as a single code unit.
 /// </remarks>
-public sealed class TextEdit
+public sealed record TextEdit
 {
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextEdit"/> class.
+	/// Initializes a new instance of the <see cref="TextEdit"/> record.
 	/// </summary>
 	/// <param name="range">The range to replace.</param>
 	/// <param name="newText">The replacement text.</param>
-	public TextEdit(TextDocumentRange range, string newText)
+	/// <exception cref="ArgumentNullException"><paramref name="newText"/> is <see langword="null"/>.</exception>
+	public TextEdit(TextPositionRange range, string newText)
 	{
-		ArgumentNullException.ThrowIfNull(range);
 		ArgumentNullException.ThrowIfNull(newText);
 
 		Range = range;
@@ -26,7 +28,7 @@ public sealed class TextEdit
 	/// <summary>
 	/// Gets the range to replace.
 	/// </summary>
-	public TextDocumentRange Range { get; }
+	public TextPositionRange Range { get; }
 
 	/// <summary>
 	/// Gets the replacement text.

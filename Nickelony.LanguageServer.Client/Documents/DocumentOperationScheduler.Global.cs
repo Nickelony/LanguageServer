@@ -5,64 +5,50 @@ public sealed partial class DocumentOperationScheduler
 	/// <summary>
 	/// Enqueues an operation behind the current global operation chain.
 	/// </summary>
+	/// <remarks>
+	/// Intended for hosts that need whole-client operations (such as a configuration push) serialized behind
+	/// other global work; the client itself does not call this method. Global operations are ordered only with
+	/// respect to other global and exclusive operations; per-document work on unaffected paths is not gated. Queued
+	/// delegates must not call back into the scheduler; every enqueue and wait method rejects that pattern with an
+	/// <see cref="InvalidOperationException"/> instead of risking a deadlock.
+	/// </remarks>
 	/// <typeparam name="TResult">The operation result type.</typeparam>
 	/// <param name="operation">The operation to enqueue.</param>
 	/// <param name="cancellationToken">Cancels the queued operation.</param>
 	/// <returns>A task that completes with the queued operation result.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="operation"/> is <see langword="null"/>.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// The caller executes inside a queued scheduler operation and must queue the global operation after awaiting it instead.
+	/// </exception>
 	public Task<TResult> EnqueueGlobalAsync<TResult>(Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(operation);
 
+		EnsureNotInsideSchedulerOperation(nameof(EnqueueGlobalAsync));
+
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var enqueueGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		lock (_syncRoot)
+		try
 		{
-			Task previousOperation = _queuedGlobalOperation;
+			lock (_syncRoot)
+			{
+				Task previousOperation = _queuedGlobalOperation;
 
-			_queuedGlobalOperation = RunQueuedOperationAsync(
-				previousOperation,
-				Task.CompletedTask,
-				operation,
-				completionSource,
-				cancellationToken);
+				_queuedGlobalOperation = RunCompletionNodeAsync(
+					enqueueGate.Task,
+					[previousOperation],
+					new ActiveDocumentContext(firstFilePath: null, secondFilePath: null),
+					operation,
+					completionSource,
+					cancellationToken);
+			}
+		}
+		finally
+		{
+			enqueueGate.TrySetResult(true);
 		}
 
 		return completionSource.Task;
-	}
-
-	/// <summary>
-	/// Runs an operation after a previously scheduled operation has completed.
-	/// </summary>
-	/// <typeparam name="TResult">The operation result type.</typeparam>
-	/// <param name="previousOperation">The operation that must complete first.</param>
-	/// <param name="barrierOperation">The exclusion barrier that must also complete first.</param>
-	/// <param name="operation">The queued operation to execute.</param>
-	/// <param name="completionSource">The completion source exposed to the caller.</param>
-	/// <param name="cancellationToken">Cancels the queued operation.</param>
-	/// <returns>A task representing the scheduled queue node.</returns>
-	private static async Task RunQueuedOperationAsync<TResult>(
-		Task previousOperation,
-		Task barrierOperation,
-		Func<CancellationToken, Task<TResult>> operation,
-		TaskCompletionSource<TResult> completionSource,
-		CancellationToken cancellationToken)
-	{
-		try
-		{
-			await WaitForQueuedOperationsAsync(previousOperation, barrierOperation).ConfigureAwait(false);
-
-			cancellationToken.ThrowIfCancellationRequested();
-
-			TResult result = await operation(cancellationToken).ConfigureAwait(false);
-			completionSource.TrySetResult(result);
-		}
-		catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
-		{
-			completionSource.TrySetCanceled(cancellationToken);
-		}
-		catch (Exception exception)
-		{
-			completionSource.TrySetException(exception);
-		}
 	}
 }

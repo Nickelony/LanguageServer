@@ -1,13 +1,16 @@
+using Nickelony.IDEKit.Workspace.Documents.FileSystem;
+
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
 /// Requests replacement of the logical content and file format of a document.
 /// </summary>
-/// <remarks>The request does not write to disk; persistence is performed by <see cref="IWorkspaceDocumentStore.CommitAsync(WorkspaceDocumentCommitRequest, CancellationToken)"/>.</remarks>
+/// <remarks>The request does not write to disk; persistence is performed by <see cref="IWorkspaceDocumentStore.CommitAsync(WorkspaceDocumentCommitRequest, CancellationToken)"/>. The supplied format is stored as-is: <see cref="TextFileFormat.NewlineStyle"/> is never recomputed to match the new content.</remarks>
+/// <param name="Identity">The document instance, id, and version expected by the caller.</param>
+/// <param name="Content">The new logical content.</param>
+/// <param name="FileFormat">The format associated with the new content.</param>
 public sealed record WorkspaceDocumentReplaceRequest(
-	WorkspaceDocumentKey ExpectedDocumentKey,
-	string DocumentId,
-	long ExpectedVersion,
+	WorkspaceDocumentRequestIdentity Identity,
 	string Content,
 	TextFileFormat FileFormat);
 
@@ -15,19 +18,19 @@ public sealed record WorkspaceDocumentReplaceRequest(
 /// Requests that a document discard its unsaved logical changes.
 /// </summary>
 /// <remarks>The document is restored to its last persisted content and format if it is dirty.</remarks>
+/// <param name="Identity">The document instance, id, and version expected by the caller.</param>
 public sealed record WorkspaceDocumentDiscardRequest(
-	WorkspaceDocumentKey ExpectedDocumentKey,
-	string DocumentId,
-	long ExpectedVersion);
+	WorkspaceDocumentRequestIdentity Identity);
 
 /// <summary>
 /// Requests that a document move to a new path.
 /// </summary>
 /// <remarks>The expected source stamp protects the move from an external source-file change.</remarks>
+/// <param name="Identity">The document instance, id, and version expected by the caller.</param>
+/// <param name="ExpectedOnDiskStamp">The source stamp that must still match before the move.</param>
+/// <param name="DestinationPath">The path that receives the moved file.</param>
 public sealed record WorkspaceDocumentRenameRequest(
-	WorkspaceDocumentKey ExpectedDocumentKey,
-	string DocumentId,
-	long ExpectedVersion,
+	WorkspaceDocumentRequestIdentity Identity,
 	FileStamp ExpectedOnDiskStamp,
 	string DestinationPath);
 
@@ -39,7 +42,7 @@ public enum WorkspaceDocumentRenameStatus
 	/// <summary>The document was renamed.</summary>
 	Renamed,
 
-	/// <summary>The requested rename made no change.</summary>
+	/// <summary>The destination path is identical to the document's path after normalization; a case-only difference is a real rename.</summary>
 	NoChange,
 
 	/// <summary>The path is invalid.</summary>
@@ -48,7 +51,7 @@ public enum WorkspaceDocumentRenameStatus
 	/// <summary>The document version was stale.</summary>
 	StaleDocument,
 
-	/// <summary>The document identity was stale.</summary>
+	/// <summary>The tracked document instance does not match the request's document key.</summary>
 	StaleDocumentInstance,
 
 	/// <summary>The document was not found.</summary>
@@ -57,66 +60,64 @@ public enum WorkspaceDocumentRenameStatus
 	/// <summary>Another operation is in progress.</summary>
 	OperationInProgress,
 
-	/// <summary>An attached view has pending edits, a conflict, or a prior synchronization failure.</summary>
-	ViewNotSynchronized,
-
 	/// <summary>The source file stamp did not match the expected stamp.</summary>
 	ExternalFileConflict,
 
 	/// <summary>The destination already exists.</summary>
 	DestinationExists,
 
-	/// <summary>The destination is in use.</summary>
+	/// <summary>A tracked document already occupies the destination path.</summary>
 	DestinationInUse,
 
-	/// <summary>The destination is busy.</summary>
+	/// <summary>Another operation is currently reserving the destination path.</summary>
 	DestinationBusy,
 
-	/// <summary>The move failed.</summary>
+	/// <summary>The move did not complete because of an unexpected error.</summary>
 	MoveFailed,
 
-	/// <summary>View synchronization failed after the document moved.</summary>
-	ViewUpdateFailed,
+	/// <summary>The move failed and its final state could not be established; for example, a case-only rename whose rollback move also failed.</summary>
+	MoveStateUnknown,
 
-	/// <summary>The operation was cancelled.</summary>
-	Cancelled
+	/// <summary>The operation was canceled.</summary>
+	Canceled
 }
 
 /// <summary>
 /// Contains the outcome of renaming a document.
 /// </summary>
 /// <remarks>
-/// The requested identity fields are echoed in the result. <see cref="Snapshot"/> contains the
-/// current document state when it is still tracked; <see cref="FailedViewIds"/> identifies views
-/// that could not be synchronized when the operation reached the view manager.
+/// <see cref="Snapshot"/> contains the current document state when it is still tracked.
 /// </remarks>
+/// <param name="Status">The rename outcome.</param>
+/// <param name="RequestedIdentity">The document instance, id, and version supplied with the request: the identity before the rename. The renamed identity is in <see cref="Snapshot"/>.</param>
+/// <param name="Snapshot">The current document state; <see langword="null"/> when the document was not found or the request path was invalid.</param>
+/// <param name="ObservedOnDiskStamp">The stamp that closes the rename: the resulting source stamp after a successful move (which may echo the request's expected stamp when the file system does not report one), or the stamp observed when a conflict or failure was detected; <see langword="null"/> when none was observed.</param>
+/// <param name="Failure">Explains a failed operation, when one occurred.</param>
 public sealed record WorkspaceDocumentRenameResult(
 	WorkspaceDocumentRenameStatus Status,
-	WorkspaceDocumentKey RequestedDocumentKey,
-	string RequestedDocumentId,
-	long RequestedVersion,
+	WorkspaceDocumentRequestIdentity RequestedIdentity,
 	WorkspaceDocumentSnapshot? Snapshot,
 	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null,
-	IReadOnlyList<string>? FailedViewIds = null);
+	WorkspaceOperationFailure? Failure = null);
 
 /// <summary>
-/// Requests that a document be persisted at a second path.
+/// Requests that a document be persisted at a destination path.
 /// </summary>
 /// <remarks>The source file is retained; the tracked document is retargeted to the destination on success.</remarks>
+/// <param name="Identity">The document instance, id, and version expected by the caller.</param>
+/// <param name="ExpectedOnDiskStamp">The source stamp that must still match before the write.</param>
+/// <param name="DestinationPath">The path that receives the written copy.</param>
 public sealed record WorkspaceDocumentSaveAsRequest(
-	WorkspaceDocumentKey ExpectedDocumentKey,
-	string DocumentId,
-	long ExpectedVersion,
+	WorkspaceDocumentRequestIdentity Identity,
 	FileStamp ExpectedOnDiskStamp,
 	string DestinationPath);
 
 /// <summary>
-/// Describes the outcome of saving a document at a second path.
+/// Describes the outcome of saving a document at a destination path.
 /// </summary>
 public enum WorkspaceDocumentSaveAsStatus
 {
-	/// <summary>The document was saved at the new path.</summary>
+	/// <summary>The document was saved at the destination path; a destination that resolves to the document's own file is saved in place.</summary>
 	SavedAs,
 
 	/// <summary>The path is invalid.</summary>
@@ -125,7 +126,7 @@ public enum WorkspaceDocumentSaveAsStatus
 	/// <summary>The document version was stale.</summary>
 	StaleDocument,
 
-	/// <summary>The document identity was stale.</summary>
+	/// <summary>The tracked document instance does not match the request's document key.</summary>
 	StaleDocumentInstance,
 
 	/// <summary>The document was not found.</summary>
@@ -134,65 +135,63 @@ public enum WorkspaceDocumentSaveAsStatus
 	/// <summary>Another operation is in progress.</summary>
 	OperationInProgress,
 
-	/// <summary>An attached view has pending edits, a conflict, or a prior synchronization failure.</summary>
-	ViewNotSynchronized,
-
 	/// <summary>The destination already exists.</summary>
 	DestinationExists,
 
-	/// <summary>The destination is in use.</summary>
+	/// <summary>
+	/// A tracked document already occupies the destination path. The document issuing the save is
+	/// excluded: saving onto its own file is a save in place and reports
+	/// <see cref="WorkspaceDocumentSaveAsStatus.SavedAs"/>.
+	/// </summary>
 	DestinationInUse,
 
-	/// <summary>The destination is busy.</summary>
+	/// <summary>Another operation is currently reserving the destination path.</summary>
 	DestinationBusy,
 
 	/// <summary>The source file stamp did not match the expected stamp.</summary>
 	ExternalFileConflict,
 
-	/// <summary>The write failed.</summary>
+	/// <summary>The write did not complete because of an unexpected error.</summary>
 	WriteFailed,
 
 	/// <summary>The replacement state is unknown.</summary>
 	ReplacementStateUnknown,
 
-	/// <summary>View synchronization failed after the document was saved at the destination.</summary>
-	ViewUpdateFailed,
-
-	/// <summary>The operation was cancelled.</summary>
-	Cancelled
+	/// <summary>The operation was canceled.</summary>
+	Canceled
 }
 
 /// <summary>
-/// Contains the outcome of saving a document at a second path.
+/// Contains the outcome of saving a document at a destination path.
 /// </summary>
 /// <remarks>
 /// A successful result points to the destination path and preserves the document key. The source
-/// file is not removed. <see cref="FailedViewIds"/> is populated only when view synchronization fails.
+/// file is not removed.
 /// </remarks>
+/// <param name="Status">The save-as outcome.</param>
+/// <param name="RequestedIdentity">The document instance, id, and version supplied with the request: the identity before the save-as. The retargeted identity is in <see cref="Snapshot"/>.</param>
+/// <param name="Snapshot">
+/// The current document state; <see langword="null"/> when the document was not found or the request
+/// path was invalid.
+/// </param>
+/// <param name="ObservedOnDiskStamp">The stamp that closes the write: the resulting destination stamp after a successful save-as, or the stamp observed when a conflict or destination collision was detected; <see langword="null"/> when none was observed.</param>
+/// <param name="Failure">Explains a failed operation, when one occurred.</param>
 public sealed record WorkspaceDocumentSaveAsResult(
 	WorkspaceDocumentSaveAsStatus Status,
-	WorkspaceDocumentKey RequestedDocumentKey,
-	string RequestedDocumentId,
-	long RequestedVersion,
+	WorkspaceDocumentRequestIdentity RequestedIdentity,
 	WorkspaceDocumentSnapshot? Snapshot,
 	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null,
-	IReadOnlyList<string>? FailedViewIds = null);
+	WorkspaceOperationFailure? Failure = null);
 
 /// <summary>
 /// Requests deletion of a workspace document.
 /// </summary>
-/// <param name="ExpectedDocumentKey">The document incarnation expected by the caller.</param>
-/// <param name="DocumentId">The normalized document id expected by the caller.</param>
-/// <param name="ExpectedVersion">The document version captured by the caller.</param>
+/// <remarks>Deletion uses the file system supplied to the store and is permanent by default; see <see cref="IWorkspaceFileSystem"/> remarks for host-specific deletion behavior.</remarks>
+/// <param name="Identity">The document instance, id, and version expected by the caller.</param>
 /// <param name="ExpectedOnDiskStamp">The on-disk stamp that must still match before deletion.</param>
-/// <param name="UseRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; <see langword="false"/> to delete permanently.</param>
 public sealed record WorkspaceDocumentDeleteRequest(
-	WorkspaceDocumentKey ExpectedDocumentKey,
-	string DocumentId,
-	long ExpectedVersion,
-	FileStamp ExpectedOnDiskStamp,
-	bool UseRecycleBin = false);
+	WorkspaceDocumentRequestIdentity Identity,
+	FileStamp ExpectedOnDiskStamp);
 
 /// <summary>
 /// Describes the outcome of deleting a document.
@@ -202,13 +201,10 @@ public enum WorkspaceDocumentDeleteStatus
 	/// <summary>The document was deleted.</summary>
 	Deleted,
 
-	/// <summary>The path is invalid.</summary>
-	InvalidPath,
-
 	/// <summary>The document version was stale.</summary>
 	StaleDocument,
 
-	/// <summary>The document identity was stale.</summary>
+	/// <summary>The tracked document instance does not match the request's document key.</summary>
 	StaleDocumentInstance,
 
 	/// <summary>The document was not found.</summary>
@@ -217,48 +213,44 @@ public enum WorkspaceDocumentDeleteStatus
 	/// <summary>Another operation is in progress.</summary>
 	OperationInProgress,
 
-	/// <summary>An attached view has pending edits, a conflict, or a prior synchronization failure.</summary>
-	ViewNotSynchronized,
-
-	/// <summary>The file stamp did not match the expected stamp.</summary>
+	/// <summary>The on-disk stamp did not match the expected stamp.</summary>
 	ExternalFileConflict,
 
-	/// <summary>The delete failed.</summary>
+	/// <summary>The delete did not complete because of an unexpected error.</summary>
 	DeleteFailed,
 
-	/// <summary>View synchronization failed after the document was deleted.</summary>
-	ViewUpdateFailed,
-
-	/// <summary>The operation was cancelled.</summary>
-	Cancelled
+	/// <summary>The operation was canceled.</summary>
+	Canceled
 }
 
 /// <summary>
 /// Contains the outcome of deleting a document.
 /// </summary>
 /// <remarks>
-/// The snapshot in a successful result describes the document immediately before it was removed
-/// from tracking. <see cref="FailedViewIds"/> is populated only when the view manager could not
-/// close or release all attached views.
+/// <see cref="Snapshot"/> describes the document immediately before it was removed from tracking in
+/// a successful result; a failed result carries the current tracked state instead. Only
+/// <see cref="WorkspaceDocumentDeleteStatus.DocumentNotFound"/> returns no snapshot.
 /// </remarks>
+/// <param name="Status">The delete outcome.</param>
+/// <param name="RequestedIdentity">The document instance, id, and version supplied with the request.</param>
+/// <param name="Snapshot">The current tracked state; for a successful delete, the state immediately before removal. <see langword="null"/> when the document was not found.</param>
+/// <param name="ObservedOnDiskStamp">The stamp that closes the delete: the stamp reported by the file system after a successful delete (the default file system reports none), or the stamp observed when a conflict or failure was detected; <see langword="null"/> when none was observed.</param>
+/// <param name="Failure">Explains a failed operation, when one occurred.</param>
 public sealed record WorkspaceDocumentDeleteResult(
 	WorkspaceDocumentDeleteStatus Status,
-	WorkspaceDocumentKey RequestedDocumentKey,
-	string RequestedDocumentId,
-	long RequestedVersion,
+	WorkspaceDocumentRequestIdentity RequestedIdentity,
 	WorkspaceDocumentSnapshot? Snapshot,
 	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null,
-	IReadOnlyList<string>? FailedViewIds = null);
+	WorkspaceOperationFailure? Failure = null);
 
 /// <summary>
 /// Describes the outcome of a synchronous logical document mutation.
 /// </summary>
-/// <remarks>No status in this enumeration writes to disk.</remarks>
+/// <remarks>These statuses describe logical mutation outcomes; none of them writes to disk.</remarks>
 public enum WorkspaceDocumentMutationStatus
 {
-	/// <summary>The content was replaced.</summary>
-	Replaced,
+	/// <summary>The tracked logical state changed.</summary>
+	Changed,
 
 	/// <summary>The request made no logical change.</summary>
 	NoChange,
@@ -266,7 +258,7 @@ public enum WorkspaceDocumentMutationStatus
 	/// <summary>The document version was stale.</summary>
 	StaleDocument,
 
-	/// <summary>The document identity was stale.</summary>
+	/// <summary>The tracked document instance does not match the request's document key.</summary>
 	StaleDocumentInstance,
 
 	/// <summary>The document was not found.</summary>
@@ -283,44 +275,10 @@ public enum WorkspaceDocumentMutationStatus
 /// <see cref="Snapshot"/> contains the current tracked state for every status except
 /// <see cref="WorkspaceDocumentMutationStatus.DocumentNotFound"/>.
 /// </remarks>
+/// <param name="Status">The mutation outcome.</param>
+/// <param name="RequestedIdentity">The document instance, id, and version supplied with the request.</param>
+/// <param name="Snapshot">The current tracked state; <see langword="null"/> when the document was not found.</param>
 public sealed record WorkspaceDocumentMutationResult(
 	WorkspaceDocumentMutationStatus Status,
-	WorkspaceDocumentKey RequestedDocumentKey,
-	string RequestedDocumentId,
-	long RequestedVersion,
+	WorkspaceDocumentRequestIdentity RequestedIdentity,
 	WorkspaceDocumentSnapshot? Snapshot);
-
-/// <summary>
-/// Describes the outcome of opening or loading a workspace document.
-/// </summary>
-/// <remarks><see cref="AlreadyOpen"/> means the existing tracked snapshot was returned without another load.</remarks>
-public enum WorkspaceDocumentOpenStatus
-{
-	/// <summary>The document was opened.</summary>
-	Opened,
-
-	/// <summary>The document was already open.</summary>
-	AlreadyOpen,
-
-	/// <summary>The path is invalid.</summary>
-	InvalidPath,
-
-	/// <summary>The document could not be loaded.</summary>
-	LoadFailed,
-
-	/// <summary>The operation was cancelled.</summary>
-	Cancelled
-}
-
-/// <summary>
-/// Contains the outcome of opening or loading a workspace document.
-/// </summary>
-/// <remarks>
-/// A successful result includes a snapshot. A load failure includes a typed
-/// <see cref="WorkspaceOperationFailure"/> and no snapshot; cancellation and invalid paths also
-/// return no snapshot.
-/// </remarks>
-public sealed record WorkspaceDocumentOpenResult(
-	WorkspaceDocumentOpenStatus Status,
-	WorkspaceDocumentSnapshot? Snapshot,
-	WorkspaceOperationFailure? Failure = null);

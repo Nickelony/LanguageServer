@@ -1,9 +1,10 @@
+using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense;
 using Nickelony.IDEKit.IntelliSense.Hover;
-using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerResponseParserTests
+public sealed partial class LuaLanguageServerResponseParserTests
 {
 	[TestMethod]
 	public void ParseHoverInfo_PreservesIndentedMarkdownAndHardBreakWhitespace()
@@ -17,11 +18,134 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response);
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, string.Empty);
 
 		Assert.IsNotNull(hover);
 		Assert.AreEqual("    local value = 1  \nnext", hover.Content);
-		Assert.AreEqual(TextHoverContentKind.Markdown, hover.ContentKind);
+		Assert.AreEqual(TextMarkupKind.Markdown, hover.ContentKind);
+		Assert.IsNull(hover.Range);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_NormalizesMarkdownLineEndings()
+	{
+		HoverResponse response = DeserializeHoverResponse(new
+		{
+			contents = new
+			{
+				kind = "markdown",
+				value = "first\r\nsecond"
+			}
+		});
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, string.Empty);
+
+		// Markdown line endings are normalized like completion documentation; the surrounding
+		// whitespace of the payload itself is preserved.
+		Assert.IsNotNull(hover);
+		Assert.AreEqual("first\nsecond", hover.Content);
+		Assert.AreEqual(TextMarkupKind.Markdown, hover.ContentKind);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_ConvertsProtocolRangeToSnapshotOffsets()
+	{
+		const string document = "local a = 1\nlocal b = 2\nlocal c = 3\nlocal value = 1";
+
+		HoverResponse response = DeserializeHoverResponse(new
+		{
+			contents = new
+			{
+				kind = "plaintext",
+				value = "local value = 1"
+			},
+			range = new
+			{
+				start = new { line = 3, character = 2 },
+				end = new { line = 3, character = 7 }
+			}
+		});
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, document);
+
+		Assert.IsNotNull(hover);
+		Assert.AreEqual(new TextRange(38, 5), hover.Range);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_ReversedProtocolRange_IsDropped()
+	{
+		const string document = "local value = 1";
+
+		HoverResponse response = DeserializeHoverResponse(new
+		{
+			contents = new
+			{
+				kind = "plaintext",
+				value = "local value = 1"
+			},
+			range = new
+			{
+				start = new { line = 0, character = 7 },
+				end = new { line = 0, character = 2 }
+			}
+		});
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, document);
+
+		Assert.IsNotNull(hover);
+		Assert.IsNull(hover.Range);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_RangeBeyondTheLineLength_ClampsToTheDocument()
+	{
+		const string document = "local value = 1";
+
+		HoverResponse response = DeserializeHoverResponse(new
+		{
+			contents = new
+			{
+				kind = "plaintext",
+				value = "local value = 1"
+			},
+			range = new
+			{
+				start = new { line = 0, character = 6 },
+				end = new { line = 0, character = 99 }
+			}
+		});
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, document);
+
+		// Characters beyond the line length are clamped; only negative coordinates reject the range.
+		Assert.IsNotNull(hover);
+		Assert.AreEqual(new TextRange(6, 9), hover.Range);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_NegativeProtocolCoordinates_RejectTheRange()
+	{
+		const string document = "local value = 1";
+
+		HoverResponse response = DeserializeHoverResponse(new
+		{
+			contents = new
+			{
+				kind = "plaintext",
+				value = "local value = 1"
+			},
+			range = new
+			{
+				start = new { line = -1, character = 0 },
+				end = new { line = 0, character = 5 }
+			}
+		});
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, document);
+
+		Assert.IsNotNull(hover);
+		Assert.IsNull(hover.Range);
 	}
 
 	[TestMethod]
@@ -40,11 +164,11 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response);
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, string.Empty);
 
 		Assert.IsNotNull(hover);
-		Assert.AreEqual($"Summary{Environment.NewLine}{Environment.NewLine}    local value = 1", hover.Content);
-		Assert.AreEqual(TextHoverContentKind.Markdown, hover.ContentKind);
+		Assert.AreEqual("Summary\n\n    local value = 1", hover.Content);
+		Assert.AreEqual(TextMarkupKind.Markdown, hover.ContentKind);
 	}
 
 	[TestMethod]
@@ -59,74 +183,37 @@ public partial class LuaLanguageServerResponseParserTests
 			}
 		});
 
-		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response);
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, string.Empty);
 
 		Assert.IsNotNull(hover);
 		Assert.AreEqual("````lua\nprint(\"```\")\n````", hover.Content.Replace("\r\n", "\n", StringComparison.Ordinal));
-		Assert.AreEqual(TextHoverContentKind.Markdown, hover.ContentKind);
+		Assert.AreEqual(TextMarkupKind.Markdown, hover.ContentKind);
 	}
 
 	[TestMethod]
-	public void MarkupContentReader_ExtractContent_CombinesMixedArrayAndSkipsMalformedEntries()
+	public void ParseHoverInfo_MissingContents_ReturnsNull()
 	{
-		JsonElement element = JsonSerializer.SerializeToElement(new object[]
+		HoverResponse response = DeserializeHoverResponse(new { });
+
+		TextHoverInfo? hover = LuaLanguageServerResponseParser.ParseHoverInfo(response, "local value = 1");
+
+		Assert.IsNull(hover);
+	}
+
+	[TestMethod]
+	public void ParseHoverInfo_NullOrBlankContents_ReturnsNull()
+	{
+		HoverResponse nullContents = DeserializeHoverResponse(new { contents = (object?)null });
+		HoverResponse blankContents = DeserializeHoverResponse(new
 		{
-			"Summary",
-			new
+			contents = new
 			{
 				kind = "markdown",
-				value = "**bold**"
-			},
-			new
-			{
-				value = 5
-			},
-			new
-			{
-				language = "lua",
-				value = "print(1)"
-			},
-			new
-			{
-				value = "tail"
+				value = "  "
 			}
 		});
 
-		MarkupContent content = MarkupContentReader.ExtractContent(element);
-
-		Assert.IsTrue(content.IsMarkdown);
-
-		Assert.AreEqual(
-			"Summary\n\n**bold**\n\n```lua\nprint(1)\n```\n\ntail",
-			content.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
-	}
-
-	[TestMethod]
-	public void MarkupContentReader_ExtractContent_FallsBackToPlainValueWhenKindHasWrongType()
-	{
-		JsonElement element = JsonSerializer.SerializeToElement(new
-		{
-			kind = 5,
-			value = "plain text"
-		});
-
-		MarkupContent content = MarkupContentReader.ExtractContent(element);
-
-		Assert.AreEqual("plain text", content.Text);
-		Assert.IsFalse(content.IsMarkdown);
-	}
-
-	[TestMethod]
-	public void MarkupContentReader_ExtractContent_ReturnsDefaultForPartiallyMissingCodeBlockPayload()
-	{
-		JsonElement element = JsonSerializer.SerializeToElement(new
-		{
-			language = "lua"
-		});
-
-		MarkupContent content = MarkupContentReader.ExtractContent(element);
-
-		Assert.IsTrue(string.IsNullOrEmpty(content.Text));
-		Assert.IsFalse(content.IsMarkdown);
+		Assert.IsNull(LuaLanguageServerResponseParser.ParseHoverInfo(nullContents, "local value = 1"));
+		Assert.IsNull(LuaLanguageServerResponseParser.ParseHoverInfo(blankContents, "local value = 1"));
 	}
 }

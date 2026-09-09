@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <RunSettingsFilePath>test.runsettings</RunSettingsFilePath>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
@@ -10,16 +11,21 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="4.3.3" />
     <PackageReference Include="MSTest.TestFramework" Version="4.3.3" />
-    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Nickelony.LanguageServer.Abstractions\Nickelony.LanguageServer.Abstractions.csproj" />
     <ProjectReference Include="..\..\Nickelony.LanguageServer.Client\Nickelony.LanguageServer.Client.csproj" />
+    <ProjectReference Include="..\Nickelony.LanguageServer.Client.Tests.FakeServer\Nickelony.LanguageServer.Client.Tests.FakeServer.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\TestSupport\TestLoggerScope.cs" Link="Support\TestLoggerScope.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The real-process test runs the compiled fake server; the path is injected so the test can find the
+         build output without depending on the working directory. -->
+    <AssemblyMetadata Include="FakeServerAssemblyPath" Value="$(MSBuildThisFileDirectory)..\Nickelony.LanguageServer.Client.Tests.FakeServer\bin\$(Configuration)\net8.0\Nickelony.LanguageServer.Client.FakeServer.dll" />
   </ItemGroup>
 
   <ItemGroup>

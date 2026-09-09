@@ -4,19 +4,21 @@ namespace Nickelony.LanguageServer.Abstractions;
 /// Describes a request to find symbol references at a document position.
 /// </summary>
 /// <remarks>
-/// The request position uses zero-based line and column indices. Returned <see cref="TextReferenceLocation"/> values
-/// use one-based coordinates. Negative line and column values are changed to zero.
+/// Returned <see cref="TextReferenceLocation"/> values use the same zero-based LSP units as the request position.
 /// </remarks>
-public sealed class TextReferenceRequest
+public sealed record TextReferenceRequest
 {
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextReferenceRequest"/> class.
+	/// Initializes a new instance of the <see cref="TextReferenceRequest"/> record.
 	/// </summary>
 	/// <param name="filePath">The current document file path.</param>
 	/// <param name="documentText">The current document content.</param>
-	/// <param name="line">The zero-based current line index.</param>
-	/// <param name="column">The zero-based current column index.</param>
+	/// <param name="line">The zero-based current line index. Negative values are changed to zero.</param>
+	/// <param name="column">The zero-based current column index. Negative values are changed to zero.</param>
 	/// <param name="includeDeclaration"><see langword="true"/> to include the symbol declaration when available.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/> or <paramref name="documentText"/> is <see langword="null"/>.
+	/// </exception>
 	public TextReferenceRequest(string filePath, string documentText, int line, int column, bool includeDeclaration = true)
 	{
 		ArgumentNullException.ThrowIfNull(filePath);

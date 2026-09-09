@@ -13,7 +13,7 @@ internal static partial class LuaLanguageServerResponseParser
 			return [];
 
 		var textEdits = new List<TextEdit>();
-		AppendTextEdits(response, textEdits);
+		WorkspaceEditConversion.AppendTextEdits(response, textEdits);
 		return textEdits;
 	}
 }

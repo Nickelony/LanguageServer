@@ -17,6 +17,7 @@ public interface ITextReferencesProvider
 	/// <param name="request">The current document and caret-position request.</param>
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
 	/// <returns>The resolved reference locations, or an empty list when references are unsupported or none are available.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
 	Task<IReadOnlyList<TextReferenceLocation>> GetReferencesAsync(
 		TextReferenceRequest request, CancellationToken cancellationToken = default);
 }

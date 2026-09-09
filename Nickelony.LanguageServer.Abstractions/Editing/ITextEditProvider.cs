@@ -18,7 +18,9 @@ public interface ITextEditProvider : ITextFormattingProvider
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
 	/// <returns>
 	/// The workspace edit to apply, or <see langword="null"/> when rename is unsupported, the requested name is
-	/// invalid, or no changes are available.
+	/// invalid, no changes are available, or the server's edit contains resource operations that this model cannot
+	/// represent (<see cref="TextWorkspaceEdit"/>).
 	/// </returns>
+	/// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
 	Task<TextWorkspaceEdit?> RenameSymbolAsync(TextRenameRequest request, CancellationToken cancellationToken = default);
 }

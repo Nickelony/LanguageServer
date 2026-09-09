@@ -1,11 +1,13 @@
+using Nickelony.IDEKit.IntelliSense.Infrastructure;
+
 namespace Nickelony.IDEKit.IntelliSense.Hover;
 
 /// <summary>
-/// Represents an in-process hover request against an immutable document snapshot.
+/// Describes a hover request against an immutable document snapshot.
 /// </summary>
 /// <remarks>
 /// Hover requests use a zero-based document offset so they can be constructed directly from
-/// editor caret positions without converting to line and column coordinates.
+/// editor positions without converting to line and character coordinates.
 /// </remarks>
 public sealed record TextHoverRequest
 {
@@ -13,16 +15,17 @@ public sealed record TextHoverRequest
 	/// Initializes a new instance of the <see cref="TextHoverRequest"/> record.
 	/// </summary>
 	/// <param name="documentText">The current document snapshot text.</param>
-	/// <param name="hoveredOffset">The zero-based hovered offset within that snapshot.</param>
+	/// <param name="hoveredOffset">The zero-based UTF-16 hovered offset within that snapshot.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="documentText"/> is <see langword="null"/>.
+	/// </exception>
 	/// <exception cref="ArgumentOutOfRangeException">
 	/// <paramref name="hoveredOffset"/> is negative or greater than the length of <paramref name="documentText"/>.
 	/// </exception>
 	public TextHoverRequest(string documentText, int hoveredOffset)
 	{
 		ArgumentNullException.ThrowIfNull(documentText);
-
-		if (hoveredOffset < 0 || hoveredOffset > documentText.Length)
-			throw new ArgumentOutOfRangeException(nameof(hoveredOffset));
+		SnapshotOffsetValidation.Validate(documentText, hoveredOffset, nameof(hoveredOffset), "hovered");
 
 		DocumentText = documentText;
 		HoveredOffset = hoveredOffset;
@@ -34,7 +37,7 @@ public sealed record TextHoverRequest
 	public string DocumentText { get; }
 
 	/// <summary>
-	/// Gets the zero-based hovered offset within <see cref="DocumentText"/>.
+	/// Gets the zero-based UTF-16 hovered offset within <see cref="DocumentText"/>.
 	/// </summary>
 	public int HoveredOffset { get; }
 }

@@ -6,8 +6,11 @@ namespace Nickelony.IDEKit.IntelliSense.DocumentSymbols;
 /// Classifies a <see cref="TextDocumentSymbol"/> by its language construct.
 /// </summary>
 /// <remarks>
-/// Mirrors the LSP <c>SymbolKind</c> values but stays protocol-independent; hosts may map this
-/// value onto their own symbol or icon model.
+/// The members mirror the LSP <c>SymbolKind</c> values one-to-one, with the protocol numerics as
+/// their values, but the type stays protocol-independent: hosts map a member onto their own symbol
+/// or icon model. Zero is not a member, so <c>default(TextDocumentSymbolKind)</c> is not a valid
+/// kind. The protocol bridge lives with the protocol boundary in
+/// <c>Nickelony.LanguageServer.Client</c>.
 /// </remarks>
 public enum TextDocumentSymbolKind
 {

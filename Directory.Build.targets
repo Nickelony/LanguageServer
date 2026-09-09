@@ -6,15 +6,17 @@
   </PropertyGroup>
 
   <!--
-    Package-boundary guard: no Nickelony.IDEKit.* package may reference
-    Nickelony.IDEKit.Workspace. The AvalonEdit-to-Workspace bridge is host-owned
-    code, so a package that needs workspace integration must not reintroduce
-    the dependency. Test projects are exempt because they legitimately
+    Package-boundary guard: no Nickelony.IDEKit.* package may reference the
+    workspace document-authority package. The AvalonEdit-to-Workspace bridge is
+    host-owned code, so a package that needs workspace integration must not
+    reintroduce the dependency. Nickelony.IDEKit.Workspace.Views is the one
+    member of the workspace family and references the document-authority
+    package by design. Test projects are exempt because they legitimately
     reference the packages they test.
   -->
   <Target Name="GuardNoWorkspacePackageReferences"
           AfterTargets="ResolveProjectReferences"
-          Condition="$(MSBuildProjectName.StartsWith('Nickelony.IDEKit.')) and !$(MSBuildProjectName.EndsWith('.Tests'))">
+          Condition="$(MSBuildProjectName.StartsWith('Nickelony.IDEKit.')) and !$(MSBuildProjectName.EndsWith('.Tests')) and '$(MSBuildProjectName)' != 'Nickelony.IDEKit.Workspace.Views'">
     <Error Condition="'%(ProjectReference.Filename)' == 'Nickelony.IDEKit.Workspace'"
            Text="'$(MSBuildProjectName)' must not reference Nickelony.IDEKit.Workspace. The AvalonEdit-to-Workspace bridge is host-owned code, not a package dependency." />
     <Error Condition="'%(PackageReference.Identity)' == 'Nickelony.IDEKit.Workspace'"

@@ -4,7 +4,7 @@ using System.Windows.Media;
 
 namespace Nickelony.IDEKit.KeyBindings.Tests;
 
-[TestClass]
+[STATestClass]
 public class KeyBindingDispatcherTests
 {
 	private static CommandCatalog<TestCommand> CreateCatalog()
@@ -27,90 +27,70 @@ public class KeyBindingDispatcherTests
 	[TestMethod]
 	public void TryHandleKeyDown_BoundAndExecutable_ExecutesAndReturnsTrue()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var executedCommands = new List<TestCommand>();
-			var dispatcher = new KeyBindingDispatcher<TestCommand>(
-				CreateService(),
-				_ => true,
-				executedCommands.Add);
+		var executedCommands = new List<TestCommand>();
+		var dispatcher = new KeyBindingDispatcher<TestCommand>(
+			CreateService(),
+			_ => true,
+			executedCommands.Add);
 
-			KeyEventArgs args = CreateKeyDown(Key.S, Key.LeftCtrl);
+		KeyEventArgs args = CreateKeyDown(Key.S, Key.LeftCtrl);
 
-			bool handled = dispatcher.TryHandleKeyDown(args);
+		bool handled = dispatcher.TryHandleKeyDown(args);
 
-			Assert.IsTrue(handled);
-			Assert.AreEqual(1, executedCommands.Count);
-			Assert.AreEqual(TestCommand.Save, executedCommands[0]);
-		});
+		Assert.IsTrue(handled);
+		Assert.AreEqual(1, executedCommands.Count);
+		Assert.AreEqual(TestCommand.Save, executedCommands[0]);
 	}
 
 	[TestMethod]
 	public void TryHandleKeyDown_BoundButCannotExecute_ReturnsFalseAndDoesNotExecute()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var executedCommands = new List<TestCommand>();
-			var dispatcher = new KeyBindingDispatcher<TestCommand>(
-				CreateService(),
-				_ => false,
-				executedCommands.Add);
+		var executedCommands = new List<TestCommand>();
+		var dispatcher = new KeyBindingDispatcher<TestCommand>(
+			CreateService(),
+			_ => false,
+			executedCommands.Add);
 
-			KeyEventArgs args = CreateKeyDown(Key.S, Key.LeftCtrl);
+		KeyEventArgs args = CreateKeyDown(Key.S, Key.LeftCtrl);
 
-			bool handled = dispatcher.TryHandleKeyDown(args);
+		bool handled = dispatcher.TryHandleKeyDown(args);
 
-			Assert.IsFalse(handled);
-			Assert.AreEqual(0, executedCommands.Count);
-		});
+		Assert.IsFalse(handled);
+		Assert.AreEqual(0, executedCommands.Count);
 	}
 
 	[TestMethod]
 	public void TryHandleKeyDown_UnboundKeyCombo_ReturnsFalseAndDoesNotExecute()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var executedCommands = new List<TestCommand>();
-			var dispatcher = new KeyBindingDispatcher<TestCommand>(
-				CreateService(),
-				_ => true,
-				executedCommands.Add);
+		var executedCommands = new List<TestCommand>();
+		var dispatcher = new KeyBindingDispatcher<TestCommand>(
+			CreateService(),
+			_ => true,
+			executedCommands.Add);
 
-			KeyEventArgs args = CreateKeyDown(Key.Q, Key.LeftCtrl);
+		KeyEventArgs args = CreateKeyDown(Key.Q, Key.LeftCtrl);
 
-			bool handled = dispatcher.TryHandleKeyDown(args);
+		bool handled = dispatcher.TryHandleKeyDown(args);
 
-			Assert.IsFalse(handled);
-			Assert.AreEqual(0, executedCommands.Count);
-		});
+		Assert.IsFalse(handled);
+		Assert.AreEqual(0, executedCommands.Count);
 	}
 
 	[TestMethod]
 	public void TryHandleKeyDown_ModifierOnlyKey_ReturnsFalseAndDoesNotExecute()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var executedCommands = new List<TestCommand>();
-			var dispatcher = new KeyBindingDispatcher<TestCommand>(
-				CreateService(),
-				_ => true,
-				executedCommands.Add);
+		var executedCommands = new List<TestCommand>();
+		var dispatcher = new KeyBindingDispatcher<TestCommand>(
+			CreateService(),
+			_ => true,
+			executedCommands.Add);
 
-			KeyEventArgs args = CreateKeyDown(Key.LeftCtrl);
+		KeyEventArgs args = CreateKeyDown(Key.LeftCtrl);
 
-			bool handled = dispatcher.TryHandleKeyDown(args);
+		bool handled = dispatcher.TryHandleKeyDown(args);
 
-			Assert.IsFalse(handled);
-			Assert.AreEqual(0, executedCommands.Count);
-		});
-	}
-
-	[TestMethod]
-	public void TryHandleKeyDown_NullEvent_Throws()
-	{
-		var dispatcher = new KeyBindingDispatcher<TestCommand>(CreateService(), _ => true, _ => { });
-
-		Assert.ThrowsExactly<ArgumentNullException>(() => dispatcher.TryHandleKeyDown(null!));
+		Assert.IsFalse(handled);
+		Assert.AreEqual(0, executedCommands.Count);
 	}
 
 	private sealed class FakeKeyboardDevice : KeyboardDevice

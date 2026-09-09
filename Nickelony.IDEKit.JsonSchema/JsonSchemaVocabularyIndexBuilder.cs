@@ -1,7 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
-
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nickelony.IDEKit.JsonSchema;
 
@@ -17,7 +16,7 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 	/// </summary>
 	/// <param name="schema">The root schema to index.</param>
 	/// <returns>The built vocabulary index and any diagnostics.</returns>
-	/// <exception cref="ArgumentNullException"><paramref name="schema"/> is null.</exception>
+	/// <exception cref="ArgumentNullException"><paramref name="schema"/> is <see langword="null"/>.</exception>
 	[SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The public builder API intentionally exposes instance methods.")]
 	public JsonSchemaVocabularyIndexResult Build(JSchema schema)
 	{
@@ -41,25 +40,30 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 	/// The built vocabulary index and diagnostics, or a failed result when conversion or indexing
 	/// fails.
 	/// </returns>
-	/// <exception cref="ArgumentNullException"><paramref name="schemaToken"/> is null.</exception>
+	/// <exception cref="ArgumentNullException"><paramref name="schemaToken"/> is <see langword="null"/>.</exception>
 	public JsonSchemaVocabularyIndexResult Build(JToken schemaToken)
 	{
 		ArgumentNullException.ThrowIfNull(schemaToken);
 
+		JSchema schema;
+
 		try
 		{
-			return Build(schemaToken.ToObject<JSchema>() ?? throw new JSchemaException("The token does not represent a schema object."));
+			schema = schemaToken.ToObject<JSchema>() ?? throw new JSchemaException("The token does not represent a schema object.");
 		}
 		catch (Exception exception)
 		{
 			return Failure($"The schema token could not be read as a JSON schema: {exception.Message}");
 		}
+
+		return Build(schema);
 	}
 
 	/// <summary>
 	/// Builds a vocabulary index from schema text read through a reader, optionally using custom
 	/// reader settings.
 	/// </summary>
+	/// <remarks>The method reads the entire reader and does not dispose it.</remarks>
 	/// <param name="reader">The reader over the schema text.</param>
 	/// <param name="settings">
 	/// The schema reader settings, or <see langword="null"/> to use the defaults.
@@ -68,8 +72,7 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 	/// The built vocabulary index and any diagnostics, or a failed result when the schema text
 	/// cannot be read or parsed.
 	/// </returns>
-	/// <remarks>The method reads the entire reader and does not dispose it.</remarks>
-	/// <exception cref="ArgumentNullException"><paramref name="reader"/> is null.</exception>
+	/// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
 	public JsonSchemaVocabularyIndexResult Build(TextReader reader, JSchemaReaderSettings? settings = null)
 	{
 		ArgumentNullException.ThrowIfNull(reader);
@@ -200,25 +203,27 @@ public sealed class JsonSchemaVocabularyIndexBuilder
 		if (type is null)
 			return [];
 
+		// The types are emitted in the declaration order of JsonSchemaPropertyType so the list order
+		// stays deterministic and matches the enum.
 		var result = new List<JsonSchemaPropertyType>();
-
-		if (type.Value.HasFlag(JSchemaType.String))
-			result.Add(JsonSchemaPropertyType.String);
-
-		if (type.Value.HasFlag(JSchemaType.Number))
-			result.Add(JsonSchemaPropertyType.Number);
-
-		if (type.Value.HasFlag(JSchemaType.Integer))
-			result.Add(JsonSchemaPropertyType.Integer);
-
-		if (type.Value.HasFlag(JSchemaType.Boolean))
-			result.Add(JsonSchemaPropertyType.Boolean);
 
 		if (type.Value.HasFlag(JSchemaType.Object))
 			result.Add(JsonSchemaPropertyType.Object);
 
 		if (type.Value.HasFlag(JSchemaType.Array))
 			result.Add(JsonSchemaPropertyType.Array);
+
+		if (type.Value.HasFlag(JSchemaType.String))
+			result.Add(JsonSchemaPropertyType.String);
+
+		if (type.Value.HasFlag(JSchemaType.Integer))
+			result.Add(JsonSchemaPropertyType.Integer);
+
+		if (type.Value.HasFlag(JSchemaType.Number))
+			result.Add(JsonSchemaPropertyType.Number);
+
+		if (type.Value.HasFlag(JSchemaType.Boolean))
+			result.Add(JsonSchemaPropertyType.Boolean);
 
 		if (type.Value.HasFlag(JSchemaType.Null))
 			result.Add(JsonSchemaPropertyType.Null);

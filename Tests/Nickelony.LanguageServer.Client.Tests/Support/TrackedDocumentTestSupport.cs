@@ -2,16 +2,8 @@ namespace Nickelony.LanguageServer.Client.Tests;
 
 internal sealed class TestTrackedDocumentStore : TrackedDocumentStore<TestTrackedDocumentState>
 {
-	protected override TestTrackedDocumentState CreateTrackedDocumentState(
-		string filePath,
-		string uri,
-		string content,
-		int version,
-		bool isOpen,
-		int openReferenceCount,
-		int requestReferenceCount,
-		long lastAccessStamp)
-		=> new(filePath, uri, content, version, isOpen, openReferenceCount, requestReferenceCount, lastAccessStamp);
+	protected override TestTrackedDocumentState CreateTrackedDocumentState(TrackedDocumentInitialState initialState)
+		=> new(initialState);
 
 	protected override long GetLastAccessStamp(TestTrackedDocumentState state)
 		=> state.LastAccessStamp;
@@ -34,9 +26,8 @@ internal sealed class TestTrackedDocumentStore : TrackedDocumentStore<TestTracke
 
 internal sealed class TestTrackedDocumentState : TrackedDocumentState
 {
-	public TestTrackedDocumentState(string filePath, string uri, string content, int version, bool isOpen,
-		int openReferenceCount, int requestReferenceCount, long lastAccessStamp)
-		: base(filePath, uri, content, version, isOpen, openReferenceCount, requestReferenceCount, lastAccessStamp)
+	public TestTrackedDocumentState(TrackedDocumentInitialState initialState)
+		: base(initialState)
 	{ }
 
 	public void Touch(long lastAccessStamp)

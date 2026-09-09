@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Client.Tests;
 
 [TestClass]
-public class DocumentOperationSchedulerTests
+public sealed class DocumentOperationSchedulerTests
 {
 	[TestMethod]
 	public async Task EnqueueGlobalAsync_CanceledWhileWaiting_DoesNotInvokeDelegate()
@@ -47,7 +47,7 @@ public class DocumentOperationSchedulerTests
 
 		int canceledOperationCallCount = 0;
 
-		Task<bool> firstTask = scheduler.EnqueuePerDocumentAsync("test.lua", async _ =>
+		Task<bool> firstTask = scheduler.EnqueuePerDocumentAsync("test.ext", async _ =>
 		{
 			firstStarted.TrySetResult(true);
 			await allowFirstToFinish.Task.ConfigureAwait(false);
@@ -56,7 +56,7 @@ public class DocumentOperationSchedulerTests
 
 		await firstStarted.Task.ConfigureAwait(false);
 
-		Task<bool> canceledTask = scheduler.EnqueuePerDocumentAsync("test.lua", _ =>
+		Task<bool> canceledTask = scheduler.EnqueuePerDocumentAsync("test.ext", _ =>
 		{
 			Interlocked.Increment(ref canceledOperationCallCount);
 			return Task.FromResult(true);
@@ -82,7 +82,7 @@ public class DocumentOperationSchedulerTests
 		int canceledOperationCallCount = 0;
 		int laterOperationCallCount = 0;
 
-		Task<bool> firstTask = scheduler.EnqueuePerDocumentAsync("test.lua", async _ =>
+		Task<bool> firstTask = scheduler.EnqueuePerDocumentAsync("test.ext", async _ =>
 		{
 			firstStarted.TrySetResult(true);
 			await allowFirstToFinish.Task.ConfigureAwait(false);
@@ -91,13 +91,13 @@ public class DocumentOperationSchedulerTests
 
 		await firstStarted.Task.ConfigureAwait(false);
 
-		Task<bool> canceledTask = scheduler.EnqueuePerDocumentAsync("test.lua", _ =>
+		Task<bool> canceledTask = scheduler.EnqueuePerDocumentAsync("test.ext", _ =>
 		{
 			Interlocked.Increment(ref canceledOperationCallCount);
 			return Task.FromResult(true);
 		}, cancellationTokenSource.Token);
 
-		Task<bool> laterTask = scheduler.EnqueuePerDocumentAsync("test.lua", _ =>
+		Task<bool> laterTask = scheduler.EnqueuePerDocumentAsync("test.ext", _ =>
 		{
 			Interlocked.Increment(ref laterOperationCallCount);
 			return Task.FromResult(true);
@@ -118,7 +118,7 @@ public class DocumentOperationSchedulerTests
 	public async Task EnqueuePerDocumentAsync_NormalizesEquivalentPathsIntoSameQueue()
 	{
 		var scheduler = new DocumentOperationScheduler();
-		string canonicalFilePath = Path.Combine(Path.GetTempPath(), "DocumentOperationSchedulerTests", "test.lua");
+		string canonicalFilePath = Path.Combine(Path.GetTempPath(), "DocumentOperationSchedulerTests", "test.ext");
 
 		string directoryPath = Path.GetDirectoryName(canonicalFilePath)
 			?? throw new InvalidOperationException("The canonical test file path did not have a directory.");
@@ -140,13 +140,14 @@ public class DocumentOperationSchedulerTests
 
 		Task<bool> secondTask = scheduler.EnqueuePerDocumentAsync(aliasedFilePath, _ =>
 		{
+			// Equivalent paths share one queue, so the second operation cannot start before the first finished;
+			// checking the release point inside the delegate keeps the ordering assertion free of timing windows.
+			Assert.IsTrue(allowFirstToFinish.Task.IsCompleted,
+				"An aliased path must serialize behind the already-running operation for the canonical path.");
+
 			Interlocked.Increment(ref secondOperationCallCount);
 			return Task.FromResult(true);
 		}, CancellationToken.None);
-
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.AreEqual(0, secondOperationCallCount);
 
 		allowFirstToFinish.TrySetResult(true);
 
@@ -156,7 +157,7 @@ public class DocumentOperationSchedulerTests
 	}
 
 	[TestMethod]
-	public async Task QueueLatestUpdateAsync_SerializesRunningWorkAndSkipsSupersededPendingUpdates()
+	public async Task EnqueueLatestUpdateAsync_SerializesRunningWorkAndSkipsSupersededPendingUpdates()
 	{
 		var scheduler = new DocumentOperationScheduler();
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -165,7 +166,7 @@ public class DocumentOperationSchedulerTests
 		int secondStarted = 0;
 		int thirdStarted = 0;
 
-		Task firstTask = scheduler.QueueLatestUpdateAsync("test.lua", async _ =>
+		Task firstTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async _ =>
 		{
 			firstStarted.TrySetResult(true);
 			await allowFirstToFinish.Task.ConfigureAwait(false);
@@ -173,22 +174,22 @@ public class DocumentOperationSchedulerTests
 
 		await firstStarted.Task.ConfigureAwait(false);
 
-		Task secondTask = scheduler.QueueLatestUpdateAsync("test.lua", _ =>
+		Task secondTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ =>
 		{
 			Interlocked.Increment(ref secondStarted);
 			return Task.CompletedTask;
 		});
 
-		Task thirdTask = scheduler.QueueLatestUpdateAsync("test.lua", _ =>
+		Task thirdTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ =>
 		{
+			// The pending slot runs only after the running update finished; checking the release point inside the
+			// delegate keeps the serialization assertion free of timing windows.
+			Assert.IsTrue(allowFirstToFinish.Task.IsCompleted,
+				"A pending latest-update slot must wait for the running update before it executes.");
+
 			Interlocked.Increment(ref thirdStarted);
 			return Task.CompletedTask;
 		});
-
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.AreEqual(0, secondStarted);
-		Assert.AreEqual(0, thirdStarted);
 
 		allowFirstToFinish.TrySetResult(true);
 
@@ -199,7 +200,7 @@ public class DocumentOperationSchedulerTests
 	}
 
 	[TestMethod]
-	public async Task QueueLatestUpdateAsync_SupersedingPendingWork_DoesNotCancelRunningUpdate()
+	public async Task EnqueueLatestUpdateAsync_SupersedingPendingWork_DoesNotCancelRunningUpdate()
 	{
 		var scheduler = new DocumentOperationScheduler();
 		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -208,7 +209,7 @@ public class DocumentOperationSchedulerTests
 
 		int thirdStarted = 0;
 
-		Task firstTask = scheduler.QueueLatestUpdateAsync("test.lua", async token =>
+		Task firstTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async token =>
 		{
 			firstStarted.TrySetResult(true);
 			await secondQueued.Task.ConfigureAwait(false);
@@ -221,18 +222,19 @@ public class DocumentOperationSchedulerTests
 
 		await firstStarted.Task.ConfigureAwait(false);
 
-		Task secondTask = scheduler.QueueLatestUpdateAsync("test.lua", _ => Task.CompletedTask);
-		Task thirdTask = scheduler.QueueLatestUpdateAsync("test.lua", _ =>
+		Task secondTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ => Task.CompletedTask);
+		Task thirdTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ =>
 		{
+			// The superseding update runs only after the running update finished; checking the release point
+			// inside the delegate keeps the serialization assertion free of timing windows.
+			Assert.IsTrue(allowFirstToFinish.Task.IsCompleted,
+				"A superseding queued update must not start before the running update finishes.");
+
 			Interlocked.Increment(ref thirdStarted);
 			return Task.CompletedTask;
 		});
 
 		secondQueued.TrySetResult(true);
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.AreEqual(0, thirdStarted);
-
 		allowFirstToFinish.TrySetResult(true);
 
 		await Task.WhenAll(firstTask, secondTask, thirdTask).ConfigureAwait(false);
@@ -248,8 +250,9 @@ public class DocumentOperationSchedulerTests
 		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		int secondStarted = 0;
+		Task waitTask = null!;
 
-		Task firstTask = scheduler.QueueLatestUpdateAsync("test.lua", async _ =>
+		Task firstTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async _ =>
 		{
 			firstStarted.TrySetResult(true);
 			await allowFirstToFinish.Task.ConfigureAwait(false);
@@ -257,17 +260,18 @@ public class DocumentOperationSchedulerTests
 
 		await firstStarted.Task.ConfigureAwait(false);
 
-		Task secondTask = scheduler.QueueLatestUpdateAsync("test.lua", _ =>
+		Task secondTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ =>
 		{
+			// The queued update is running at this point, so the wait cannot have completed yet; checking it here
+			// keeps the assertion free of timing windows.
+			Assert.IsFalse(waitTask.IsCompleted,
+				"Waiting for document operations should include queued latest-update work for the same path.");
+
 			Interlocked.Increment(ref secondStarted);
 			return Task.CompletedTask;
 		});
 
-		Task waitTask = scheduler.WaitForPerDocumentOperationsAsync("test.lua", "test.lua");
-
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.IsFalse(waitTask.IsCompleted, "Waiting for document operations should include queued latest-update work for the same path.");
+		waitTask = scheduler.WaitForPerDocumentOperationsAsync("test.ext", "test.ext");
 
 		allowFirstToFinish.TrySetResult(true);
 
@@ -286,8 +290,8 @@ public class DocumentOperationSchedulerTests
 		int laterOperationCallCount = 0;
 
 		Task<bool> exclusiveTask = scheduler.EnqueueExclusivePerDocumentAsync(
-			"old.lua",
-			"new.lua",
+			"old.ext",
+			"new.ext",
 			async _ =>
 			{
 				exclusiveStarted.TrySetResult(true);
@@ -298,15 +302,16 @@ public class DocumentOperationSchedulerTests
 
 		await exclusiveStarted.Task.ConfigureAwait(false);
 
-		Task<bool> laterTask = scheduler.EnqueuePerDocumentAsync("new.lua", _ =>
+		Task<bool> laterTask = scheduler.EnqueuePerDocumentAsync("new.ext", _ =>
 		{
+			// The exclusive operation still owns an affected path here; checking the release point inside the
+			// delegate keeps the blocking assertion free of timing windows.
+			Assert.IsTrue(allowExclusiveToFinish.Task.IsCompleted,
+				"Per-document work on a path affected by an exclusive operation must wait for it to finish.");
+
 			Interlocked.Increment(ref laterOperationCallCount);
 			return Task.FromResult(true);
 		}, CancellationToken.None);
-
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.AreEqual(0, laterOperationCallCount);
 
 		allowExclusiveToFinish.TrySetResult(true);
 
@@ -323,28 +328,336 @@ public class DocumentOperationSchedulerTests
 		var exclusiveStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		var allowExclusiveToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
+		Task waitTask = null!;
+
 		Task<bool> exclusiveTask = scheduler.EnqueueExclusivePerDocumentAsync(
-			"old.lua",
-			"new.lua",
+			"old.ext",
+			"new.ext",
 			async _ =>
 			{
 				exclusiveStarted.TrySetResult(true);
 				await allowExclusiveToFinish.Task.ConfigureAwait(false);
+
+				// The exclusive operation is still running here, so the wait cannot have completed yet; checking it
+				// here keeps the assertion free of timing windows.
+				Assert.IsFalse(waitTask.IsCompleted,
+					"Waiting for document operations should include an active exclusive operation for the affected paths.");
+
 				return true;
 			},
 			CancellationToken.None);
 
 		await exclusiveStarted.Task.ConfigureAwait(false);
 
-		Task waitTask = scheduler.WaitForPerDocumentOperationsAsync("old.lua", "new.lua");
-
-		await Task.Delay(50).ConfigureAwait(false);
-
-		Assert.IsFalse(waitTask.IsCompleted, "Waiting for document operations should include active exclusive barriers for the affected paths.");
+		waitTask = scheduler.WaitForPerDocumentOperationsAsync("old.ext", "new.ext");
 
 		allowExclusiveToFinish.TrySetResult(true);
 
 		Assert.IsTrue(await exclusiveTask.ConfigureAwait(false));
 		await waitTask.ConfigureAwait(false);
+	}
+
+	[TestMethod]
+	public async Task EnqueueExclusivePerDocumentAsync_WhileLatestUpdateIsRunning_CompletesWithoutDeadlock()
+	{
+		var scheduler = new DocumentOperationScheduler();
+		var updateStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var allowUpdateToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		int exclusiveStarted = 0;
+		int laterWorkStarted = 0;
+
+		Task updateTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async _ =>
+		{
+			updateStarted.TrySetResult(true);
+			await allowUpdateToFinish.Task.ConfigureAwait(false);
+		});
+
+		await updateStarted.Task.ConfigureAwait(false);
+
+		// The exclusive operation arrives while the update is still running and must wait for it, while the work
+		// queued afterwards must wait for the exclusive operation. None of the participants may wait for itself.
+		Task<bool> exclusiveTask = scheduler.EnqueueExclusivePerDocumentAsync("test.ext", "renamed.ext", _ =>
+		{
+			Interlocked.Increment(ref exclusiveStarted);
+			return Task.FromResult(true);
+		}, CancellationToken.None);
+
+		Task<bool> laterTask = scheduler.EnqueuePerDocumentAsync("test.ext", _ =>
+		{
+			Interlocked.Increment(ref laterWorkStarted);
+			return Task.FromResult(true);
+		}, CancellationToken.None);
+
+		allowUpdateToFinish.TrySetResult(true);
+
+		await Task.WhenAll(updateTask, exclusiveTask, laterTask).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Assert.AreEqual(1, exclusiveStarted);
+		Assert.AreEqual(1, laterWorkStarted);
+	}
+
+	[TestMethod]
+	public async Task EnqueuePerDocumentAsync_FromInsideAnOperationForTheSamePath_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueuePerDocumentAsync("test.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueuePerDocumentAsync("test.ext", _ => Task.FromResult(true), CancellationToken.None)).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task EnqueueLatestUpdateAsync_FromInsideAnUpdateForTheSamePath_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task updateTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueueLatestUpdateAsync("test.ext", _ => Task.CompletedTask)).ConfigureAwait(false);
+		});
+
+		await updateTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+	}
+
+	[TestMethod]
+	public async Task WaitForPerDocumentOperationsAsync_FromInsideAnOperationForTheSamePath_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueuePerDocumentAsync("test.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.WaitForPerDocumentOperationsAsync("test.ext", "test.ext")).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task EnqueueGlobalAsync_FromInsideAGlobalOperation_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueueGlobalAsync(async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueueGlobalAsync(_ => Task.FromResult(true), CancellationToken.None)).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task EnqueuePerDocumentAsync_FromInsideAnOperationForAnotherPath_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueuePerDocumentAsync("first.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueuePerDocumentAsync("second.ext", _ => Task.FromResult(true), CancellationToken.None)).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task EnqueueGlobalAsync_FromInsideAPerDocumentOperation_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueuePerDocumentAsync("first.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueueGlobalAsync(_ => Task.FromResult(true), CancellationToken.None)).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task EnqueueExclusivePerDocumentAsync_FromInsideAnotherOperation_FailsFast()
+	{
+		var scheduler = new DocumentOperationScheduler();
+
+		Task<bool> outerTask = scheduler.EnqueuePerDocumentAsync("first.ext", async _ =>
+		{
+			await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+				scheduler.EnqueueExclusivePerDocumentAsync("first.ext", "second.ext", _ => Task.FromResult(true), CancellationToken.None)).ConfigureAwait(false);
+
+			return true;
+		}, CancellationToken.None);
+
+		Assert.IsTrue(await outerTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task CancelQueuedUpdate_SkipsPendingUpdateWithoutRunningItsDelegate()
+	{
+		var scheduler = new DocumentOperationScheduler();
+		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int pendingRan = 0;
+
+		Task firstTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async _ =>
+		{
+			firstStarted.TrySetResult(true);
+			await allowFirstToFinish.Task.ConfigureAwait(false);
+		});
+
+		await firstStarted.Task.ConfigureAwait(false);
+
+		Task pendingTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ =>
+		{
+			Interlocked.Increment(ref pendingRan);
+			return Task.CompletedTask;
+		});
+
+		scheduler.CancelQueuedUpdate("test.ext");
+		allowFirstToFinish.TrySetResult(true);
+
+		await firstTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+		await pendingTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Assert.AreEqual(0, pendingRan);
+	}
+
+	[TestMethod]
+	public async Task CancelAllQueuedUpdates_SkipsEveryPendingUpdate()
+	{
+		var scheduler = new DocumentOperationScheduler();
+		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var secondStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var allowSecondToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int pendingRan = 0;
+
+		Task runningFirst = scheduler.EnqueueLatestUpdateAsync("first.ext", async _ =>
+		{
+			firstStarted.TrySetResult(true);
+			await allowFirstToFinish.Task.ConfigureAwait(false);
+		});
+
+		Task runningSecond = scheduler.EnqueueLatestUpdateAsync("second.ext", async _ =>
+		{
+			secondStarted.TrySetResult(true);
+			await allowSecondToFinish.Task.ConfigureAwait(false);
+		});
+
+		await Task.WhenAll(firstStarted.Task, secondStarted.Task).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Task pendingFirst = scheduler.EnqueueLatestUpdateAsync("first.ext", _ =>
+		{
+			Interlocked.Increment(ref pendingRan);
+			return Task.CompletedTask;
+		});
+
+		Task pendingSecond = scheduler.EnqueueLatestUpdateAsync("second.ext", _ =>
+		{
+			Interlocked.Increment(ref pendingRan);
+			return Task.CompletedTask;
+		});
+
+		scheduler.CancelAllQueuedUpdates();
+		allowFirstToFinish.TrySetResult(true);
+		allowSecondToFinish.TrySetResult(true);
+
+		await Task.WhenAll(runningFirst, runningSecond).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+		await Task.WhenAll(pendingFirst, pendingSecond).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Assert.AreEqual(0, pendingRan);
+	}
+
+	[TestMethod]
+	public async Task CancelQueuedUpdate_WhenRunningUpdateWasSuperseded_StopsTheRunningDelegate()
+	{
+		var scheduler = new DocumentOperationScheduler();
+		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var secondQueued = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int firstCancellationObserved = 0;
+
+		Task firstTask = scheduler.EnqueueLatestUpdateAsync("test.ext", async token =>
+		{
+			firstStarted.TrySetResult(true);
+			await secondQueued.Task.ConfigureAwait(false);
+
+			try
+			{
+				await Task.Delay(Timeout.InfiniteTimeSpan, token).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				Interlocked.Increment(ref firstCancellationObserved);
+				throw;
+			}
+		});
+
+		await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Task secondTask = scheduler.EnqueueLatestUpdateAsync("test.ext", _ => Task.CompletedTask);
+		secondQueued.TrySetResult(true);
+
+		// The enqueue superseded the running update in the slot; the cancel must still reach it instead of only
+		// skipping the newer pending update.
+		scheduler.CancelQueuedUpdate("test.ext");
+
+		await Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await firstTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false)).ConfigureAwait(false);
+		await secondTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Assert.AreEqual(1, firstCancellationObserved);
+	}
+
+	[TestMethod]
+	public async Task EnqueueGlobalAsync_SerializesBehindRunningGlobalOperationAndRuns()
+	{
+		var scheduler = new DocumentOperationScheduler();
+		var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var allowFirstToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		int secondRunCount = 0;
+
+		Task<bool> firstTask = scheduler.EnqueueGlobalAsync(async _ =>
+		{
+			firstStarted.TrySetResult(true);
+			await allowFirstToFinish.Task.ConfigureAwait(false);
+			return true;
+		}, CancellationToken.None);
+
+		await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+		Task<bool> secondTask = scheduler.EnqueueGlobalAsync(_ =>
+		{
+			Assert.IsTrue(allowFirstToFinish.Task.IsCompleted,
+				"A global operation must not start while another global operation is still running.");
+
+			Interlocked.Increment(ref secondRunCount);
+			return Task.FromResult(true);
+		}, CancellationToken.None);
+
+		// The later global operation stays queued until the running one releases.
+		Task completedTask = await Task.WhenAny(secondTask, Task.Delay(TimeSpan.FromMilliseconds(200))).ConfigureAwait(false);
+
+		Assert.AreNotSame(secondTask, completedTask);
+
+		allowFirstToFinish.TrySetResult(true);
+
+		Assert.IsTrue(await firstTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+		Assert.IsTrue(await secondTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+		Assert.AreEqual(1, secondRunCount);
 	}
 }

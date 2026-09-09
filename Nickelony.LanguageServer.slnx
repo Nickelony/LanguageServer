@@ -1,27 +1,38 @@
 <Solution>
+  <Folder Name="/artifacts/" />
   <Folder Name="/src/">
     <Project Path="Nickelony.LanguageServer.Abstractions/Nickelony.LanguageServer.Abstractions.csproj" />
     <Project Path="Nickelony.LanguageServer.Client/Nickelony.LanguageServer.Client.csproj" />
+    <Project Path="Nickelony.LanguageServer.Provider/Nickelony.LanguageServer.Provider.csproj" />
     <Project Path="Nickelony.LanguageServer.Lua/Nickelony.LanguageServer.Lua.csproj" />
     <Project Path="Nickelony.IDEKit.AvalonEdit/Nickelony.IDEKit.AvalonEdit.csproj" />
-    <Project Path="Nickelony.IDEKit.AvalonEdit.IntelliSense/Nickelony.IDEKit.AvalonEdit.IntelliSense.csproj" />
-    <Project Path="Nickelony.IDEKit.AvalonEdit.Extras/Nickelony.IDEKit.AvalonEdit.Extras.csproj" />
+    <Project Path="Nickelony.IDEKit.AvalonEdit.LanguageFeatures/Nickelony.IDEKit.AvalonEdit.LanguageFeatures.csproj" />
+    <Project Path="Nickelony.IDEKit.AvalonEdit.Markdown/Nickelony.IDEKit.AvalonEdit.Markdown.csproj" />
+    <Project Path="Nickelony.IDEKit.AvalonEdit.TextMate/Nickelony.IDEKit.AvalonEdit.TextMate.csproj" />
     <Project Path="Nickelony.IDEKit.KeyBindings/Nickelony.IDEKit.KeyBindings.csproj" />
     <Project Path="Nickelony.IDEKit.Core/Nickelony.IDEKit.Core.csproj" />
     <Project Path="Nickelony.IDEKit.IntelliSense/Nickelony.IDEKit.IntelliSense.csproj" />
     <Project Path="Nickelony.IDEKit.JsonSchema/Nickelony.IDEKit.JsonSchema.csproj" />
-    <Project Path="Nickelony.IDEKit.Tooling/Nickelony.IDEKit.Tooling.csproj" />
+    <Project Path="Nickelony.IDEKit.Processes/Nickelony.IDEKit.Processes.csproj" />
     <Project Path="Nickelony.IDEKit.Workspace/Nickelony.IDEKit.Workspace.csproj" />
+    <Project Path="Nickelony.IDEKit.Workspace.Views/Nickelony.IDEKit.Workspace.Views.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="Tests/Nickelony.LanguageServer.Client.Tests.FakeServer/Nickelony.LanguageServer.Client.Tests.FakeServer.csproj" />
     <Project Path="Tests/Nickelony.LanguageServer.Client.Tests/Nickelony.LanguageServer.Client.Tests.csproj" />
+    <Project Path="Tests/Nickelony.LanguageServer.Abstractions.Tests/Nickelony.LanguageServer.Abstractions.Tests.csproj" />
     <Project Path="Tests/Nickelony.LanguageServer.Lua.Tests/Nickelony.LanguageServer.Lua.Tests.csproj" />
+    <Project Path="Tests/Nickelony.LanguageServer.Provider.Tests/Nickelony.LanguageServer.Provider.Tests.csproj" />
     <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.Tests/Nickelony.IDEKit.AvalonEdit.Tests.csproj" />
-    <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests/Nickelony.IDEKit.AvalonEdit.IntelliSense.Tests.csproj" />
-    <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.Extras.Tests/Nickelony.IDEKit.AvalonEdit.Extras.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.LanguageFeatures.Tests/Nickelony.IDEKit.AvalonEdit.LanguageFeatures.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.Markdown.Tests/Nickelony.IDEKit.AvalonEdit.Markdown.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.AvalonEdit.TextMate.Tests/Nickelony.IDEKit.AvalonEdit.TextMate.Tests.csproj" />
     <Project Path="Tests/Nickelony.IDEKit.KeyBindings.Tests/Nickelony.IDEKit.KeyBindings.Tests.csproj" />
     <Project Path="Tests/Nickelony.IDEKit.Core.Tests/Nickelony.IDEKit.Core.Tests.csproj" />
     <Project Path="Tests/Nickelony.IDEKit.IntelliSense.Tests/Nickelony.IDEKit.IntelliSense.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.JsonSchema.Tests/Nickelony.IDEKit.JsonSchema.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.Processes.Tests/Nickelony.IDEKit.Processes.Tests.csproj" />
     <Project Path="Tests/Nickelony.IDEKit.Workspace.Tests/Nickelony.IDEKit.Workspace.Tests.csproj" />
+    <Project Path="Tests/Nickelony.IDEKit.Workspace.Views.Tests/Nickelony.IDEKit.Workspace.Views.Tests.csproj" />
   </Folder>
 </Solution>

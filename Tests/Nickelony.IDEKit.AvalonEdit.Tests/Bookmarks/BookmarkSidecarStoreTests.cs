@@ -1,4 +1,3 @@
-using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Bookmarks;
 using System.IO;
 
@@ -7,62 +6,94 @@ namespace Nickelony.IDEKit.AvalonEdit.Tests;
 [TestClass]
 public sealed class BookmarkSidecarStoreTests
 {
-	private static string CreateTempPath(out string directory)
-	{
-		directory = Path.Combine(Path.GetTempPath(), "BookmarkSidecarStoreTests-" + Guid.NewGuid().ToString("N"));
+	private readonly TempDirectoryScope _tempDirectory = new("BookmarkSidecarStoreTests");
 
-		Directory.CreateDirectory(directory);
-
-		return Path.Combine(directory, "script.txt");
-	}
+	private string CreateTempPath()
+		=> _tempDirectory.CreatePath("document.txt");
 
 	[TestCleanup]
 	public void Cleanup()
-	{
-		foreach (string dir in Directory.GetDirectories(Path.GetTempPath(), "BookmarkSidecarStoreTests-*"))
-		{
-			try
-			{
-				Directory.Delete(dir, recursive: true);
-			}
-			catch (IOException)
-			{ }
-			catch (UnauthorizedAccessException)
-			{ }
-		}
-	}
+		=> _tempDirectory.Dispose();
 
 	[TestMethod]
-	public void Save_ThenRestore_RoundTripsLineNumbers()
+	public void Save_ThenLoad_RoundTripsLineNumbersThroughStore()
 	{
-		string filePath = CreateTempPath(out _);
-		var store = new BookmarkSidecarStore();
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
 
 		bool saved = store.Save(filePath, [2, 7]);
 		Assert.IsTrue(saved);
 
-		IReadOnlyList<int> restored = store.Restore(filePath);
-
-		Assert.AreSequenceEqual([2, 7], [.. restored]);
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> loaded));
+		Assert.AreSequenceEqual([2, 7], [.. loaded]);
 	}
 
 	[TestMethod]
 	public void Save_EmptySet_DeletesSidecar()
 	{
-		string filePath = CreateTempPath(out _);
-		var store = new BookmarkSidecarStore();
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
 
 		store.Save(filePath, [1]);
 		store.Save(filePath, []);
 
 		Assert.IsFalse(File.Exists(filePath + ".bkmrk"));
-		Assert.IsEmpty(store.Restore(filePath));
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> emptyAfterDelete));
+		Assert.IsEmpty(emptyAfterDelete);
+	}
+
+	[TestMethod]
+	public void Save_OnlyIgnoredEntries_DeletesSidecar()
+	{
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
+
+		store.Save(filePath, [1, 2]);
+		Assert.IsTrue(File.Exists(filePath + ".bkmrk"));
+
+		// Entries below one are ignored by the underlying writer, so a set that filters to nothing
+		// deletes the sidecar instead of writing one.
+		store.Save(filePath, [0, -3]);
+
+		Assert.IsFalse(File.Exists(filePath + ".bkmrk"));
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> emptyAfterIgnored));
+		Assert.IsEmpty(emptyAfterIgnored);
+	}
+
+	[TestMethod]
+	public void TryLoad_NormalizesSkippedDuplicatesAndOrdering()
+	{
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
+
+		// The sidecar is written raw so the load normalization is exercised directly: a skipped
+		// non-integer, a duplicate, and unordered entries.
+		File.WriteAllLines(filePath + ".bkmrk", ["7", "not-a-number", "3", "3", "1", "0"]);
+
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> loaded));
+		Assert.AreSequenceEqual([1, 3, 7], [.. loaded]);
+	}
+
+	[TestMethod]
+	public void BlankOrNullExtension_IsRejected()
+	{
+		Assert.ThrowsExactly<ArgumentNullException>(() => new BookmarkSidecarStore(null!));
+		Assert.ThrowsExactly<ArgumentException>(() => new BookmarkSidecarStore(string.Empty));
+		Assert.ThrowsExactly<ArgumentException>(() => new BookmarkSidecarStore("   "));
+	}
+
+	[TestMethod]
+	public void UnusableExtensionForms_AreRejected()
+	{
+		Assert.ThrowsExactly<ArgumentException>(() => new BookmarkSidecarStore("."));
+		Assert.ThrowsExactly<ArgumentException>(() => new BookmarkSidecarStore("a/b"));
+		Assert.ThrowsExactly<ArgumentException>(() => new BookmarkSidecarStore("x\\y"));
 	}
 
 	[TestMethod]
 	public void CustomExtension_IsHonored()
 	{
-		string filePath = CreateTempPath(out _);
+		string filePath = CreateTempPath();
 		var store = new BookmarkSidecarStore(".markers");
 
 		store.Save(filePath, [3]);
@@ -72,44 +103,59 @@ public sealed class BookmarkSidecarStoreTests
 	}
 
 	[TestMethod]
-	public void Coordinator_SaveBookmarks_ThenRestoreBookmarks_RoundTrips()
+	public void Save_UnwritablePath_ReturnsFalseAndTryLoadReportsNothingStored()
 	{
-		string filePath = CreateTempPath(out _);
-		var document = new TextDocument("one\r\ntwo\r\nthree\r\nfour");
-		var coordinator = new BookmarkCoordinator(() => document);
-		var store = new BookmarkSidecarStore();
+		string filePath = CreateTempPath();
+		string blockerPath = Path.Combine(Path.GetDirectoryName(filePath)!, "blocker");
 
-		coordinator.ToggleBookmark(GetLineOffset(document, 2));
-		coordinator.ToggleBookmark(GetLineOffset(document, 4));
+		File.WriteAllText(blockerPath, "not a directory");
 
-		coordinator.SaveBookmarks(store, filePath);
-		coordinator.Clear();
+		// 'blocker' is a file, so the sidecar path below it cannot be written.
+		string blockedPath = Path.Combine(blockerPath, "document.txt");
+		var store = new BookmarkSidecarStore(".bkmrk");
 
-		Assert.IsEmpty(coordinator.GetBookmarkedLines());
+		Assert.IsFalse(store.Save(blockedPath, [1]));
 
-		coordinator.RestoreBookmarks(store, filePath);
-
-		Assert.HasCount(2, coordinator.GetBookmarkedLines());
-		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
-		Assert.AreEqual(4, coordinator.GetBookmarkedLines()[1].LineNumber);
+		// No sidecar exists at the blocked path, so the load reports success with an empty list.
+		Assert.IsTrue(store.TryLoad(blockedPath, out IReadOnlyList<int> blockedLines));
+		Assert.IsEmpty(blockedLines);
 	}
 
 	[TestMethod]
-	public void Coordinator_Restore_OutOfRangeLines_AreIgnored()
+	public void TryLoad_MissingSidecar_ReportsSuccessWithEmptyList()
 	{
-		string filePath = CreateTempPath(out _);
-		var document = new TextDocument("one\r\ntwo\r\nthree");
-		var coordinator = new BookmarkCoordinator(() => document);
-		var store = new BookmarkSidecarStore();
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
 
-		store.Save(filePath, [2, 99]);
-
-		coordinator.RestoreBookmarks(store, filePath);
-
-		Assert.HasCount(1, coordinator.GetBookmarkedLines());
-		Assert.AreEqual(2, coordinator.GetBookmarkedLines()[0].LineNumber);
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> loaded));
+		Assert.IsEmpty(loaded);
 	}
 
-	private static int GetLineOffset(TextDocument document, int lineNumber)
-		=> document.GetLineByNumber(lineNumber).Offset;
+	[TestMethod]
+	public void TryLoad_EmptyFileAndOnlyIgnoredEntries_ReportSuccessWithEmptyList()
+	{
+		string filePath = CreateTempPath();
+		var store = new BookmarkSidecarStore(".bkmrk");
+
+		File.WriteAllText(filePath + ".bkmrk", string.Empty);
+
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> emptyFile));
+		Assert.IsEmpty(emptyFile);
+
+		File.WriteAllLines(filePath + ".bkmrk", ["0", string.Empty, "x"]);
+
+		Assert.IsTrue(store.TryLoad(filePath, out IReadOnlyList<int> ignoredEntries));
+		Assert.IsEmpty(ignoredEntries);
+	}
+
+	[TestMethod]
+	public void TryLoad_SidecarPathOccupiedByDirectory_ReportsFailure()
+	{
+		string filePath = CreateTempPath();
+		Directory.CreateDirectory(filePath + ".bkmrk");
+		var store = new BookmarkSidecarStore(".bkmrk");
+
+		Assert.IsFalse(store.TryLoad(filePath, out IReadOnlyList<int> loaded));
+		Assert.IsEmpty(loaded);
+	}
 }

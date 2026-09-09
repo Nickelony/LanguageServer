@@ -1,58 +1,81 @@
-using Nickelony.IDEKit.Core.Identifiers;
 using Nickelony.IDEKit.IntelliSense.Completion;
+using Nickelony.IDEKit.IntelliSense.Tests.TestSupport;
+using System.Globalization;
 
 namespace Nickelony.IDEKit.IntelliSense.Tests.Completion;
 
 [TestClass]
+// The Turkish-culture test mutates the process-wide culture, so this class must not run in parallel.
+[DoNotParallelize]
 public sealed class TextCompletionFilterTests
 {
-	private static readonly IReadOnlyList<TextCompletionItem> s_items =
-	[
-		new TextCompletionItem("Alpha", "Alpha"),
-		new TextCompletionItem("Beta", "Beta: "),
-		new TextCompletionItem("Gamma", "Gamma")
-	];
+	private static readonly IReadOnlyList<TextCompletionItem> s_items = CompletionTestCatalog.Items;
 
 	[TestMethod]
-	public void FilterByCurrentWord_EmptyWord_ReturnsAllItems()
+	public void FilterByWord_EmptyItems_ReturnsEmpty()
 	{
-		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByCurrentWord(s_items, new TextCompletionContext(string.Empty, 0));
-
-		Assert.AreEqual(3, result.Count);
-	}
-
-	[TestMethod]
-	public void FilterByCurrentWord_KeepsItemsContainingWord()
-	{
-		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByCurrentWord(s_items, new TextCompletionContext("Bet", 3));
-
-		Assert.AreEqual(1, result.Count);
-		Assert.AreEqual("Beta: ", result[0].InsertText);
-	}
-
-	[TestMethod]
-	public void FilterByCurrentWord_IsCaseInsensitive()
-	{
-		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByCurrentWord(s_items, new TextCompletionContext("gam", 3));
-
-		Assert.AreEqual(1, result.Count);
-		Assert.AreEqual("Gamma", result[0].InsertText);
-	}
-
-	[TestMethod]
-	public void FilterByCurrentWord_NoMatch_ReturnsEmpty()
-	{
-		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByCurrentWord(s_items, new TextCompletionContext("Zzz", 3));
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord([], "Alpha");
 
 		Assert.AreEqual(0, result.Count);
 	}
 
 	[TestMethod]
-	public void FilterByWord_EmptyWord_ReturnsAllItems()
+	public void FilterByWord_MultipleMatches_PreserveInputOrderAndItemIdentity()
+	{
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord(s_items, "a");
+
+		Assert.AreEqual(3, result.Count);
+		Assert.AreSame(s_items[0], result[0]);
+		Assert.AreSame(s_items[1], result[1]);
+		Assert.AreSame(s_items[2], result[2]);
+	}
+
+	[TestMethod]
+	public void FilterByWord_WhitespaceOnlyWord_MatchesFilterTextLiterally()
+	{
+		// A whitespace-only word is matched literally rather than treated as empty; only an item whose
+		// filter text contains the whitespace matches.
+		var item = new TextCompletionItem("display") { FilterText = "Beta: " };
+
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord([item], " ");
+
+		Assert.AreEqual(1, result.Count);
+	}
+
+	[TestMethod]
+	public void FilterByWord_EmptyWord_ReturnsCallerOwnedCopyOfAllItems()
 	{
 		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord(s_items, string.Empty);
 
-		Assert.AreEqual(3, result.Count);
+		Assert.AreNotSame(s_items, result);
+		CollectionAssert.AreEqual(s_items.ToArray(), result.ToArray());
+	}
+
+	[TestMethod]
+	public void FilterByWord_UnderTurkishCulture_KeepsOrdinalCaseInsensitiveMatching()
+	{
+		// Turkish maps 'I' and 'i' to different letters; the ordinal contract must keep ASCII casing
+		// variants matching regardless of the current culture.
+		var previousCulture = CultureInfo.CurrentCulture;
+		var previousUiCulture = CultureInfo.CurrentUICulture;
+
+		try
+		{
+			CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
+			CultureInfo.CurrentUICulture = new CultureInfo("tr-TR");
+
+			IReadOnlyList<TextCompletionItem> items = [new TextCompletionItem("Item") { InsertText = "Item" }];
+
+			IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord(items, "item");
+
+			Assert.AreEqual(1, result.Count);
+			Assert.AreEqual("Item", result[0].InsertText);
+		}
+		finally
+		{
+			CultureInfo.CurrentCulture = previousCulture;
+			CultureInfo.CurrentUICulture = previousUiCulture;
+		}
 	}
 
 	[TestMethod]
@@ -65,22 +88,44 @@ public sealed class TextCompletionFilterTests
 	}
 
 	[TestMethod]
-	public void FilterByWord_NoMatch_ReturnsEmpty()
+	public void FilterByWord_NoMatch_ReturnsAndReusesTheSharedEmptyResult()
 	{
-		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord(s_items, "Zzz");
+		// The no-match refresh path returns one shared empty list instead of allocating per call.
+		IReadOnlyList<TextCompletionItem> first = TextCompletionFilter.FilterByWord(s_items, "Zzz");
+		IReadOnlyList<TextCompletionItem> second = TextCompletionFilter.FilterByWord(s_items, "Zzz");
+
+		Assert.AreEqual(0, first.Count);
+		Assert.AreSame(first, second);
+	}
+
+	[TestMethod]
+	public void FilterByWord_MatchesFilterTextWhenInsertTextDiffers()
+	{
+		var item = new TextCompletionItem("display") { InsertText = "inserted", FilterText = "aliased" };
+
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord([item], "alias");
+
+		Assert.AreEqual(1, result.Count);
+	}
+
+	[TestMethod]
+	public void FilterByWord_DoesNotMatchInsertTextWhenFilterTextDiffers()
+	{
+		// The match rule covers filterText and its label fallback only; commit text must not widen it.
+		var item = new TextCompletionItem("display") { InsertText = "inserted", FilterText = "aliased" };
+
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord([item], "sert");
 
 		Assert.AreEqual(0, result.Count);
 	}
 
 	[TestMethod]
-	public void GetPrefix_ReturnsPrefixAtCaret()
+	public void FilterByWord_InsertTextOnlyMatch_IsRejected()
 	{
-		Assert.AreEqual("Beta_2", IdentifierHelper.GetPrefix("Beta_2: value", 6));
-	}
+		// The catalog's Beta item inserts "Beta: " while its label is "Beta"; the insertion text is not
+		// part of the match rule, so a word that only the insertion text contains selects nothing.
+		IReadOnlyList<TextCompletionItem> result = TextCompletionFilter.FilterByWord(s_items, "a: ");
 
-	[TestMethod]
-	public void GetPrefix_InvalidCaret_ReturnsEmpty()
-	{
-		Assert.AreEqual(string.Empty, IdentifierHelper.GetPrefix("Beta", 5));
+		Assert.AreEqual(0, result.Count);
 	}
 }

@@ -1,3 +1,5 @@
+using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.IntelliSense;
 using Nickelony.IDEKit.IntelliSense.Hover;
 using Nickelony.IDEKit.IntelliSense.Navigation;
 using Nickelony.IDEKit.IntelliSense.Signatures;
@@ -5,26 +7,30 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntelliSenseProviderTests
+public sealed partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
-	public async Task DispatchWorkspaceFileChangesAsync_RefreshesConfigurationWhenApiLibraryChanges()
+	public async Task DispatchWorkspaceFileChangesAsync_RefreshesConfigurationWhenLuaLsConfigurationChanges()
 	{
 		string workspaceRoot = Path.Combine(Path.GetTempPath(), "LuaConfigRefresh_" + Guid.NewGuid().ToString("N"));
-		string apiDirectory = Path.Combine(workspaceRoot, ".API");
-		string apiFilePath = Path.Combine(apiDirectory, "Generated.lua");
+		string configurationFilePath = Path.Combine(workspaceRoot, ".luarc.json");
 
 		try
 		{
-			Directory.CreateDirectory(apiDirectory);
-			File.WriteAllText(apiFilePath, "return {}");
+			Directory.CreateDirectory(workspaceRoot);
 
 			using var client = new FakeLanguageServerClient();
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(
+				workspaceRoot,
+				client,
+				out _,
+				new LuaLanguageServerOptions { AdditionalLibraryDirectories = [@"C:\Libraries\Extra"] });
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			var batch = new FileChangeBatch(
 			[
-				new WorkspaceFileChange(apiFilePath, FileChangeKind.Changed)
+				new WorkspaceFileChange(configurationFilePath, FileChangeKind.Changed)
 			]);
 
 			await DispatchWorkspaceFileChangesAsync(provider, batch, CancellationToken.None);
@@ -40,12 +46,49 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				.GetProperty("library");
 
 			Assert.AreEqual(1, settings.GetArrayLength());
-			Assert.AreEqual(apiDirectory, settings[0].GetString());
+			Assert.AreEqual(@"C:\Libraries\Extra", settings[0].GetString());
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
+		}
+	}
+
+	[TestMethod]
+	public async Task DispatchWorkspaceFileChangesAsync_ConfigurationRefreshUsesProviderOptions()
+	{
+		string workspaceRoot = Path.Combine(Path.GetTempPath(), "LuaConfigRefreshOptions_" + Guid.NewGuid().ToString("N"));
+		string configurationFilePath = Path.Combine(workspaceRoot, ".luarc.json");
+
+		try
+		{
+			Directory.CreateDirectory(workspaceRoot);
+
+			using var client = new FakeLanguageServerClient();
+			using var provider = CreateProviderWithWatcherCapture(
+				workspaceRoot,
+				client,
+				out _,
+				new LuaLanguageServerOptions { RuntimeVersion = "LuaJIT" });
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
+
+			var batch = new FileChangeBatch(
+			[
+				new WorkspaceFileChange(configurationFilePath, FileChangeKind.Changed)
+			]);
+
+			await DispatchWorkspaceFileChangesAsync(provider, batch, CancellationToken.None);
+
+			JsonElement settings = client.GetLastNotificationParameters("workspace/didChangeConfiguration")
+				.GetProperty("settings")
+				.GetProperty("Lua");
+
+			Assert.AreEqual("LuaJIT", settings.GetProperty("runtime").GetProperty("version").GetString());
+		}
+		finally
+		{
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -53,13 +96,12 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	public async Task DispatchWorkspaceFileChangesAsync_ReplaysDeferredChangesAfterStartupRecovery()
 	{
 		string workspaceRoot = Path.Combine(Path.GetTempPath(), "LuaDeferredWorkspaceReplay_" + Guid.NewGuid().ToString("N"));
-		string apiDirectory = Path.Combine(workspaceRoot, ".API");
-		string apiFilePath = Path.Combine(apiDirectory, "Generated.lua");
+		string configurationFilePath = Path.Combine(workspaceRoot, ".luarc.json");
 		string scriptFilePath = Path.Combine(workspaceRoot, "Scripts", "test.lua");
 
 		try
 		{
-			Directory.CreateDirectory(apiDirectory);
+			Directory.CreateDirectory(workspaceRoot);
 
 			using var client = new FakeLanguageServerClient
 			{
@@ -75,11 +117,16 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(
+				workspaceRoot,
+				client,
+				out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			var batch = new FileChangeBatch(
 			[
-				new WorkspaceFileChange(apiFilePath, FileChangeKind.Changed)
+				new WorkspaceFileChange(configurationFilePath, FileChangeKind.Changed)
 			]);
 
 			await DispatchWorkspaceFileChangesAsync(provider, batch, CancellationToken.None);
@@ -104,8 +151,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -133,7 +179,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(workspaceRoot, client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -162,8 +210,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -192,7 +239,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(workspaceRoot, client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -223,8 +272,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -252,7 +300,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(workspaceRoot, client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			var batch = new FileChangeBatch(
 			[
@@ -278,8 +328,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -306,7 +355,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(workspaceRoot, client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			client.BlockNextWatchedFilesNotification();
 			client.ThrowIOExceptionAfterWatchedFilesNotificationGateRelease = true;
@@ -318,13 +369,13 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 			Task dispatchTask = DispatchWorkspaceFileChangesAsync(provider, batch, CancellationToken.None);
 
-			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeWatchedFiles", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
+			Assert.IsTrue(await client.WaitForMethodCountAsync("workspace/didChangeWatchedFiles", 1, TestPolling.DefaultTimeout).ConfigureAwait(false));
 
 			client.IsReady = false;
 
 			Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(scriptFilePath, "local value = 1", 0, 0);
 
-			DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+			DateTime deadline = DateTime.UtcNow + TestPolling.DefaultTimeout;
 
 			while (client.StartCallCount < 2 && DateTime.UtcNow < deadline)
 				await Task.Delay(10).ConfigureAwait(false);
@@ -344,8 +395,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -371,7 +421,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 				})
 			};
 
-			using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+			using var provider = CreateProviderWithWatcherCapture(workspaceRoot, client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client);
 
 			for (int i = 1; i <= 3; i++)
 			{
@@ -400,8 +452,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		}
 		finally
 		{
-			if (Directory.Exists(workspaceRoot))
-				Directory.Delete(workspaceRoot, recursive: true);
+			TestTempDirectories.Delete(workspaceRoot);
 		}
 	}
 
@@ -418,10 +469,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			StartResult = false
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		var failures = new List<LanguageServerStartupFailure>();
 
-		provider.StartupFailed += failures.Add;
+		provider.StartupFailed += (_, eventArgs) => failures.Add(eventArgs.Failure);
 
 		await provider.GetHoverAsync(filePath, content, 0, 0);
 		await provider.GetHoverAsync(filePath, content, 0, 0);
@@ -453,13 +504,13 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextHoverInfo? hover = await provider.GetHoverAsync(filePath, content, 0, 0);
 
 		Assert.IsNotNull(hover);
 		Assert.AreEqual("Hover docs.", hover.Content);
-		Assert.IsTrue(hover.ContentKind == TextHoverContentKind.Markdown);
+		Assert.IsTrue(hover.ContentKind == TextMarkupKind.Markdown);
 
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/hover" },
@@ -486,18 +537,39 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextDefinitionLocation? definition = await provider.GetDefinitionAsync(filePath, "value", 0, 0);
 
 		Assert.IsNotNull(definition);
-		Assert.AreEqual(targetPath, definition.FilePath);
-		Assert.AreEqual(5, definition.LineNumber);
-		Assert.AreEqual(3, definition.ColumnNumber);
+		Assert.AreEqual(targetPath, definition.DocumentId);
+		Assert.AreEqual(new TextPositionRange(new TextPosition(4, 2), new TextPosition(4, 7)), definition.TargetRange);
+		Assert.IsNull(definition.SelectionRange);
 
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/definition" },
 			client.GetSentMethodNames());
+	}
+
+	[TestMethod]
+	public async Task GetDefinitionAsync_NullServerResponse_ReturnsTheNullFallback()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		// A configured JSON null models a server that answers the request with null instead of a
+		// location list; the provider must send the request and surface its documented null fallback.
+		using var client = new FakeLanguageServerClient
+		{
+			DefinitionResponse = JsonSerializer.SerializeToElement<object?>(null)
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		TextDefinitionLocation? definition = await provider.GetDefinitionAsync(filePath, "value", 0, 0);
+
+		Assert.IsNull(definition);
+		Assert.AreEqual(1, CountSentMethods(client, "textDocument/definition"));
 	}
 
 	[TestMethod]
@@ -532,18 +604,57 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
-		IReadOnlyList<TextReferenceLocation> references = await provider.GetReferencesAsync(filePath, "value", 0, 0);
+		IReadOnlyList<TextReferenceLocation> references = await provider.GetReferencesAsync(new TextReferenceRequest(filePath, "value", 0, 0));
 
 		Assert.AreEqual(1, references.Count);
 		Assert.AreEqual(targetPath, references[0].FilePath);
-		Assert.AreEqual(3, references[0].StartLineNumber);
-		Assert.AreEqual(5, references[0].StartColumnNumber);
+		Assert.AreEqual(new TextPosition(2, 4), references[0].Range.Start);
 
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/references" },
 			client.GetSentMethodNames());
+	}
+
+	[TestMethod]
+	public async Task GetReferencesAsync_DefaultsIncludeDeclarationToTrue()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			ReferencesResponse = JsonSerializer.SerializeToElement(Array.Empty<object>())
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		await provider.GetReferencesAsync(new TextReferenceRequest(filePath, "value", 0, 0));
+
+		JsonElement parameters = client.GetLastRequestParameters("textDocument/references");
+
+		Assert.IsTrue(parameters.GetProperty("context").GetProperty("includeDeclaration").GetBoolean());
+	}
+
+	[TestMethod]
+	public async Task GetReferencesAsync_WhenIncludeDeclarationIsFalse_SendsFalseInPayload()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			ReferencesResponse = JsonSerializer.SerializeToElement(Array.Empty<object>())
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		await provider.GetReferencesAsync(new TextReferenceRequest(filePath, "value", 0, 0, includeDeclaration: false));
+
+		JsonElement parameters = client.GetLastRequestParameters("textDocument/references");
+
+		Assert.IsFalse(parameters.GetProperty("context").GetProperty("includeDeclaration").GetBoolean());
 	}
 
 	[TestMethod]
@@ -586,20 +697,55 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
-		TextSignatureHelpInfo? signature = await provider.GetSignatureHelpAsync(filePath, "spawn(", 0, 6);
+		TextSignatureHelp? signature = await provider.GetSignatureHelpAsync(filePath, "spawn(", 0, 6);
 
 		Assert.IsNotNull(signature);
-		Assert.AreEqual("spawn(room, objectName)", signature.Label);
-		Assert.AreEqual("Spawns an object.", signature.Documentation);
+		Assert.AreEqual("spawn(room, objectName)", signature.ActiveSignature.Label);
+		Assert.AreEqual("Spawns an object.", signature.ActiveSignature.Documentation);
 		Assert.AreEqual(1, signature.ActiveParameterIndex);
-		Assert.AreEqual(2, signature.Parameters.Count);
-		Assert.AreEqual("objectName", signature.Parameters[1].Label);
-		Assert.AreEqual("Object name.", signature.Parameters[1].Documentation);
+		Assert.AreEqual(2, signature.ActiveSignature.Parameters.Count);
+		Assert.AreEqual("objectName", signature.ActiveSignature.Parameters[1].Label);
+		Assert.AreEqual("Object name.", signature.ActiveSignature.Parameters[1].Documentation);
 
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/signatureHelp" },
 			client.GetSentMethodNames());
+	}
+
+	[TestMethod]
+	public async Task DispatchWorkspaceFileChangesAsync_RefreshesConfigurationFromNonPrimaryRoot()
+	{
+		string primaryRoot = Path.Combine(Path.GetTempPath(), "LuaMultiRootConfigPrimary_" + Guid.NewGuid().ToString("N"));
+		string secondaryRoot = Path.Combine(Path.GetTempPath(), "LuaMultiRootConfigSecondary_" + Guid.NewGuid().ToString("N"));
+		string configurationFilePath = Path.Combine(secondaryRoot, ".luarc.json");
+
+		try
+		{
+			Directory.CreateDirectory(primaryRoot);
+			Directory.CreateDirectory(secondaryRoot);
+
+			using var client = new FakeLanguageServerClient();
+			using var provider = CreateProviderWithWatcherCapture([primaryRoot, secondaryRoot], client, out _);
+
+			await StartProviderAndCaptureWorkspaceWatcherAsync(provider, client, primaryRoot);
+
+			var batch = new FileChangeBatch(
+			[
+				new WorkspaceFileChange(configurationFilePath, FileChangeKind.Changed)
+			]);
+
+			await DispatchWorkspaceFileChangesAsync(provider, secondaryRoot, batch, CancellationToken.None);
+
+			CollectionAssert.AreEqual(
+				new[] { "workspace/didChangeConfiguration", "workspace/didChangeWatchedFiles" },
+				client.GetSentMethodNames());
+		}
+		finally
+		{
+			TestTempDirectories.Delete(primaryRoot);
+			TestTempDirectories.Delete(secondaryRoot);
+		}
 	}
 }

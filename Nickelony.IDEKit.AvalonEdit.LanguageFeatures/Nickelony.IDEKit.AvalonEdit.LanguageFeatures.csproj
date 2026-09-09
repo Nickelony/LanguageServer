@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Nickelony.IDEKit.AvalonEdit.LanguageFeatures</RootNamespace>
+    <AssemblyName>Nickelony.IDEKit.AvalonEdit.LanguageFeatures</AssemblyName>
+    <PackageId>Nickelony.IDEKit.AvalonEdit.LanguageFeatures</PackageId>
+    <Description>AvalonEdit IntelliSense UI controllers: completion windows, hover tooltips, signature help, definition navigation, code actions, and semantic-token colorizing, built on Nickelony.IDEKit.Core, Nickelony.IDEKit.IntelliSense, and Nickelony.IDEKit.AvalonEdit.</Description>
+    <PackageTags>text-editor;editor;avaloneditor;wpf;intellisense;completion;hover;signature-help;definition-navigation;code-actions;quick-fix;semantic-tokens;tooltip;nickelony</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nickelony.IDEKit.Core\Nickelony.IDEKit.Core.csproj" />
+    <ProjectReference Include="..\Nickelony.IDEKit.AvalonEdit\Nickelony.IDEKit.AvalonEdit.csproj" />
+    <ProjectReference Include="..\Nickelony.IDEKit.IntelliSense\Nickelony.IDEKit.IntelliSense.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Infrastructure\BrushHelpers.cs" Link="Infrastructure\BrushHelpers.cs" />
+    <Compile Include="..\Shared\Infrastructure\DispatcherDebouncer.cs" Link="Infrastructure\DispatcherDebouncer.cs" />
+    <Compile Include="..\Shared\Infrastructure\DispatcherInvocation.cs" Link="Infrastructure\DispatcherInvocation.cs" />
+    <Compile Include="..\Shared\Infrastructure\NumericValidation.cs" Link="Infrastructure\NumericValidation.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nickelony.IDEKit.AvalonEdit.LanguageFeatures.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Icon\LanguageServer.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -3,19 +3,20 @@ namespace Nickelony.LanguageServer.Abstractions;
 /// <summary>
 /// Describes a request to rename the symbol at a document position.
 /// </summary>
-/// <remarks>
-/// The position uses zero-based line and column indices. Negative line and column values are changed to zero.
-/// </remarks>
-public sealed class TextRenameRequest
+public sealed record TextRenameRequest
 {
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextRenameRequest"/> class.
+	/// Initializes a new instance of the <see cref="TextRenameRequest"/> record.
 	/// </summary>
 	/// <param name="filePath">The current document file path.</param>
 	/// <param name="documentText">The current document content.</param>
-	/// <param name="line">The zero-based current line index.</param>
-	/// <param name="column">The zero-based current column index.</param>
+	/// <param name="line">The zero-based current line index. Negative values are changed to zero.</param>
+	/// <param name="column">The zero-based current column index. Negative values are changed to zero.</param>
 	/// <param name="newName">The requested replacement name.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/>, <paramref name="documentText"/>, or <paramref name="newName"/> is
+	/// <see langword="null"/>.
+	/// </exception>
 	public TextRenameRequest(string filePath, string documentText, int line, int column, string newName)
 	{
 		ArgumentNullException.ThrowIfNull(filePath);

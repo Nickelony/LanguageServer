@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Logging;
+using Nickelony.IDEKit.Core.Text;
 using Nickelony.IDEKit.IntelliSense.Navigation;
 using Nickelony.LanguageServer.Testing;
-using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerResponseParserTests
+public sealed partial class LuaLanguageServerResponseParserTests
 {
 	[TestMethod]
 	public void ParseDefinitionLocation_UsesFirstEntryFromMultiLocationResponse()
@@ -37,105 +37,9 @@ public partial class LuaLanguageServerResponseParserTests
 			}));
 
 		Assert.IsNotNull(location);
-		Assert.AreEqual(firstPath, location.FilePath);
-		Assert.AreEqual(3, location.LineNumber);
-		Assert.AreEqual(5, location.ColumnNumber);
-	}
-
-	[TestMethod]
-	public void DeserializeDefinitionResponse_PreservesAllTargetsFromMultiLocationResponse()
-	{
-		string firstPath = Path.GetFullPath(@"C:\Workspace\Scripts\first.lua");
-		string secondPath = Path.GetFullPath(@"C:\Workspace\Scripts\second.lua");
-
-		DefinitionResponse response = DeserializeDefinitionResponse(new object[]
-		{
-			new
-			{
-				uri = new Uri(firstPath).AbsoluteUri,
-				range = new
-				{
-					start = new { line = 2, character = 4 },
-					end = new { line = 2, character = 10 }
-				}
-			},
-			new
-			{
-				uri = new Uri(secondPath).AbsoluteUri,
-				range = new
-				{
-					start = new { line = 8, character = 1 },
-					end = new { line = 8, character = 5 }
-				}
-			}
-		});
-
-		Assert.AreEqual(2, response.Targets.Count);
-		Assert.AreEqual(new Uri(firstPath).AbsoluteUri, response.Targets[0].Uri);
-		Assert.AreEqual(3, response.Targets[0].LineNumber);
-		Assert.AreEqual(5, response.Targets[0].ColumnNumber);
-		Assert.AreEqual(new Uri(secondPath).AbsoluteUri, response.Targets[1].Uri);
-		Assert.AreEqual(9, response.Targets[1].LineNumber);
-		Assert.AreEqual(2, response.Targets[1].ColumnNumber);
-	}
-
-	[TestMethod]
-	public void SerializeDefinitionResponse_WritesRoundTrippableLocationArray()
-	{
-		string firstUri = new Uri(Path.GetFullPath(@"C:\Workspace\Scripts\first.lua")).AbsoluteUri;
-		string secondUri = new Uri(Path.GetFullPath(@"C:\Workspace\Scripts\second.lua")).AbsoluteUri;
-
-		var response = new DefinitionResponse(
-		[
-			new DefinitionTargetResponse(firstUri, 3, 5),
-			new DefinitionTargetResponse(secondUri, 9, 2)
-		]);
-
-		string json = JsonSerializer.Serialize(response);
-
-		DefinitionResponse roundTripped = JsonSerializer.Deserialize<DefinitionResponse>(json)
-			?? throw new AssertFailedException("Serialized definition response should deserialize successfully.");
-
-		Assert.AreEqual(2, roundTripped.Targets.Count);
-		Assert.AreEqual(firstUri, roundTripped.Targets[0].Uri);
-		Assert.AreEqual(3, roundTripped.Targets[0].LineNumber);
-		Assert.AreEqual(5, roundTripped.Targets[0].ColumnNumber);
-		Assert.AreEqual(secondUri, roundTripped.Targets[1].Uri);
-		Assert.AreEqual(9, roundTripped.Targets[1].LineNumber);
-		Assert.AreEqual(2, roundTripped.Targets[1].ColumnNumber);
-	}
-
-	[TestMethod]
-	public void DeserializeDefinitionResponse_IgnoresMalformedTargetsAndKeepsUsableEntries()
-	{
-		string validPath = Path.GetFullPath(@"C:\Workspace\Scripts\valid.lua");
-
-		DefinitionResponse response = DeserializeDefinitionResponse(new object[]
-		{
-			new
-			{
-				uri = "not a uri",
-				range = new
-				{
-					start = new { line = 0, character = 0 },
-					end = new { line = 0, character = 1 }
-				}
-			},
-			new
-			{
-				uri = new Uri(validPath).AbsoluteUri,
-				range = new
-				{
-					start = new { line = 3, character = 2 },
-					end = new { line = 3, character = 7 }
-				}
-			}
-		});
-
-		Assert.AreEqual(1, response.Targets.Count);
-		Assert.AreEqual(new Uri(validPath).AbsoluteUri, response.Targets[0].Uri);
-		Assert.AreEqual(4, response.Targets[0].LineNumber);
-		Assert.AreEqual(3, response.Targets[0].ColumnNumber);
+		Assert.AreEqual(firstPath, location.DocumentId);
+		Assert.AreEqual(new TextPositionRange(new TextPosition(2, 4), new TextPosition(2, 10)), location.TargetRange);
+		Assert.IsNull(location.SelectionRange);
 	}
 
 	[TestMethod]
@@ -155,51 +59,40 @@ public partial class LuaLanguageServerResponseParserTests
 			}));
 
 		Assert.IsNotNull(location);
-		Assert.AreEqual(targetPath, location.FilePath);
-		Assert.AreEqual(5, location.LineNumber);
-		Assert.AreEqual(3, location.ColumnNumber);
+		Assert.AreEqual(targetPath, location.DocumentId);
+
+		// A location link without a distinct target range uses the selection range as the target.
+		var expectedRange = new TextPositionRange(new TextPosition(4, 2), new TextPosition(4, 9));
+
+		Assert.AreEqual(expectedRange, location.TargetRange);
+		Assert.AreEqual(expectedRange, location.SelectionRange);
 	}
 
 	[TestMethod]
-	public void DeserializeDefinitionResponse_FallsBackToTargetRangeWhenSelectionRangeIsMalformed()
+	public void ParseDefinitionLocation_KeepsDistinctTargetAndSelectionRanges()
 	{
 		string targetPath = Path.GetFullPath(@"C:\Workspace\Scripts\linked.lua");
 
-		DefinitionResponse response = DeserializeDefinitionResponse(new
-		{
-			targetUri = new Uri(targetPath).AbsoluteUri,
-			targetSelectionRange = new
+		TextDefinitionLocation? location = LuaLanguageServerResponseParser.ParseDefinitionLocation(
+			DeserializeDefinitionResponse(new
 			{
-				start = new { line = -1, character = 2 },
-				end = new { line = 4, character = 9 }
-			},
-			targetRange = new
-			{
-				start = new { line = 6, character = 3 },
-				end = new { line = 6, character = 8 }
-			}
-		});
+				targetUri = new Uri(targetPath).AbsoluteUri,
+				targetRange = new
+				{
+					start = new { line = 4, character = 0 },
+					end = new { line = 8, character = 3 }
+				},
+				targetSelectionRange = new
+				{
+					start = new { line = 4, character = 2 },
+					end = new { line = 4, character = 9 }
+				}
+			}));
 
-		Assert.AreEqual(1, response.Targets.Count);
-		Assert.AreEqual(new Uri(targetPath).AbsoluteUri, response.Targets[0].Uri);
-		Assert.AreEqual(7, response.Targets[0].LineNumber);
-		Assert.AreEqual(4, response.Targets[0].ColumnNumber);
-	}
-
-	[TestMethod]
-	public void DeserializeDefinitionResponse_ReturnsEmptyTargetsForSingleMalformedPayload()
-	{
-		DefinitionResponse response = DeserializeDefinitionResponse(new
-		{
-			uri = "not a uri",
-			range = new
-			{
-				start = new { line = 0, character = 0 },
-				end = new { line = 0, character = 1 }
-			}
-		});
-
-		Assert.AreEqual(0, response.Targets.Count);
+		Assert.IsNotNull(location);
+		Assert.AreEqual(targetPath, location.DocumentId);
+		Assert.AreEqual(new TextPositionRange(new TextPosition(4, 0), new TextPosition(8, 3)), location.TargetRange);
+		Assert.AreEqual(new TextPositionRange(new TextPosition(4, 2), new TextPosition(4, 9)), location.SelectionRange);
 	}
 
 	[TestMethod]
@@ -227,7 +120,7 @@ public partial class LuaLanguageServerResponseParserTests
 		string targetPath = Path.GetFullPath(@"C:\Workspace\Scripts\references.lua");
 
 		IReadOnlyList<TextReferenceLocation> locations = LuaLanguageServerResponseParser.ParseReferenceLocations(
-			DeserializeReferenceResponse(new object[]
+			DeserializeReferenceLocations(new object[]
 			{
 				new
 				{
@@ -251,10 +144,7 @@ public partial class LuaLanguageServerResponseParserTests
 
 		Assert.AreEqual(1, locations.Count);
 		Assert.AreEqual(targetPath, locations[0].FilePath);
-		Assert.AreEqual(3, locations[0].StartLineNumber);
-		Assert.AreEqual(5, locations[0].StartColumnNumber);
-		Assert.AreEqual(3, locations[0].EndLineNumber);
-		Assert.AreEqual(10, locations[0].EndColumnNumber);
+		Assert.AreEqual(new TextPositionRange(new TextPosition(2, 4), new TextPosition(2, 9)), locations[0].Range);
 	}
 
 	[TestMethod]
@@ -263,7 +153,7 @@ public partial class LuaLanguageServerResponseParserTests
 		string targetPath = Path.GetFullPath(@"C:\Workspace\Scripts\references.lua");
 
 		IReadOnlyList<TextReferenceLocation> locations = LuaLanguageServerResponseParser.ParseReferenceLocations(
-			DeserializeReferenceResponse(new object[]
+			DeserializeReferenceLocations(new object[]
 			{
 				new
 				{
@@ -280,7 +170,7 @@ public partial class LuaLanguageServerResponseParserTests
 	}
 
 	[TestMethod]
-	public void ParseWorkspaceEdit_MergesChangeMapAndDocumentChanges()
+	public void ParseWorkspaceEdit_PrefersDocumentChangesOverChangeMap()
 	{
 		string firstPath = Path.GetFullPath(@"C:\Workspace\Scripts\first.lua");
 		string secondPath = Path.GetFullPath(@"C:\Workspace\Scripts\second.lua");
@@ -324,12 +214,199 @@ public partial class LuaLanguageServerResponseParserTests
 				}
 			}));
 
+		// LSP defines both representations as alternatives; when a server populates both, the structured
+		// documentChanges list wins so every edit cannot be applied twice.
 		Assert.IsNotNull(workspaceEdit);
-		Assert.AreEqual(2, workspaceEdit.DocumentEdits.Count);
-		Assert.AreEqual(firstPath, workspaceEdit.DocumentEdits[0].FilePath);
-		Assert.AreEqual("local", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
-		Assert.AreEqual(secondPath, workspaceEdit.DocumentEdits[1].FilePath);
-		Assert.AreEqual("name", workspaceEdit.DocumentEdits[1].TextEdits[0].NewText);
+		Assert.AreEqual(1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(secondPath, workspaceEdit.DocumentEdits[0].FilePath);
+		Assert.AreEqual("name", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_FallsBackToChangesWhenDocumentChangesProduceNoEdit()
+	{
+		string changeMapPath = Path.GetFullPath(@"C:\Workspace\Scripts\changes-only.lua");
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(
+			DeserializeWorkspaceEditResponse(new
+			{
+				changes = new Dictionary<string, object[]>
+				{
+					[new Uri(changeMapPath).AbsoluteUri] =
+					[
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 5 }
+							},
+							newText = "renamed"
+						}
+					]
+				},
+				documentChanges = Array.Empty<object>()
+			}));
+
+		// An empty documentChanges list must not discard a populated changes map; the rename would
+		// otherwise be lost silently.
+		Assert.IsNotNull(workspaceEdit);
+		Assert.AreEqual(1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(changeMapPath, workspaceEdit.DocumentEdits[0].FilePath);
+		Assert.AreEqual("renamed", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_FallsBackToChangesWhenDocumentChangesContainOnlySkippedEdits()
+	{
+		string changeMapPath = Path.GetFullPath(@"C:\Workspace\Scripts\changes-only.lua");
+		string skippedPath = Path.GetFullPath(@"C:\Workspace\Scripts\skipped.lua");
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(
+			DeserializeWorkspaceEditResponse(new
+			{
+				changes = new Dictionary<string, object[]>
+				{
+					[new Uri(changeMapPath).AbsoluteUri] =
+					[
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 5 }
+							},
+							newText = "renamed"
+						}
+					]
+				},
+				documentChanges = new object[]
+				{
+					new
+					{
+						textDocument = new { uri = new Uri(skippedPath).AbsoluteUri },
+						edits = new object[]
+						{
+							new { range = (object?)null, newText = "no range" },
+							new { range = new { start = new { line = 0, character = 0 }, end = new { line = 0, character = 1 } }, newText = (string?)null }
+						}
+					}
+				}
+			}));
+
+		// documentChanges entries whose edits are all skipped must not discard a populated changes
+		// map; only a yield of usable edits counts as a usable documentChanges representation.
+		Assert.IsNotNull(workspaceEdit);
+		Assert.AreEqual(1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(changeMapPath, workspaceEdit.DocumentEdits[0].FilePath);
+		Assert.AreEqual("renamed", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_FallsBackToChangesWhenDocumentChangesCarryNullEditLists()
+	{
+		string changeMapPath = Path.GetFullPath(@"C:\Workspace\Scripts\changes-only.lua");
+		string nullEditsPath = Path.GetFullPath(@"C:\Workspace\Scripts\null-edits.lua");
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(
+			DeserializeWorkspaceEditResponse(new
+			{
+				changes = new Dictionary<string, object[]>
+				{
+					[new Uri(changeMapPath).AbsoluteUri] =
+					[
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 5 }
+							},
+							newText = "renamed"
+						}
+					]
+				},
+				documentChanges = new object[]
+				{
+					new
+					{
+						textDocument = new { uri = new Uri(nullEditsPath).AbsoluteUri },
+						edits = (object?)null
+					}
+				}
+			}));
+
+		Assert.IsNotNull(workspaceEdit);
+		Assert.AreEqual(1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(changeMapPath, workspaceEdit.DocumentEdits[0].FilePath);
+		Assert.AreEqual("renamed", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_ReturnsNullWhenDocumentChangeUriCannotBeResolved()
+	{
+		WorkspaceEditResponse? response = DeserializeWorkspaceEditResponse(new
+		{
+			documentChanges = new object[]
+			{
+				new
+				{
+					textDocument = new { uri = "https://example.com/not-a-file.lua" },
+					edits = new object[]
+					{
+						new
+						{
+							range = new
+							{
+								start = new { line = 0, character = 0 },
+								end = new { line = 0, character = 5 }
+							},
+							newText = "renamed"
+						}
+					}
+				}
+			}
+		});
+
+		using var logScope = new TestLoggerScope(LogLevel.Warning);
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(response, logScope);
+
+		// An unresolvable target URI fails the whole rename closed so no partial rename is applied.
+		Assert.IsNull(workspaceEdit);
+		Assert.AreEqual(1, logScope.Logs.Count);
+		StringAssert.Contains(logScope.Logs[0], "could not be resolved to a local file path");
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_ReturnsNullWhenChangeMapUriCannotBeResolved()
+	{
+		WorkspaceEditResponse? response = DeserializeWorkspaceEditResponse(new
+		{
+			changes = new Dictionary<string, object[]>
+			{
+				["https://example.com/not-a-file.lua"] =
+				[
+					new
+					{
+						range = new
+						{
+							start = new { line = 0, character = 0 },
+							end = new { line = 0, character = 5 }
+						},
+						newText = "renamed"
+					}
+				]
+			}
+		});
+
+		using var logScope = new TestLoggerScope(LogLevel.Warning);
+
+		TextWorkspaceEdit? workspaceEdit = LuaLanguageServerResponseParser.ParseWorkspaceEdit(response, logScope);
+
+		Assert.IsNull(workspaceEdit);
+		Assert.AreEqual(1, logScope.Logs.Count);
+		StringAssert.Contains(logScope.Logs[0], "change-map URI could not be resolved");
 	}
 
 	[TestMethod]
@@ -371,7 +448,7 @@ public partial class LuaLanguageServerResponseParserTests
 			}));
 
 		Assert.IsNotNull(workspaceEdit);
-		Assert.AreEqual(LanguageServerPathHelper.UsesCaseSensitiveLocalPaths ? 2 : 1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(LanguageServerPaths.UsesCaseSensitiveLocalPaths ? 2 : 1, workspaceEdit.DocumentEdits.Count);
 	}
 
 	[TestMethod]
@@ -440,100 +517,9 @@ public partial class LuaLanguageServerResponseParserTests
 		Assert.IsNull(workspaceEdit);
 		Assert.AreEqual(1, logScope.Logs.Count);
 		StringAssert.Contains(logScope.Logs[0], "unsupported resource operation");
-		StringAssert.Contains(logScope.Logs[0], "rename workspace edit");
+		StringAssert.Contains(logScope.Logs[0], "workspace edit");
 		StringAssert.Contains(logScope.Logs[0], "first.lua");
 		StringAssert.Contains(logScope.Logs[0], "second.lua");
-	}
-
-	[TestMethod]
-	public void DeserializeWorkspaceEditResponse_PreservesResourceOperationMetadataInDocumentChanges()
-	{
-		string firstPath = Path.GetFullPath(@"C:\Workspace\Scripts\first.lua");
-		string secondPath = Path.GetFullPath(@"C:\Workspace\Scripts\second.lua");
-
-		WorkspaceEditResponse? response = DeserializeWorkspaceEditResponse(new
-		{
-			documentChanges = new object[]
-			{
-				new
-				{
-					textDocument = new { uri = new Uri(firstPath).AbsoluteUri },
-					edits = new object[]
-					{
-						new
-						{
-							range = new
-							{
-								start = new { line = 0, character = 0 },
-								end = new { line = 0, character = 5 }
-							},
-							newText = "local"
-						}
-					}
-				},
-				new
-				{
-					kind = "rename",
-					oldUri = new Uri(firstPath).AbsoluteUri,
-					newUri = new Uri(secondPath).AbsoluteUri
-				}
-			}
-		});
-
-		Assert.IsNotNull(response);
-		Assert.IsNotNull(response.Value.DocumentChanges);
-		Assert.AreEqual(2, response.Value.DocumentChanges.Count);
-		Assert.AreEqual(firstPath, Path.GetFullPath(new Uri(response.Value.DocumentChanges[0].TextDocument?.Uri ?? string.Empty).LocalPath));
-		Assert.AreEqual("rename", response.Value.DocumentChanges[1].Kind);
-		Assert.AreEqual(new Uri(firstPath).AbsoluteUri, response.Value.DocumentChanges[1].OldUri);
-		Assert.AreEqual(new Uri(secondPath).AbsoluteUri, response.Value.DocumentChanges[1].NewUri);
-	}
-
-	[TestMethod]
-	public void WorkspaceEditResponse_DefensivelyClonesNestedEditCollections()
-	{
-		IReadOnlyList<TextEditPayload> edits =
-		[
-			new TextEditPayload(
-				new ProtocolRangePayload(
-					new ProtocolNullablePosition(0, 0),
-					new ProtocolNullablePosition(0, 1)),
-				"x")
-		];
-
-		var changes = new Dictionary<string, IReadOnlyList<TextEditPayload>?>
-		{
-			[new Uri(@"C:\Workspace\Scripts\first.lua").AbsoluteUri] = edits
-		};
-
-		WorkspaceDocumentChangePayload[] documentChanges =
-		[
-			new WorkspaceDocumentChangePayload(
-				new TextDocumentUriPayload(new Uri(@"C:\Workspace\Scripts\first.lua").AbsoluteUri),
-				edits,
-				kind: null,
-				uri: null,
-				oldUri: null,
-				newUri: null)
-		];
-
-		var response = new WorkspaceEditResponse(changes, documentChanges);
-		changes.Clear();
-
-		documentChanges[0] = new WorkspaceDocumentChangePayload(
-			new TextDocumentUriPayload(new Uri(@"C:\Workspace\Scripts\second.lua").AbsoluteUri),
-			edits,
-			kind: "rename",
-			uri: null,
-			oldUri: new Uri(@"C:\Workspace\Scripts\first.lua").AbsoluteUri,
-			newUri: new Uri(@"C:\Workspace\Scripts\second.lua").AbsoluteUri);
-
-		Assert.IsNotNull(response.Changes);
-		Assert.AreEqual(1, response.Changes.Count);
-		Assert.IsNotNull(response.DocumentChanges);
-		Assert.AreEqual(1, response.DocumentChanges.Count);
-		Assert.AreEqual(new Uri(@"C:\Workspace\Scripts\first.lua").AbsoluteUri, response.DocumentChanges[0].TextDocument?.Uri);
-		Assert.IsFalse(response.DocumentChanges[0].IsResourceOperation);
 	}
 
 	[TestMethod]
@@ -564,9 +550,24 @@ public partial class LuaLanguageServerResponseParserTests
 
 		Assert.AreEqual(2, textEdits.Count);
 		Assert.AreEqual("local value = 1\r\n", textEdits[0].NewText);
-		Assert.AreEqual(1, textEdits[0].Range.StartLineNumber);
-		Assert.AreEqual(1, textEdits[0].Range.StartColumnNumber);
-		Assert.AreEqual(2, textEdits[1].Range.StartLineNumber);
-		Assert.AreEqual(5, textEdits[1].Range.EndColumnNumber);
+		Assert.AreEqual(new TextPosition(0, 0), textEdits[0].Range.Start);
+		Assert.AreEqual(new TextPosition(0, 0), textEdits[0].Range.End);
+		Assert.AreEqual(new TextPosition(1, 0), textEdits[1].Range.Start);
+		Assert.AreEqual(new TextPosition(1, 4), textEdits[1].Range.End);
+	}
+
+	[TestMethod]
+	public void ParseWorkspaceEdit_ChangeMapWithNullEntry_IsTreatedAsAbsent()
+	{
+		WorkspaceEditResponse? response = DeserializeWorkspaceEditResponse(new
+		{
+			changes = new Dictionary<string, object?>
+			{
+				[new Uri(Path.GetFullPath(@"C:\Workspace\Scripts\first.lua")).AbsoluteUri] = null
+			}
+		});
+
+		// A null edit list adds no entries; the response then yields no usable edit at all.
+		Assert.IsNull(LuaLanguageServerResponseParser.ParseWorkspaceEdit(response));
 	}
 }

@@ -3,6 +3,9 @@
 This guide describes the lifecycle and threading contract a host should follow when
 consuming the provider package.
 
+If you are implementing a language provider rather than consuming one, start with the
+[provider authoring guide](ProviderAuthoring.md).
+
 ## Construction and disposal
 
 Construct the provider during host setup, subscribe to callbacks before opening documents,
@@ -11,7 +14,7 @@ Disposal is idempotent and closes callback admission before releasing those reso
 
 ```csharp
 var provider = new LuaLanguageServerIntelliSenseProvider(
-    workspaceRootDirectoryPath: workspaceRoot,
+    workspaceRootDirectoryPaths: [workspaceRoot],
     serverExecutablePath: luaLanguageServerPath,
     logger: logger);
 
@@ -45,10 +48,14 @@ may arrive on background threads. Their handlers run serially for one invocation
 failing handler does not prevent later subscribers from running. Marshal to the editor UI
 dispatcher before touching controls, and treat each payload as an owned immutable snapshot.
 
+Payload events follow the standard .NET event pattern: the provider is the sender, and the
+event data is a single `EventArgs` object (`eventArgs.FilePath`, `eventArgs.Diagnostics`,
+`eventArgs.Failure`, and so on).
+
 ```csharp
-provider.DiagnosticsUpdated += (path, diagnostics) =>
+provider.DiagnosticsUpdated += (_, eventArgs) =>
 {
-    editorDispatcher.Post(() => errorList.Replace(path, diagnostics));
+    editorDispatcher.Post(() => errorList.Replace(eventArgs.FilePath, eventArgs.Diagnostics));
 };
 ```
 
@@ -75,10 +82,10 @@ try
 }
 catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
 {
-    // The caller cancelled; do not display this as an empty completion result or an error.
+    // The caller canceled; do not display this as an empty completion result or an error.
 }
 ```
 
 Caller cancellation propagates as `OperationCanceledException`. Provider disposal,
 provider-enforced timeouts, internal transport failure, and unsupported capabilities use
-the documented fallback result instead; they are not reported as caller cancellation.
+the documented fallback value instead; they are not reported as caller cancellation.

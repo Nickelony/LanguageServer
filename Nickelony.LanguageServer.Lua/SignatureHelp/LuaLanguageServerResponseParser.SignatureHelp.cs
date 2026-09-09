@@ -1,103 +1,115 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
+using Nickelony.IDEKit.Core.Text;
 using Nickelony.IDEKit.IntelliSense.Signatures;
+using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua;
 
 internal static partial class LuaLanguageServerResponseParser
 {
+	// The line separator passed to the plain-text normalizer that projects signature-help
+	// documentation into the plain-text-only signature model.
+	private const string DocumentationNewLine = "\n";
+
 	/// <summary>
-	/// Parses signature help metadata from a LuaLS signature-help response.
+	/// Parses a signature-help payload from a LuaLS signature-help response.
 	/// </summary>
 	/// <param name="response">The signature help response payload, or <see langword="null"/> when unavailable.</param>
-	/// <returns>The parsed signature help info, or <see langword="null"/> when no signatures are present.</returns>
-	internal static TextSignatureHelpInfo? ParseSignatureHelp(SignatureHelpResponse? response)
+	/// <returns>
+	/// The parsed signature help payload including every signature with a label, or
+	/// <see langword="null"/> when no signature with a label is present.
+	/// </returns>
+	internal static TextSignatureHelp? ParseSignatureHelp(SignatureHelpResponse? response)
 	{
-		if (response?.Signatures is not { Length: > 0 } signatures)
+		if (response?.Signatures is not { Length: > 0 } signaturePayloads)
 			return null;
 
-		int activeSignature = response.ActiveSignature is int parsedActiveSignature
-			? Math.Clamp(parsedActiveSignature, 0, signatures.Length - 1)
-			: 0;
+		int activeSignatureElementIndex = Math.Max(0, response.ActiveSignature ?? 0);
+		int activeSignatureIndex = 0;
 
-		SignatureHelpSignaturePayload signatureElement = signatures[activeSignature];
+		var signatures = new List<TextSignatureInformation>(signaturePayloads.Length);
 
-		if (string.IsNullOrWhiteSpace(signatureElement.Label))
+		for (int i = 0; i < signaturePayloads.Length; i++)
+		{
+			if (signaturePayloads[i] is not { } signaturePayload || string.IsNullOrWhiteSpace(signaturePayload.Label))
+				continue;
+
+			// Track where the active signature lands once unusable entries are skipped.
+			if (i < activeSignatureElementIndex)
+				activeSignatureIndex++;
+
+			signatures.Add(CreateSignatureInformation(signaturePayload, signaturePayload.Label));
+		}
+
+		if (signatures.Count == 0)
 			return null;
 
-		string label = signatureElement.Label;
+		activeSignatureIndex = Math.Min(activeSignatureIndex, signatures.Count - 1);
 
-		string? documentation = signatureElement.Documentation.ValueKind != JsonValueKind.Undefined
-			? ExtractMarkupText(signatureElement.Documentation)
+		return new(signatures, activeSignatureIndex, GetActiveParameterIndex(response.ActiveParameter));
+	}
+
+	/// <summary>
+	/// Interprets an LSP <c>activeParameter</c> value into a parameter index, the not-specified
+	/// sentinel, or the LSP 3.18 "no active parameter" state.
+	/// </summary>
+	/// <param name="activeParameterElement">The raw payload value.</param>
+	/// <returns>The parameter index, the not-specified sentinel, or <see langword="null"/>.</returns>
+	/// <remarks>
+	/// An absent property keeps the sentinel so the next fallback level applies; an explicit
+	/// <see langword="null"/> maps to the LSP 3.18 "no active parameter" state; a non-negative
+	/// integer that fits <see cref="int"/> is used verbatim. A negative number follows the pre-3.18
+	/// convention in which servers signaled "no active parameter" with <c>-1</c>, so it maps to
+	/// <see langword="null"/> as well; any other number (fractional or out of range) falls back to
+	/// the sentinel like an unknown value.
+	/// </remarks>
+	private static int? GetActiveParameterIndex(JsonElement activeParameterElement)
+	{
+		return activeParameterElement.ValueKind switch
+		{
+			JsonValueKind.Undefined => -1,
+			JsonValueKind.Null => null,
+			JsonValueKind.Number when activeParameterElement.TryGetInt32(out int index) => index < 0 ? null : index,
+			_ => -1
+		};
+	}
+
+	/// <summary>
+	/// Extracts plain-text documentation from an LSP markup payload. Fence lines are removed so the
+	/// result satisfies the plain-text-only signature model; inline markup is preserved as text.
+	/// </summary>
+	/// <param name="element">The markup payload to flatten.</param>
+	/// <returns>The plain-text documentation, or <see langword="null"/> when the payload is blank.</returns>
+	private static string? ExtractMarkupText(JsonElement element)
+		=> BacktickFenceTextNormalizer.NormalizeForPlainText(MarkupContentReader.ExtractContent(element).Text, DocumentationNewLine);
+
+	private static TextSignatureInformation CreateSignatureInformation(SignatureHelpSignaturePayload signaturePayload, string label)
+	{
+		string? documentation = signaturePayload.Documentation is { } documentationElement
+			? ExtractMarkupText(documentationElement)
 			: null;
-
-		int activeParameter = ResolveActiveParameter(response, signatureElement);
 
 		var parameters = new List<TextSignatureParameterInfo>();
 
-		if (signatureElement.Parameters is { Length: > 0 } parametersElement)
+		if (signaturePayload.Parameters is { Length: > 0 } parameterPayloads)
 		{
-			for (int i = 0; i < parametersElement.Length; i++)
+			for (int i = 0; i < parameterPayloads.Length; i++)
 			{
-				SignatureHelpParameterPayload paramElement = parametersElement[i];
+				SignatureHelpParameterPayload parameterPayload = parameterPayloads[i];
 
-				string? parameterLabel = paramElement.Label.ValueKind == JsonValueKind.String
-					? paramElement.Label.GetString()
-					: TryExtractParameterLabel(label, paramElement.Label, out string? extractedLabel)
+				string? parameterLabel = parameterPayload.Label.ValueKind == JsonValueKind.String
+					? parameterPayload.Label.GetString()
+					: SignatureLabelParser.TryExtractParameterLabel(label, parameterPayload.Label, out string? extractedLabel)
 						? extractedLabel
 						: null;
 
-				string? parameterDocumentation = paramElement.Documentation.ValueKind != JsonValueKind.Undefined
-					? ExtractMarkupText(paramElement.Documentation)
+				string? parameterDocumentation = parameterPayload.Documentation is { } parameterDocumentationElement
+					? ExtractMarkupText(parameterDocumentationElement)
 					: null;
 
 				parameters.Add(new TextSignatureParameterInfo(parameterLabel ?? string.Empty, parameterDocumentation));
 			}
 		}
 
-		return new(label, activeParameter, documentation, parameters);
-	}
-
-	private static string? ExtractMarkupText(JsonElement element)
-	{
-		string text = MarkupContentReader.ExtractContent(element).Text;
-		return string.IsNullOrWhiteSpace(text) ? null : text;
-	}
-
-	private static int ResolveActiveParameter(SignatureHelpResponse response, SignatureHelpSignaturePayload signatureElement)
-	{
-		if (response.ActiveParameter is int responseActiveParameter)
-			return Math.Max(0, responseActiveParameter);
-
-		if (signatureElement.ActiveParameter is int signatureActiveParameter)
-			return Math.Max(0, signatureActiveParameter);
-
-		return 0;
-	}
-
-	private static bool TryExtractParameterLabel(string signatureLabel, JsonElement parameterLabelElement,
-		[NotNullWhen(true)] out string? parameterLabel)
-	{
-		parameterLabel = null;
-
-		if (string.IsNullOrEmpty(signatureLabel) || parameterLabelElement.ValueKind != JsonValueKind.Array)
-			return false;
-
-		JsonElement.ArrayEnumerator labelParts = parameterLabelElement.EnumerateArray();
-
-		if (!labelParts.MoveNext() || !labelParts.Current.TryGetInt32(out int startIndex))
-			return false;
-
-		if (!labelParts.MoveNext() || !labelParts.Current.TryGetInt32(out int endIndex))
-			return false;
-
-		startIndex = Math.Max(0, Math.Min(startIndex, signatureLabel.Length));
-		endIndex = Math.Max(startIndex, Math.Min(endIndex, signatureLabel.Length));
-
-		if (endIndex <= startIndex)
-			return false;
-
-		parameterLabel = signatureLabel[startIndex..endIndex];
-		return true;
+		return new(label, documentation, GetActiveParameterIndex(signaturePayload.ActiveParameter), parameters);
 	}
 }

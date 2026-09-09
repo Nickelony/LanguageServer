@@ -10,10 +10,10 @@ This package contains the **editor-facing lifecycle contract** of the Nickelony 
 family - the stable seam between a text editor and any language provider. It holds the provider
 lifecycle (document open/update/close/rename, request cancellation, startup/capability events,
 session state) and the protocol-bound payloads. All of its types live in the single namespace
-`Nickelony.LanguageServer.Abstractions`; the `Editing/`, `Navigation/`, and `Infrastructure/`
-folder structure is purely organizational. The shared, protocol-free IntelliSense payload
-values (`TextEditorDiagnostic`, `TextHoverInfo`, `TextDefinitionLocation`,
-`TextSignatureHelpInfo`, `TextCompletionItem`) and the synchronous provider request records live
+`Nickelony.LanguageServer.Abstractions`; the `CodeActions/`, `Editing/`, `Lifecycle/`, and
+`Navigation/` folder structure is purely organizational. The shared, protocol-free IntelliSense payload
+values (`TextDiagnostic`, `TextHoverInfo`, `TextDefinitionLocation`,
+`TextSignatureHelp`, `TextCompletionItem`) and the synchronous provider request records live
 in the dependency-free `Nickelony.IDEKit.IntelliSense` package under the
 `Nickelony.IDEKit.IntelliSense` feature namespaces
 (`Nickelony.IDEKit.IntelliSense.Diagnostics`, `...Hover`, `...Navigation`,
@@ -26,17 +26,18 @@ single `Nickelony.LanguageServer.Abstractions` namespace; rows that name a
 `Nickelony.IDEKit.IntelliSense.*` namespace are shared payloads referenced from the
 `Nickelony.IDEKit.IntelliSense` package:
 
-| Area | Types |
+| Area | Types / members |
 |---|---|
 | Provider | `ILanguageServerIntelliSenseProvider` |
 | Session state | `LanguageServerProviderState` |
 | Document lifecycle | `OpenDocument`, `UpdateDocument`, `CloseDocument`, `RenameDocument` |
 | Completion | `TextCompletionItem`, `TextCompletionItemKind` (in `Nickelony.IDEKit.IntelliSense.Completion`) |
-| Diagnostics | `TextEditorDiagnostic`, `TextEditorDiagnosticSeverity` (in `Nickelony.IDEKit.IntelliSense.Diagnostics`) |
-| Hover | `TextHoverInfo`, `TextHoverContentKind` (in `Nickelony.IDEKit.IntelliSense.Hover`) |
+| Diagnostics | `TextDiagnostic` (in `Nickelony.IDEKit.IntelliSense.Diagnostics`), `TextDiagnosticSeverity` (in `Nickelony.IDEKit.Core.Diagnostics`) |
+| Hover | `TextHoverInfo`, `TextMarkupKind` (in `Nickelony.IDEKit.IntelliSense.Hover`) |
 | Navigation | `ITextReferencesProvider`, `TextReferenceLocation`, `TextReferenceRequest`; `TextDefinitionLocation` (in `Nickelony.IDEKit.IntelliSense.Navigation`) |
-| Editing | `ITextEditProvider`, `ITextFormattingProvider`, `TextEdit`, `TextWorkspaceEdit`, `TextDocumentEdit`, `TextDocumentRange`, `TextFormatRequest`, `TextFormattingOptions`, `TextRenameRequest` |
-| Signatures | `TextSignatureHelpInfo`, `TextSignatureParameterInfo` (in `Nickelony.IDEKit.IntelliSense.Signatures`) |
+| Editing | `ITextEditProvider`, `ITextFormattingProvider`, `TextEdit`, `TextWorkspaceEdit`, `TextDocumentEdit`, `TextFormatRequest`, `TextFormattingOptions`, `TextRenameRequest` |
+| Code actions | `TextCodeAction`, `TextCodeActionRequest` |
+| Signatures | `TextSignatureHelp`, `TextSignatureInformation`, `TextSignatureParameterInfo` (in `Nickelony.IDEKit.IntelliSense.Signatures`) |
 | Failures | `LanguageServerStartupFailure`, `WorkspaceWatcherFailure` |
 
 Because this package is the contract seam, it is safe for **any** project to reference - an
@@ -60,8 +61,9 @@ using Nickelony.IDEKit.IntelliSense.Completion;
 // An editor consumes the contract, whatever provider backs it:
 ILanguageServerIntelliSenseProvider provider = GetProvider(); // e.g. the Lua provider
 
-provider.DiagnosticsUpdated += (filePath, diagnostics) =>
+provider.DiagnosticsUpdated += (_, eventArgs) =>
 {
+    // eventArgs carries the file path and an owned diagnostics snapshot.
     // Marshal to your UI thread before touching controls.
 };
 
@@ -72,12 +74,28 @@ IReadOnlyList<TextCompletionItem> items =
 ```
 
 Or implement the contract to provide IntelliSense for your own language - all the
-`Text*` types are plain records designed to be trivially constructible.
+`Text*` types are plain immutable records designed to be trivially constructible.
+
+## Coordinate conventions
+
+The contract uses zero-based LSP coordinates for its range payloads:
+
+- **Request positions are zero-based** line and column indices (`TextReferenceRequest.Line`/
+  `Column`, `TextRenameRequest.Line`/`Column`, and both ends of `TextCodeActionRequest.Range`);
+  negative values are changed to zero.
+- **Results and range payloads use zero-based** line and character positions in LSP units, carried
+  by `Nickelony.IDEKit.Core.Text.TextPositionRange` (`TextEdit.Range`,
+  `TextReferenceLocation.Range`): lines count line breaks, characters count UTF-16 code units within
+  the line, and a tab counts as a single code unit. Range values are stored as supplied.
+- The shared IntelliSense payloads use zero-based UTF-16 document offsets where their request
+  records carry offsets (for example `TextHoverRequest.HoveredOffset`).
+
+Hosts convert between their own caret coordinates and these bases at the boundary.
 
 ## Dependencies
 
-`Nickelony.IDEKit.IntelliSense` (for the shared `Nickelony.IDEKit.IntelliSense.*` payload
-values), which in turn depends on `Nickelony.IDEKit.Core` for the text primitives.
+`Nickelony.IDEKit.Core` (for the shared text primitives such as `TextPositionRange`) and
+`Nickelony.IDEKit.IntelliSense` (for the shared `Nickelony.IDEKit.IntelliSense.*` payload values).
 
 ## License
 

@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
-/// Coordinates a caller waiting for an in-progress document open.
+/// Represents an in-progress document open that callers can wait on.
 /// </summary>
 internal sealed class OpenReservation
 {

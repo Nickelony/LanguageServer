@@ -1,32 +1,33 @@
 namespace Nickelony.IDEKit.Core.Comments;
 
 /// <summary>
-/// Describes the comment syntax of a language: the line-comment delimiter, the
-/// optional block-comment delimiters, whether block comments may nest, and which
-/// string-literal styles are recognized so a delimiter inside string content is not
-/// treated as a comment start. Bundle the delimiters into one value and pass it to
-/// <see cref="CommentHelper"/> instead of threading each delimiter as a separate
-/// parameter.
+/// Describes the comment syntax of a language: the line-comment delimiter, the optional
+/// block-comment delimiters, and which string-literal styles are recognized while scanning.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Bundle the delimiters into one value and pass it to <see cref="CommentOperations"/> instead of
+/// threading each delimiter as a separate parameter.
+/// </para>
+/// <para>
+/// Block-comment delimiters are fixed strings, so parameterized long-bracket forms such as Lua's
+/// <c>--[==[</c> cannot be expressed.
+/// </para>
+/// </remarks>
 public readonly record struct CommentSyntax
 {
 	/// <summary>
 	/// Gets the line-comment delimiter, such as <c>"//"</c>, <c>"--"</c>, or <c>";"</c>,
-	/// or <see langword="null"/> when the language has no line comments.
+	/// or <see langword="null"/> when the language has no line comments. A delimiter that is empty or
+	/// whitespace-only is normalized to <see langword="null"/> at construction.
 	/// </summary>
 	public string? LineCommentDelimiter { get; }
 
 	/// <summary>
-	/// Gets the block-comment opener, such as <c>"/*"</c> or <c>"--[["</c>, or
-	/// <see langword="null"/> when the language has no block comments.
+	/// Gets the block-comment delimiters and nesting rule, or <see langword="null"/> when the
+	/// language has no block comments.
 	/// </summary>
-	public string? BlockCommentOpen { get; }
-
-	/// <summary>
-	/// Gets the block-comment closer, such as <c>"*/"</c> or <c>"]]"</c>, or
-	/// <see langword="null"/> when the language has no block comments.
-	/// </summary>
-	public string? BlockCommentClose { get; }
+	public BlockCommentSyntax? BlockComments { get; }
 
 	/// <summary>
 	/// Gets the string-literal styles recognized while scanning, so a delimiter inside
@@ -35,47 +36,33 @@ public readonly record struct CommentSyntax
 	public StringLiteralStyle StringStyle { get; }
 
 	/// <summary>
-	/// Gets a value indicating whether an opener inside a block comment increases the
-	/// nesting depth so the comment closes only after the matching final closer.
-	/// Defaults to <see langword="false"/>, matching languages such as C where the
-	/// first closer ends the comment.
+	/// Initializes a new instance of the <see cref="CommentSyntax"/> struct.
 	/// </summary>
-	public bool AllowNestedBlockComments { get; }
-
-	/// <summary>
-	/// Initializes a new instance of the <see cref="CommentSyntax"/> struct. An empty
-	/// or <see langword="null"/> line delimiter disables line-comment awareness, and
-	/// an empty or <see langword="null"/> block-comment opener or closer disables
-	/// block-comment awareness entirely (both delimiters must be present).
-	/// </summary>
+	/// <remarks>
+	/// An empty, whitespace-only, or <see langword="null"/> line delimiter disables line-comment
+	/// awareness. Block comments are enabled exactly when <paramref name="blockComments"/> carries a
+	/// pair; the pair itself validates that both delimiters are present and non-blank.
+	/// </remarks>
 	/// <param name="lineCommentDelimiter">The line-comment delimiter, or <see langword="null"/> for none.</param>
-	/// <param name="blockCommentOpen">The block-comment opener, or <see langword="null"/> for none.</param>
-	/// <param name="blockCommentClose">The block-comment closer, or <see langword="null"/> for none.</param>
+	/// <param name="blockComments">The block-comment delimiters, or <see langword="null"/> for none.</param>
 	/// <param name="stringStyle">The string-literal styles to recognize while scanning.</param>
-	/// <param name="allowNestedBlockComments">Whether block comments may nest.</param>
+	/// <exception cref="ArgumentException">
+	/// <paramref name="blockComments"/> is an uninitialized pair whose delimiters are
+	/// <see langword="null"/> (for example the result of <c>default(BlockCommentSyntax)</c>);
+	/// construct a real pair or pass <see langword="null"/> for a language without block comments.
+	/// </exception>
 	public CommentSyntax(
 		string? lineCommentDelimiter,
-		string? blockCommentOpen,
-		string? blockCommentClose,
-		StringLiteralStyle stringStyle,
-		bool allowNestedBlockComments = false)
+		BlockCommentSyntax? blockComments,
+		StringLiteralStyle stringStyle)
 	{
-		// Empty delimiters disable the corresponding comment kind.
-		lineCommentDelimiter = string.IsNullOrEmpty(lineCommentDelimiter) ? null : lineCommentDelimiter;
-		blockCommentOpen = string.IsNullOrEmpty(blockCommentOpen) ? null : blockCommentOpen;
-		blockCommentClose = string.IsNullOrEmpty(blockCommentClose) ? null : blockCommentClose;
+		if (blockComments is { Open: null } or { Close: null })
+			throw new ArgumentException("The block-comment syntax must carry an opener and a closer; pass null for a language without block comments.", nameof(blockComments));
 
-		// Both block delimiters are required together; when either is absent the
-		// language has no block comments.
-		if (blockCommentOpen is null)
-			blockCommentClose = null;
-		else if (blockCommentClose is null)
-			blockCommentOpen = null;
-
-		LineCommentDelimiter = lineCommentDelimiter;
-		BlockCommentOpen = blockCommentOpen;
-		BlockCommentClose = blockCommentClose;
+		// An empty or whitespace-only line delimiter disables line-comment awareness, so a stray
+		// whitespace delimiter cannot make every whitespace character a comment opener.
+		LineCommentDelimiter = string.IsNullOrWhiteSpace(lineCommentDelimiter) ? null : lineCommentDelimiter;
+		BlockComments = blockComments;
 		StringStyle = stringStyle;
-		AllowNestedBlockComments = allowNestedBlockComments;
 	}
 }

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Nickelony.IDEKit.AvalonEdit.TextMate</RootNamespace>
+    <AssemblyName>Nickelony.IDEKit.AvalonEdit.TextMate</AssemblyName>
+    <PackageId>Nickelony.IDEKit.AvalonEdit.TextMate</PackageId>
+    <Description>TextMate syntax-highlighting infrastructure for AvalonEdit editors: a colorizing transformer, a document line-list adapter, and a token-theme style resolver built on TextMateSharp, on top of Nickelony.IDEKit.AvalonEdit.</Description>
+    <PackageTags>text-editor;editor;avaloneditor;wpf;textmate;syntax-highlighting;nickelony</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageReference Include="TextMateSharp" Version="2.0.3" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nickelony.IDEKit.AvalonEdit\Nickelony.IDEKit.AvalonEdit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Infrastructure\BrushHelpers.cs" Link="Infrastructure\BrushHelpers.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nickelony.IDEKit.AvalonEdit.TextMate.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Icon\LanguageServer.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

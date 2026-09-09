@@ -1,4 +1,4 @@
-using Nickelony.IDEKit.Core.Text;
+using Nickelony.IDEKit.Workspace.Documents.FileSystem;
 
 namespace Nickelony.IDEKit.Workspace.Documents;
 
@@ -15,20 +15,14 @@ internal static class WorkspaceDocumentResultFactory
 			document.DisplayPath,
 			document.Version,
 			document.PersistedVersion,
-			IsDirty(document),
-			new StringTextSnapshot(document.Content, document.DisplayPath),
+			document.IsDirty,
+			new DeferredTextSnapshot(document.Content, document.DisplayPath),
 			document.FileFormat,
 			document.OnDiskStamp);
 	}
 
 	public static IReadOnlyList<WorkspaceDocumentSnapshot> CreateSnapshots(IEnumerable<LogicalDocument> documents)
 		=> documents.Select(CreateSnapshot).ToArray();
-
-	public static bool IsDirty(LogicalDocument document)
-	{
-		return !string.Equals(document.Content, document.PersistedContent, StringComparison.Ordinal)
-			|| document.FileFormat != document.PersistedFileFormat;
-	}
 
 	public static WorkspaceDocumentCommitResult CreateCommitResult(
 		WorkspaceDocumentCommitRequest request,
@@ -39,9 +33,7 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentCommitResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
 			failure);
@@ -56,9 +48,7 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentReloadResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
 			failure);
@@ -73,13 +63,11 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentConflictResolutionResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
-			request.Choice,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
-			failure);
+			failure,
+			request.Choice);
 	}
 
 	public static WorkspaceDocumentConflictResolutionResult CreateConflictResolutionFromCommit(
@@ -96,20 +84,17 @@ internal static class WorkspaceDocumentResultFactory
 			WorkspaceDocumentCommitStatus.ExternalFileConflict => WorkspaceDocumentConflictResolutionStatus.ExternalFileConflict,
 			WorkspaceDocumentCommitStatus.WriteFailed => WorkspaceDocumentConflictResolutionStatus.WriteFailed,
 			WorkspaceDocumentCommitStatus.ReplacementStateUnknown => WorkspaceDocumentConflictResolutionStatus.ReplacementStateUnknown,
-			WorkspaceDocumentCommitStatus.Cancelled => WorkspaceDocumentConflictResolutionStatus.Cancelled,
+			WorkspaceDocumentCommitStatus.Canceled => WorkspaceDocumentConflictResolutionStatus.Canceled,
 			_ => WorkspaceDocumentConflictResolutionStatus.WriteFailed
 		};
 
 		return new WorkspaceDocumentConflictResolutionResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
-			request.Choice,
+			commitResult.RequestedIdentity,
 			commitResult.Snapshot,
 			commitResult.ObservedOnDiskStamp,
 			commitResult.Failure,
-			commitResult.BlockingViewIds);
+			request.Choice);
 	}
 
 	public static WorkspaceDocumentMutationResult CreateMutationResult(
@@ -117,11 +102,9 @@ internal static class WorkspaceDocumentResultFactory
 		WorkspaceDocumentMutationStatus status,
 		WorkspaceDocumentSnapshot? snapshot)
 	{
-		return new WorkspaceDocumentMutationResult(
+		return CreateMutationResultCore(
+			request.Identity,
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
 			snapshot);
 	}
 
@@ -134,9 +117,7 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentRenameResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
 			failure);
@@ -151,9 +132,7 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentSaveAsResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
 			failure);
@@ -168,9 +147,7 @@ internal static class WorkspaceDocumentResultFactory
 	{
 		return new WorkspaceDocumentDeleteResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			request.Identity,
 			snapshot,
 			observedOnDiskStamp,
 			failure);
@@ -208,11 +185,20 @@ internal static class WorkspaceDocumentResultFactory
 		WorkspaceDocumentMutationStatus status,
 		WorkspaceDocumentSnapshot? snapshot)
 	{
+		return CreateMutationResultCore(
+			request.Identity,
+			status,
+			snapshot);
+	}
+
+	private static WorkspaceDocumentMutationResult CreateMutationResultCore(
+		WorkspaceDocumentRequestIdentity identity,
+		WorkspaceDocumentMutationStatus status,
+		WorkspaceDocumentSnapshot? snapshot)
+	{
 		return new WorkspaceDocumentMutationResult(
 			status,
-			request.ExpectedDocumentKey,
-			request.DocumentId,
-			request.ExpectedVersion,
+			identity,
 			snapshot);
 	}
 
@@ -221,7 +207,8 @@ internal static class WorkspaceDocumentResultFactory
 		{
 			WorkspaceFileMoveStatus.DestinationExists => WorkspaceDocumentRenameStatus.DestinationExists,
 			WorkspaceFileMoveStatus.ExternalFileConflict => WorkspaceDocumentRenameStatus.ExternalFileConflict,
-			WorkspaceFileMoveStatus.Cancelled => WorkspaceDocumentRenameStatus.Cancelled,
+			WorkspaceFileMoveStatus.Canceled => WorkspaceDocumentRenameStatus.Canceled,
+			WorkspaceFileMoveStatus.MoveStateUnknown => WorkspaceDocumentRenameStatus.MoveStateUnknown,
 			_ => WorkspaceDocumentRenameStatus.MoveFailed
 		};
 
@@ -230,7 +217,8 @@ internal static class WorkspaceDocumentResultFactory
 		{
 			WorkspaceFileMoveStatus.DestinationExists => WorkspaceDocumentDirectoryRenameStatus.DestinationExists,
 			WorkspaceFileMoveStatus.ExternalFileConflict => WorkspaceDocumentDirectoryRenameStatus.ExternalFileConflict,
-			WorkspaceFileMoveStatus.Cancelled => WorkspaceDocumentDirectoryRenameStatus.Cancelled,
+			WorkspaceFileMoveStatus.Canceled => WorkspaceDocumentDirectoryRenameStatus.Canceled,
+			WorkspaceFileMoveStatus.MoveStateUnknown => WorkspaceDocumentDirectoryRenameStatus.MoveStateUnknown,
 			_ => WorkspaceDocumentDirectoryRenameStatus.MoveFailed
 		};
 
@@ -238,7 +226,7 @@ internal static class WorkspaceDocumentResultFactory
 		=> status switch
 		{
 			WorkspaceFileDeleteStatus.ExternalFileConflict => WorkspaceDocumentDirectoryDeleteStatus.ExternalFileConflict,
-			WorkspaceFileDeleteStatus.Cancelled => WorkspaceDocumentDirectoryDeleteStatus.Cancelled,
+			WorkspaceFileDeleteStatus.Canceled => WorkspaceDocumentDirectoryDeleteStatus.Canceled,
 			_ => WorkspaceDocumentDirectoryDeleteStatus.DeleteFailed
 		};
 }

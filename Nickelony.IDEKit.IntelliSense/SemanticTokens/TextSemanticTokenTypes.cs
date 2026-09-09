@@ -3,12 +3,13 @@ using System.Diagnostics.CodeAnalysis;
 namespace Nickelony.IDEKit.IntelliSense.SemanticTokens;
 
 /// <summary>
-/// Well-known semantic token types shared with the language server protocol.
+/// Well-known semantic token types mirroring the LSP names.
 /// </summary>
 /// <remarks>
-/// A token type is a semantic category, not a style: hosts map a type to their own theme brushes.
-/// The set mirrors the LSP token type names so language services can round-trip tokens without
-/// translation; hosts may use additional custom type names.
+/// A token type is a semantic category, not a style: hosts map a type to their own theme styles.
+/// The set mirrors the LSP 3.17 token type names plus the LSP 3.18 <see cref="Label"/> addition, so
+/// language providers can round-trip tokens without translation; producers may use additional
+/// custom type names.
 /// </remarks>
 public static class TextSemanticTokenTypes
 {
@@ -84,4 +85,7 @@ public static class TextSemanticTokenTypes
 
 	/// <summary>A decorator token.</summary>
 	public const string Decorator = "decorator";
+
+	/// <summary>A label token (LSP 3.18).</summary>
+	public const string Label = "label";
 }

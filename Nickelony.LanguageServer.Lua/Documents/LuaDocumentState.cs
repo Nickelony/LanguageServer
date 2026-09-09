@@ -1,76 +1,61 @@
+using Nickelony.IDEKit.IntelliSense.Diagnostics;
+
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
 /// Extends the core tracked-document state with Lua-specific caches for diagnostics and semantic tokens.
 /// </summary>
-internal sealed class LuaDocumentState : TrackedDocumentState
+/// <remarks>
+/// <para>
+/// The type is public because <see cref="LuaLanguageServerIntelliSenseProvider"/> derives from the public
+/// <see cref="LanguageServerIntelliSenseProviderBase{TDocumentState}"/> with this state type; it declares no
+/// public members of its own, so the type is opaque to consumers and only parameterizes the provider framework.
+/// </para>
+/// <para>
+/// The state-mutating members below forward to the protected <see cref="TrackedDocumentState"/> operations because
+/// the Lua document store does not derive from this state type and cannot call them directly.
+/// </para>
+/// </remarks>
+public sealed class LuaDocumentState : TrackedDocumentState
 {
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LuaDocumentState"/> class.
 	/// </summary>
-	/// <param name="filePath">The normalized tracked file path.</param>
-	/// <param name="uri">The mirrored file URI.</param>
-	/// <param name="content">The latest synchronized document content.</param>
-	/// <param name="version">The tracked document version.</param>
-	/// <param name="isOpen">Whether the language server currently considers the document open.</param>
-	/// <param name="openReferenceCount">The active editor-owned reference count.</param>
-	/// <param name="requestReferenceCount">The active request-owned reference count.</param>
-	/// <param name="lastAccessStamp">The access stamp used for request-only eviction ordering.</param>
-	internal LuaDocumentState(
-		string filePath,
-		string uri,
-		string content,
-		int version,
-		bool isOpen,
-		int openReferenceCount,
-		int requestReferenceCount,
-		long lastAccessStamp)
-		: base(filePath, uri, content, version, isOpen, openReferenceCount, requestReferenceCount, lastAccessStamp)
+	/// <param name="initialState">The initial tracked-document state.</param>
+	internal LuaDocumentState(TrackedDocumentInitialState initialState)
+		: base(initialState)
 	{ }
 
-	/// <summary>
-	/// Updates the request-only eviction stamp for the tracked document.
-	/// </summary>
-	/// <param name="lastAccessStamp">The replacement access stamp.</param>
+	/// <summary>Updates the access stamp used for idle-document eviction ordering.</summary>
 	internal void Touch(long lastAccessStamp)
 		=> SetLastAccessStamp(lastAccessStamp);
 
-	/// <summary>
-	/// Marks the document as reopened with fresh synchronized content.
-	/// </summary>
-	/// <param name="content">The reopened content.</param>
+	/// <summary>Marks the document as reopened with fresh synchronized content.</summary>
 	internal void Reopen(string content)
 		=> ReopenDocument(content);
 
 	/// <summary>
-	/// Replaces the tracked content and advances the version.
+	/// Replaces the tracked content and advances the version, returning the previous content.
 	/// </summary>
-	/// <param name="content">The replacement content.</param>
-	/// <returns>The previous tracked content.</returns>
 	internal string UpdateContent(string content)
 		=> ReplaceContent(content);
 
-	/// <summary>
-	/// Replaces the tracked file path and URI after a rename.
-	/// </summary>
-	/// <param name="filePath">The normalized replacement file path.</param>
-	/// <param name="uri">The replacement file URI.</param>
+	/// <summary>Replaces the tracked file path and URI after a rename.</summary>
 	internal void RenameTo(string filePath, string uri)
 		=> RenameDocument(filePath, uri);
 
-	/// <summary>
-	/// Marks the tracked document as closed locally while preserving cached state.
-	/// </summary>
+	/// <summary>Marks the tracked document as closed locally while preserving cached state.</summary>
 	internal void MarkClosed()
 		=> MarkDocumentClosed();
 
 	/// <summary>
-	/// Gets the cached diagnostics for the tracked document.
+	/// Gets the version-fenced diagnostics cache for the tracked document, including the content snapshot
+	/// the diagnostic offsets refer to.
 	/// </summary>
-	internal LuaDiagnosticsCache DiagnosticsCache { get; } = new();
+	internal VersionFencedPayloadCache<TextDiagnostic> DiagnosticsCache { get; } = new();
 
 	/// <summary>
-	/// Gets the cached semantic token state for the tracked document.
+	/// Gets the version-fenced semantic-token cache for the tracked document.
 	/// </summary>
-	internal LuaSemanticTokensCache SemanticTokensCache { get; } = new();
+	internal VersionFencedPayloadCache<SemanticToken> SemanticTokensCache { get; } = new();
 }

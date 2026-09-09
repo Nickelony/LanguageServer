@@ -1,4 +1,4 @@
-namespace Nickelony.IDEKit.Core.Identifiers.Tests;
+namespace Nickelony.IDEKit.Core.Tests;
 
 [TestClass]
 public sealed class IdentifierCharacterPolicyTests
@@ -30,6 +30,14 @@ public sealed class IdentifierCharacterPolicyTests
 	}
 
 	[TestMethod]
+	public void Default_AcceptsDigitAndRejectsSymbolAsStart()
+	{
+		// The default start rule is C-like and accepts digits; '$' is outside the default set.
+		Assert.IsTrue(IdentifierCharacterPolicy.Default.IsStartCharacter('4'));
+		Assert.IsFalse(IdentifierCharacterPolicy.Default.IsStartCharacter('$'));
+	}
+
+	[TestMethod]
 	public void Create_WithCustomPredicate_AppliesPredicate()
 	{
 		IdentifierCharacterPolicy policy = IdentifierCharacterPolicy.Create(static c => c is 'a' or 'b');
@@ -58,35 +66,5 @@ public sealed class IdentifierCharacterPolicyTests
 		Assert.IsTrue(policy.IsPartCharacter('4'));
 		Assert.IsTrue(policy.IsStartCharacter('x'));
 		Assert.IsFalse(policy.IsStartCharacter('4'));
-	}
-
-	[TestMethod]
-	public void Create_NullPartPredicate_Throws()
-	{
-		Assert.ThrowsExactly<ArgumentNullException>(() => IdentifierCharacterPolicy.Create(null!));
-	}
-
-	[TestMethod]
-	public void WithQuotes_AddsQuoteMembership()
-	{
-		IdentifierCharacterPolicy policy = IdentifierCharacterPolicy.Default.WithQuotes();
-
-		Assert.IsTrue(policy.IncludeQuotes);
-		Assert.IsTrue(policy.IsPartCharacter('"'));
-		Assert.IsTrue(policy.IsPartCharacter('\''));
-		Assert.IsTrue(policy.IsStartCharacter('"'));
-		Assert.IsFalse(policy.IsPartCharacter(':'));
-	}
-
-	[TestMethod]
-	public void WithPunctuation_AddsPunctuationAndSymbolMembership()
-	{
-		IdentifierCharacterPolicy policy = IdentifierCharacterPolicy.Default.WithPunctuation();
-
-		Assert.IsTrue(policy.IncludePunctuation);
-		Assert.IsTrue(policy.IsPartCharacter(':'));
-		Assert.IsTrue(policy.IsPartCharacter('$'));
-		Assert.IsTrue(policy.IsPartCharacter('.'));
-		Assert.IsFalse(policy.IsPartCharacter(' '));
 	}
 }

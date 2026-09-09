@@ -4,9 +4,20 @@ namespace Nickelony.IDEKit.Core.Editing;
 
 /// <summary>
 /// Caches a per-line parser continuation state so line-oriented scans stay fast after document edits.
-/// States are computed lazily from an <see cref="ITextSnapshot"/>; applying an edit preserves the
-/// states before the first affected line and invalidates the remainder for recomputation.
 /// </summary>
+/// <remarks>
+/// <para>
+/// States are computed lazily from an <see cref="ITextSnapshot"/>. Applying an edit preserves the
+/// cached states up to and including the first affected line's start state, which depends only on
+/// unchanged text, and invalidates the remainder for recomputation.
+/// </para>
+/// <para>
+/// All members are safe for concurrent use. The transition delegate runs while the cache lock is
+/// held, so it should be fast and pure: it must not block on other locks and must not call back
+/// into the cache, because the lock is re-entrant and such a callback would recurse until the
+/// stack overflows.
+/// </para>
+/// </remarks>
 /// <typeparam name="TState">The parser continuation state type carried across lines.</typeparam>
 public sealed class IncrementalLineStateCache<TState>
 {
@@ -23,7 +34,7 @@ public sealed class IncrementalLineStateCache<TState>
 	/// Computes the continuation state for a line given its text and the previous line's state.
 	/// </param>
 	/// <exception cref="ArgumentNullException">
-	/// <paramref name="snapshot"/> or <paramref name="transition"/> is null.
+	/// <paramref name="snapshot"/> or <paramref name="transition"/> is <see langword="null"/>.
 	/// </exception>
 	public IncrementalLineStateCache(ITextSnapshot snapshot, Func<string, TState, TState> transition)
 	{
@@ -36,11 +47,19 @@ public sealed class IncrementalLineStateCache<TState>
 
 	/// <summary>
 	/// Gets the parser continuation state that applies at the start of the specified one-based line.
-	/// Line numbers below 1 return the default state; line numbers past the end of the snapshot are
-	/// clamped to its final line.
 	/// </summary>
+	/// <remarks>
+	/// Line numbers at or below 1 return the default state. Line numbers past the end of the
+	/// snapshot clamp to its final line, so a stale number still resolves a line-start state instead
+	/// of throwing. The default state is <c>default(TState)</c>, so a reference state type may carry
+	/// <see langword="null"/>; the type intentionally leaves <typeparamref name="TState"/>
+	/// unconstrained so hosts can use a nullable state value.
+	/// </remarks>
 	/// <param name="lineNumber">The one-based document line number.</param>
-	/// <returns>The cached or computed line-start parser state, or the default state for an empty snapshot.</returns>
+	/// <returns>
+	/// The cached or computed line-start parser state, or the default state for an empty snapshot. A
+	/// line number past the end returns the state of the clamped final line, not the requested line.
+	/// </returns>
 	public TState GetLineStartState(int lineNumber)
 	{
 		if (lineNumber <= 1)
@@ -51,7 +70,7 @@ public sealed class IncrementalLineStateCache<TState>
 			if (_snapshot.LineCount == 0)
 				return default!;
 
-			int targetLineNumber = Math.Max(1, Math.Min(lineNumber, _snapshot.LineCount));
+			int targetLineNumber = Math.Min(lineNumber, _snapshot.LineCount);
 
 			EnsureFirstLineStateCached();
 			EnsureStatesCachedThrough(targetLineNumber);
@@ -60,15 +79,31 @@ public sealed class IncrementalLineStateCache<TState>
 	}
 
 	/// <summary>
-	/// Applies a document edit, preserving cached states before the first affected line and
-	/// invalidating the remainder so it can be recomputed from the new snapshot.
+	/// Applies a document edit, preserving cached states up to and including the first affected
+	/// line's start state and invalidating the remainder so it can be recomputed from the new snapshot.
 	/// </summary>
+	/// <remarks>
+	/// The caller must pass the earliest start offset of the applied edit (when a burst of edits is
+	/// coalesced, the earliest start offset of the burst) and must leave the text before that offset
+	/// unchanged, so the line containing it starts at the same state in both snapshots. The cache
+	/// cannot verify those preconditions - passing a later offset, for example the end of a replaced
+	/// range, keeps states computed from text the edit changed - but it rejects offsets outside the
+	/// new snapshot instead of silently preserving every cached state for an impossible position.
+	/// </remarks>
 	/// <param name="newSnapshot">The snapshot that reflects the document after the edit.</param>
-	/// <param name="change">The edit delta that was applied to the document.</param>
-	/// <exception cref="ArgumentNullException"><paramref name="newSnapshot"/> is null.</exception>
-	public void ApplyChange(ITextSnapshot newSnapshot, TextIncrementalChange change)
+	/// <param name="firstChangedOffset">
+	/// The zero-based offset at which the applied edit begins; must lie within the new snapshot's
+	/// text (0 through <see cref="ITextSnapshot.TextLength"/>).
+	/// </param>
+	/// <exception cref="ArgumentNullException"><paramref name="newSnapshot"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="firstChangedOffset"/> is negative or beyond the new snapshot's text length.
+	/// </exception>
+	public void ApplyEdit(ITextSnapshot newSnapshot, int firstChangedOffset)
 	{
 		ArgumentNullException.ThrowIfNull(newSnapshot);
+		ArgumentOutOfRangeException.ThrowIfNegative(firstChangedOffset);
+		ArgumentOutOfRangeException.ThrowIfGreaterThan(firstChangedOffset, newSnapshot.TextLength);
 
 		lock (_syncRoot)
 		{
@@ -77,14 +112,17 @@ public sealed class IncrementalLineStateCache<TState>
 			if (_cachedLineStartStates.Count == 0)
 				return;
 
-			int firstAffectedLineNumber = GetSafeLineNumberForOffset(change.Range.Offset);
-			int preservedLineCount = Math.Max(0, firstAffectedLineNumber - 1);
+			int firstAffectedLineNumber = GetLineNumberForOffset(firstChangedOffset);
+
+			// The state at the start of the first affected line depends only on text strictly before
+			// that line, which the edit leaves unchanged, so that state stays valid and is preserved as
+			// well. For a non-empty snapshot the retained states never outnumber its lines, because the
+			// first affected line number is a line number of the new snapshot; an empty snapshot keeps
+			// at most the single default first-line state, which GetLineStartState returns anyway.
+			int preservedLineCount = firstAffectedLineNumber;
 
 			if (_cachedLineStartStates.Count > preservedLineCount)
 				_cachedLineStartStates.RemoveRange(preservedLineCount, _cachedLineStartStates.Count - preservedLineCount);
-
-			if (_cachedLineStartStates.Count > _snapshot.LineCount)
-				_cachedLineStartStates.RemoveRange(_snapshot.LineCount, _cachedLineStartStates.Count - _snapshot.LineCount);
 		}
 	}
 
@@ -111,12 +149,11 @@ public sealed class IncrementalLineStateCache<TState>
 		}
 	}
 
-	private int GetSafeLineNumberForOffset(int offset)
+	private int GetLineNumberForOffset(int offset)
 	{
 		if (_snapshot.LineCount == 0)
 			return 1;
 
-		int safeOffset = Math.Max(0, Math.Min(offset, _snapshot.TextLength));
-		return _snapshot.GetLineByOffset(safeOffset).LineNumber;
+		return _snapshot.GetLineByOffset(offset).LineNumber;
 	}
 }

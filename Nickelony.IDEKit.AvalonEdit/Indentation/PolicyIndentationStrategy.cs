@@ -20,12 +20,19 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 	/// <summary>
 	/// Initializes a new instance of the <see cref="PolicyIndentationStrategy"/> class.
 	/// </summary>
-	/// <param name="options">The editor options used to create the indentation unit.</param>
+	/// <remarks>
+	/// The smart-indent predicate receives the document and the line immediately before the line being
+	/// indented, because the policy computes a line's indentation from its previous line.
+	/// The <see cref="TextEditorOptions"/> instance is captured at construction and later replacements are
+	/// not observed, so pass the instance installed on the editor and recreate the strategy when the
+	/// editor's options instance is replaced.
+	/// </remarks>
+	/// <param name="options">The editor options that provide the indentation unit.</param>
 	/// <param name="policy">The policy used to compute each line's desired indentation.</param>
 	/// <param name="shouldUseSmartIndent">
-	/// An optional predicate that determines whether smart indentation should be used for the line being indented.
-	/// It receives the document and the line immediately before it.
-	/// Return <see langword="false"/> to disable smart indentation for that line.
+	/// An optional predicate that receives the document and the line immediately before the line being
+	/// indented and determines whether smart indentation applies to the line being indented. Return
+	/// <see langword="false"/> to indent the line from its existing leading whitespace instead.
 	/// If omitted, smart indentation is enabled.
 	/// </param>
 	/// <exception cref="ArgumentNullException">
@@ -45,22 +52,27 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 	}
 
 	/// <inheritdoc/>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="document"/> or <paramref name="line"/> is <see langword="null"/>.
+	/// </exception>
 	public void IndentLine(TextDocument document, DocumentLine line)
 	{
-		string lineText = document.GetText(line);
-		string desiredIndentation = GetDesiredIndentation(document, line, lineText);
+		ArgumentNullException.ThrowIfNull(document);
+		ArgumentNullException.ThrowIfNull(line);
 
-		ReplaceLeadingWhitespace(document, line, lineText, desiredIndentation);
+		IndentLine(document, line, GetIndentationUnit());
 	}
 
 	/// <inheritdoc/>
 	/// <remarks>
 	/// Clamps requested line numbers to the document and groups replacements in a single document update.
+	/// A range whose end precedes its start still indents the clamped start line, and a start beyond the
+	/// document indents the last line. The indentation unit is read once for the batch.
 	/// </remarks>
+	/// <exception cref="ArgumentNullException"><paramref name="document"/> is <see langword="null"/>.</exception>
 	public void IndentLines(TextDocument document, int beginLine, int endLine)
 	{
-		if (document.LineCount == 0)
-			return;
+		ArgumentNullException.ThrowIfNull(document);
 
 		int startLine = Math.Max(1, Math.Min(beginLine, document.LineCount));
 		int lastLine = Math.Max(startLine, Math.Min(endLine, document.LineCount));
@@ -69,8 +81,12 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 
 		try
 		{
+			// The unit is read once for the batch instead of once per line; a host that changes the
+			// options sees the new unit on the next call.
+			string indentationUnit = GetIndentationUnit();
+
 			for (int lineNumber = startLine; lineNumber <= lastLine; lineNumber++)
-				IndentLine(document, document.GetLineByNumber(lineNumber));
+				IndentLine(document, document.GetLineByNumber(lineNumber), indentationUnit);
 		}
 		finally
 		{
@@ -78,26 +94,26 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 		}
 	}
 
-	private string GetDesiredIndentation(TextDocument document, DocumentLine line, string lineText)
+	private void IndentLine(TextDocument document, DocumentLine line, string indentationUnit)
+	{
+		string lineText = document.GetText(line);
+		string desiredIndentation = GetDesiredIndentation(document, line, lineText, indentationUnit);
+
+		ReplaceLeadingWhitespace(document, line, lineText, desiredIndentation);
+	}
+
+	private string GetDesiredIndentation(TextDocument document, DocumentLine line, string lineText, string indentationUnit)
 	{
 		if (line.PreviousLine is null)
-			return IndentationTextHelper.GetLeadingWhitespace(lineText);
+			return IndentationOperations.GetLeadingWhitespace(lineText);
 
 		DocumentLine previousLine = line.PreviousLine;
 		string previousLineText = document.GetText(previousLine);
-		string previousLineIndentation = IndentationTextHelper.GetLeadingWhitespace(previousLineText);
-
-		string indentationUnit = IndentationTextHelper.CreateIndentationUnit(
-			_options.ConvertTabsToSpaces,
-			_options.IndentationSize,
-			_options.IndentationSize);
-
 		bool useSmartIndent = ShouldUseSmartIndent(document, previousLine);
 
 		return _policy.GetDesiredIndentation(new IndentationContext(
 			previousLineText,
 			lineText,
-			previousLineIndentation,
 			indentationUnit,
 			useSmartIndent));
 	}
@@ -105,13 +121,23 @@ public sealed class PolicyIndentationStrategy : IIndentationStrategy
 	private bool ShouldUseSmartIndent(TextDocument document, DocumentLine previousLine)
 		=> _shouldUseSmartIndent is null || _shouldUseSmartIndent(document, previousLine);
 
+	/// <summary>
+	/// Gets the indentation unit for the current options.
+	/// </summary>
+	/// <remarks>
+	/// The unit comes from <see cref="TextEditorOptions.GetIndentationString(int)"/>, so a host that
+	/// overrides the virtual member controls the unit this strategy applies.
+	/// </remarks>
+	private string GetIndentationUnit()
+		=> _options.GetIndentationString(1);
+
 	private static void ReplaceLeadingWhitespace(
 		TextDocument document,
 		DocumentLine line,
 		string lineText,
 		string desiredIndentation)
 	{
-		int leadingWhitespaceLength = IndentationTextHelper.GetLeadingWhitespaceLength(lineText);
+		int leadingWhitespaceLength = IndentationOperations.GetLeadingWhitespaceLength(lineText);
 
 		if (leadingWhitespaceLength == desiredIndentation.Length
 			&& string.CompareOrdinal(lineText, 0, desiredIndentation, 0, leadingWhitespaceLength) == 0)

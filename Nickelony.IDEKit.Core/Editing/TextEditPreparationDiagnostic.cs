@@ -3,38 +3,44 @@ namespace Nickelony.IDEKit.Core.Editing;
 /// <summary>
 /// Identifies a deterministic text-edit preparation failure.
 /// </summary>
-/// <param name="Code">The validation rule that rejected the edit batch.</param>
-/// <param name="EditIndex">The source index of the rejected edit.</param>
-/// <param name="RelatedEditIndex">The source index of the related edit, or <c>-1</c>.</param>
-/// <param name="Message">The diagnostic message.</param>
-public sealed record TextEditPreparationDiagnostic(
-	TextEditPreparationDiagnosticCode Code,
-	int EditIndex,
-	int RelatedEditIndex,
-	string Message);
-
-/// <summary>
-/// Identifies the validation rule that rejected a text edit.
-/// </summary>
-public enum TextEditPreparationDiagnosticCode
+public sealed record TextEditPreparationDiagnostic
 {
 	/// <summary>
-	/// The edit is <see langword="null"/> or its range is outside the snapshot.
+	/// Initializes a new instance of the <see cref="TextEditPreparationDiagnostic"/> record.
 	/// </summary>
-	InvalidRange,
+	/// <param name="sourceIndex">
+	/// The source index of the edit: the same index that <see cref="Text.TextEditOperation.SourceIndex"/>
+	/// carries for a prepared operation; for a conflict, this is the edit that triggered it.
+	/// </param>
+	/// <param name="relatedSourceIndex">
+	/// The source index of the other edit in the conflicting pair, or <see langword="null"/> when the
+	/// diagnostic concerns a single edit. Multiple insertions at one offset are valid, so no
+	/// duplicate-insertion diagnostic exists.
+	/// </param>
+	/// <param name="message">The diagnostic message.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="message"/> is <see langword="null"/>.</exception>
+	public TextEditPreparationDiagnostic(int sourceIndex, int? relatedSourceIndex, string message)
+	{
+		ArgumentNullException.ThrowIfNull(message);
+
+		SourceIndex = sourceIndex;
+		RelatedSourceIndex = relatedSourceIndex;
+		Message = message;
+	}
 
 	/// <summary>
-	/// Two non-empty edit ranges overlap.
+	/// Gets the source index of the edit the diagnostic concerns.
 	/// </summary>
-	OverlappingRanges,
+	public int SourceIndex { get; }
 
 	/// <summary>
-	/// Two insertions target the same source offset.
+	/// Gets the source index of the other conflicting edit, or <see langword="null"/> when the
+	/// diagnostic concerns a single edit.
 	/// </summary>
-	DuplicateInsertion,
+	public int? RelatedSourceIndex { get; }
 
 	/// <summary>
-	/// An insertion targets the interior of a replacement range.
+	/// Gets the human-readable description of the failure.
 	/// </summary>
-	InsertionReplacementIntersection
+	public string Message { get; }
 }

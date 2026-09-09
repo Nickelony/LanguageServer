@@ -1,3 +1,5 @@
+using Nickelony.IDEKit.Workspace.Documents.FileSystem;
+
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
@@ -19,9 +21,9 @@ public enum TextEncodingKind
 }
 
 /// <summary>
-/// Identifies the newline convention detected in workspace document content.
-/// This value describes the content; it does not cause <see cref="WorkspaceFileCodec.Encode(string, TextFileFormat)"/>
-/// to rewrite newline characters.
+/// Identifies the newline convention associated with workspace document content: detected on read,
+/// supplied by the caller on open defaults and replacements. The style is metadata; it does not
+/// rewrite newline characters.
 /// </summary>
 public enum TextNewlineStyle
 {
@@ -44,6 +46,9 @@ public enum TextNewlineStyle
 /// <summary>
 /// Describes the encoding, byte-order mark, and detected newline format of a workspace file.
 /// </summary>
+/// <param name="Encoding">The text encoding used to decode or persist the file.</param>
+/// <param name="HasBom">Whether the file content starts with a byte-order mark.</param>
+/// <param name="NewlineStyle">The newline convention associated with the content.</param>
 public readonly record struct TextFileFormat(
 	TextEncodingKind Encoding,
 	bool HasBom,
@@ -53,9 +58,23 @@ public readonly record struct TextFileFormat(
 /// Captures the on-disk state used to detect changes to a workspace file.
 /// </summary>
 /// <remarks>
-/// For an existing file, the stamp includes its byte length, last-write time, and content hash.
-/// <see cref="Missing"/> represents a file that does not exist.
+/// For an existing file, the stamp includes its byte length, last-write time, and content hash. The
+/// default implementation hashes the content with SHA-256 and formats it as uppercase hexadecimal;
+/// the replacement-failure classification relies on that format. <see cref="Missing"/> represents a
+/// file that does not exist. With the default
+/// <see cref="LocalWorkspaceFileSystem"/>, capturing a stamp reads and hashes the whole file
+/// (SHA-256). Every capture therefore costs time
+/// proportional to the file size; capture a stamp once and pass it around instead of re-capturing it
+/// per check.
+/// The stamp comparison is deliberately conservative: a rewritten file usually receives a new
+/// last-write time, so the stamp differs and the change is reported as an external conflict. When a
+/// coarse timestamp (FAT/exFAT) or a network share keeps the previous time, the content hash still
+/// detects the rewrite.
 /// </remarks>
+/// <param name="Exists">Whether the file exists.</param>
+/// <param name="Length">The byte length of the file, or <see langword="null"/> when it does not exist.</param>
+/// <param name="LastWriteTimeUtc">The last write time in UTC, or <see langword="null"/> when the file does not exist.</param>
+/// <param name="ContentHash">The content hash of the file (SHA-256, uppercase hexadecimal with the default implementation), or <see langword="null"/> when the file does not exist.</param>
 public readonly record struct FileStamp(
 	bool Exists,
 	long? Length,
@@ -66,244 +85,4 @@ public readonly record struct FileStamp(
 	/// Gets the stamp for a file that does not exist.
 	/// </summary>
 	public static FileStamp Missing => new(false, null, null, null);
-}
-
-/// <summary>
-/// Specifies format defaults used when opening or creating a workspace document.
-/// </summary>
-/// <remarks>
-/// <see cref="NoBomEncoding"/> is used only when an existing file has no recognized byte-order mark.
-/// <see cref="NewFileFormat"/> is used when the requested path does not exist.
-/// </remarks>
-public readonly record struct WorkspaceDocumentOpenOptions(
-	TextEncodingKind NoBomEncoding,
-	TextFileFormat NewFileFormat);
-
-/// <summary>
-/// Describes a failure returned by a workspace document operation.
-/// </summary>
-/// <remarks>
-/// <see cref="Code"/> is a stable category for the failure. <see cref="Exception"/> may contain the
-/// underlying exception when one was available; callers should use <see cref="Message"/> for display
-/// or logging rather than depending on an exception being present.
-/// </remarks>
-public sealed record WorkspaceOperationFailure(
-	string Code,
-	string Message,
-	Exception? Exception = null);
-
-/// <summary>
-/// Contains file content or raw bytes and the metadata captured while reading it.
-/// </summary>
-/// <remarks>
-/// A file-system implementation may provide decoded <see cref="Content"/>, raw bytes through
-/// <see cref="RawBytes"/>, or both. <see cref="WorkspaceFileCodec.ReadAsync(string, CancellationToken)"/>
-/// returns raw bytes for an existing file so the document store can apply its selected no-BOM encoding.
-/// A missing file is represented by an empty content string, the default format, and
-/// <see cref="FileStamp.Missing"/>.
-/// </remarks>
-public sealed record WorkspaceFileReadResult(
-	string Content,
-	TextFileFormat FileFormat,
-	FileStamp OnDiskStamp,
-	ReadOnlyMemory<byte>? RawBytes = null);
-
-/// <summary>
-/// Identifies a temporary encoded file used during an atomic write operation.
-/// </summary>
-/// <remarks>
-/// <see cref="ContentHash"/> is the hash of the bytes written to <see cref="Path"/>. The caller owns
-/// cleanup of the temporary path through <see cref="IWorkspaceFileSystem.DeleteTemporaryAsync(WorkspaceTemporaryFile)"/>.
-/// </remarks>
-public sealed record WorkspaceTemporaryFile(
-	string Path,
-	long Length,
-	string ContentHash);
-
-/// <summary>
-/// Describes the outcome of conditionally replacing a destination file.
-/// </summary>
-public enum WorkspaceFileReplacementStatus
-{
-	/// <summary>The destination was replaced after its stamp matched the expected stamp.</summary>
-	Replaced,
-
-	/// <summary>The destination stamp did not match the expected stamp.</summary>
-	ExternalFileConflict,
-
-	/// <summary>The replacement may have occurred, but its final state could not be determined.</summary>
-	ReplacementStateUnknown,
-
-	/// <summary>The replacement failed.</summary>
-	Failed
-}
-
-/// <summary>
-/// Contains the outcome of replacing a destination file.
-/// </summary>
-/// <remarks>
-/// <see cref="ObservedOnDiskStamp"/> reports the stamp observed during conflict detection or the
-/// resulting destination stamp after replacement when it could be captured. <see cref="Failure"/>
-/// explains a failed or indeterminate operation.
-/// </remarks>
-public sealed record WorkspaceFileReplacementResult(
-	WorkspaceFileReplacementStatus Status,
-	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null);
-
-/// <summary>
-/// Describes the outcome of moving a file or directory after validating the source when applicable.
-/// </summary>
-public enum WorkspaceFileMoveStatus
-{
-	/// <summary>The source was moved.</summary>
-	Moved,
-
-	/// <summary>The destination already exists.</summary>
-	DestinationExists,
-
-	/// <summary>The source stamp did not match the expected stamp.</summary>
-	ExternalFileConflict,
-
-	/// <summary>The move failed.</summary>
-	MoveFailed,
-
-	/// <summary>The move was cancelled.</summary>
-	Cancelled
-}
-
-/// <summary>
-/// Contains the outcome of moving a file or directory.
-/// </summary>
-/// <remarks>
-/// <see cref="ObservedOnDiskStamp"/> is populated when a source-stamp conflict is observed.
-/// </remarks>
-public sealed record WorkspaceFileMoveResult(
-	WorkspaceFileMoveStatus Status,
-	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null);
-
-/// <summary>
-/// Describes the outcome of deleting a file or directory.
-/// </summary>
-public enum WorkspaceFileDeleteStatus
-{
-	/// <summary>The file or directory is absent after the delete operation.</summary>
-	Deleted,
-
-	/// <summary>The expected stamp did not match, where stamp validation applies.</summary>
-	ExternalFileConflict,
-
-	/// <summary>The delete operation failed.</summary>
-	DeleteFailed,
-
-	/// <summary>The delete operation was cancelled.</summary>
-	Cancelled
-}
-
-/// <summary>
-/// Contains the outcome of deleting a file or directory.
-/// </summary>
-/// <remarks>
-/// A file delete validates its expected stamp before deleting. Directory deletion is recursive and
-/// does not use a stamp because the directory operation has no expected-stamp parameter.
-/// </remarks>
-public sealed record WorkspaceFileDeleteResult(
-	WorkspaceFileDeleteStatus Status,
-	FileStamp? ObservedOnDiskStamp = null,
-	WorkspaceOperationFailure? Failure = null);
-
-/// <summary>
-/// Provides asynchronous file-system operations required by the workspace authority.
-/// </summary>
-/// <remarks>
-/// Implementations return operation results for expected environmental failures and may throw for
-/// failures that the implementation cannot translate. Document file paths supplied by the store are
-/// normalized document ids, except for the display-path destination of <see cref="MoveAsync"/> and
-/// the directory paths accepted by <see cref="WriteTemporaryAsync"/> and the directory methods.
-/// </remarks>
-public interface IWorkspaceFileSystem
-{
-	/// <summary>Reads a file and captures its content stamp.</summary>
-	/// <param name="path">The file path to read.</param>
-	/// <param name="cancellationToken">Cancels the read.</param>
-	/// <remarks>
-	/// An implementation may return decoded <see cref="WorkspaceFileReadResult.Content"/> or raw bytes
-	/// in <see cref="WorkspaceFileReadResult.RawBytes"/>. Missing files return
-	/// <see cref="FileStamp.Missing"/>.
-	/// </remarks>
-	Task<WorkspaceFileReadResult> ReadAsync(
-		string path,
-		CancellationToken cancellationToken);
-
-	/// <summary>Captures the current stamp for a file.</summary>
-	/// <param name="path">The file path to inspect.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	Task<FileStamp> CaptureStampAsync(
-		string path,
-		CancellationToken cancellationToken);
-
-	/// <summary>Writes bytes to a temporary file.</summary>
-	/// <param name="directory">The directory in which to create the temporary file.</param>
-	/// <param name="content">The bytes to write.</param>
-	/// <param name="cancellationToken">Cancels the write.</param>
-	Task<WorkspaceTemporaryFile> WriteTemporaryAsync(
-		string directory,
-		ReadOnlyMemory<byte> content,
-		CancellationToken cancellationToken);
-
-	/// <summary>Conditionally replaces a destination file after validating its expected stamp.</summary>
-	/// <param name="temporaryFile">The temporary file to move into the destination.</param>
-	/// <param name="destinationPath">The file path to replace or create.</param>
-	/// <param name="expectedStamp">The destination stamp that must still match.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	Task<WorkspaceFileReplacementResult> ReplaceAsync(
-		WorkspaceTemporaryFile temporaryFile,
-		string destinationPath,
-		FileStamp expectedStamp,
-		CancellationToken cancellationToken);
-
-	/// <summary>Moves a file after validating its expected source stamp.</summary>
-	/// <param name="sourcePath">The file path to move.</param>
-	/// <param name="destinationPath">The destination path, which may retain the caller's display spelling.</param>
-	/// <param name="expectedSourceStamp">The source stamp that must still match.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	Task<WorkspaceFileMoveResult> MoveAsync(
-		string sourcePath,
-		string destinationPath,
-		FileStamp expectedSourceStamp,
-		CancellationToken cancellationToken);
-
-	/// <summary>Moves a directory without a source-stamp precondition.</summary>
-	/// <param name="sourcePath">The directory path to move.</param>
-	/// <param name="destinationPath">The destination directory path.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	Task<WorkspaceFileMoveResult> MoveDirectoryAsync(
-		string sourcePath,
-		string destinationPath,
-		CancellationToken cancellationToken);
-
-	/// <summary>Deletes a file after validating its expected stamp.</summary>
-	/// <param name="path">The file path to delete.</param>
-	/// <param name="expectedStamp">The file stamp that must still match.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	/// <param name="useRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; otherwise, delete permanently.</param>
-	Task<WorkspaceFileDeleteResult> DeleteAsync(
-		string path,
-		FileStamp expectedStamp,
-		CancellationToken cancellationToken,
-		bool useRecycleBin = false);
-
-	/// <summary>Deletes a directory recursively.</summary>
-	/// <param name="path">The directory path to delete.</param>
-	/// <param name="cancellationToken">Cancels the operation.</param>
-	/// <param name="useRecycleBin"><see langword="true"/> to request recycle-bin deletion where supported; otherwise, delete permanently.</param>
-	Task<WorkspaceFileDeleteResult> DeleteDirectoryAsync(
-		string path,
-		CancellationToken cancellationToken,
-		bool useRecycleBin = false);
-
-	/// <summary>Deletes a temporary file.</summary>
-	/// <param name="temporaryFile">The temporary file to delete.</param>
-	Task DeleteTemporaryAsync(WorkspaceTemporaryFile temporaryFile);
 }

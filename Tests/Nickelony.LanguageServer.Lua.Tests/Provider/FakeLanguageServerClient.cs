@@ -4,42 +4,166 @@ namespace Nickelony.LanguageServer.Lua.Tests;
 
 internal sealed class FakeLanguageServerClient : ILanguageServerClient
 {
+	private static readonly JsonSerializerOptions s_responseDeserializationOptions = new()
+	{
+		// The real client deserializes with case-insensitive property matching, so the fake accepts
+		// the same payload casing a live server produces.
+		PropertyNameCaseInsensitive = true
+	};
+
 	private readonly object _syncRoot = new();
 	private readonly List<(string Method, JsonElement Parameters)> _sentNotifications = [];
 	private readonly List<(string Method, JsonElement Parameters)> _sentRequests = [];
 	private readonly List<string> _sentMethodNames = [];
-	private readonly Queue<JsonElement> _semanticTokensDeltaResponses = [];
 	private readonly Queue<JsonElement> _semanticTokensFullResponses = [];
+	private readonly Queue<(TaskCompletionSource<bool> Gate, JsonElement? Response)> _availableSemanticTokensFullRequestGates = new();
+	private readonly Queue<TaskCompletionSource<bool>> _pendingSemanticTokensFullRequestGates = new();
 	private TaskCompletionSource<bool>? _hoverRequestGate;
 	private TaskCompletionSource<bool>? _openNotificationGate;
 	private TaskCompletionSource<bool>? _startGate;
 	private TaskCompletionSource<bool>? _changeNotificationGate;
-	private TaskCompletionSource<bool>? _semanticTokensFullRequestGate;
 	private TaskCompletionSource<bool>? _watchedFilesNotificationGate;
 	private long _lastIssuedTransportGeneration;
+	private bool _isDisposed;
+	private bool _capabilitySnapshotPublished;
+	private TextDocumentSyncKind _configuredTextDocumentSyncKind = TextDocumentSyncKind.Incremental;
+	private bool _supportsCompletionResolve;
+	private bool _supportsDocumentSymbols = true;
+	private bool _supportsCodeActions = true;
+	private bool _supportsReferences = true;
+	private bool _supportsRename = true;
+	private bool _supportsFormatting = true;
+	private bool _supportsHover = true;
+	private bool _supportsDefinition = true;
+	private bool _supportsSignatureHelp = true;
+	private bool _supportsSemanticTokensFull = true;
+	private bool _supportsSemanticTokensDelta;
 	private readonly TaskCompletionSource<bool> _changeNotificationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private readonly TaskCompletionSource<bool> _closeNotificationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 	public bool IsReady { get; set; } = true;
 	public long TransportGeneration { get; private set; }
 	public bool StartResult { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the startup failure the fake reports. Defaults to <see langword="null"/>; tests that
+	/// exercise startup-failure paths assign their own exception.
+	/// </summary>
+	public Exception? LastStartupException { get; set; }
+
+	public JsonElement CodeActionsResponse { get; set; }
 	public JsonElement CompletionResponse { get; set; }
 	public JsonElement CompletionResolveResponse { get; set; }
 	public JsonElement DefinitionResponse { get; set; }
+	public JsonElement DocumentSymbolsResponse { get; set; }
 	public JsonElement FormattingResponse { get; set; }
-	public JsonElement HoverResponse { get; set; }
+
+	/// <summary>
+	/// Gets or sets the hover response. Defaults to a JSON <c>null</c> payload, the "no hover content"
+	/// answer that tests driving document synchronization through hover requests rely on; tests that
+	/// assert hover content assign their own payload.
+	/// </summary>
+	public JsonElement HoverResponse { get; set; } = JsonSerializer.SerializeToElement<object?>(null);
+
 	public JsonElement ReferencesResponse { get; set; }
 	public JsonElement RenameResponse { get; set; }
 	public JsonElement SignatureHelpResponse { get; set; }
-	public TextDocumentSyncKind TextDocumentSyncKind { get; set; } = TextDocumentSyncKind.Incremental;
+
+	/// <summary>
+	/// Gets or sets the text-document synchronization mode the fake negotiates on a successful start.
+	/// Reads mirror the real client contract: <see cref="TextDocumentSyncKind.None"/> until a start
+	/// succeeds, and again after the active transport becomes unhealthy.
+	/// </summary>
+	public TextDocumentSyncKind TextDocumentSyncKind
+	{
+		get => _capabilitySnapshotPublished ? _configuredTextDocumentSyncKind : TextDocumentSyncKind.None;
+		set => _configuredTextDocumentSyncKind = value;
+	}
+
 	public IReadOnlyList<string> SemanticTokenTypes { get; set; } = [];
 	public IReadOnlyList<string> SemanticTokenModifiers { get; set; } = [];
-	public bool SupportsCompletionResolve { get; set; }
-	public bool SupportsReferences { get; set; } = true;
-	public bool SupportsRename { get; set; } = true;
-	public bool SupportsFormatting { get; set; } = true;
-	public bool SupportsSemanticTokensFull { get; set; } = true;
-	public bool SupportsSemanticTokensDelta { get; set; }
+
+	/// <summary>
+	/// Gets or sets a value indicating whether the fake negotiates completion-item resolve support on a
+	/// successful start. Reads are <see langword="false"/> until a start succeeds, and again after the
+	/// active transport becomes unhealthy, mirroring the real client contract.
+	/// </summary>
+	public bool SupportsCompletionResolve
+	{
+		get => _capabilitySnapshotPublished && _supportsCompletionResolve;
+		set => _supportsCompletionResolve = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsDocumentSymbols
+	{
+		get => _capabilitySnapshotPublished && _supportsDocumentSymbols;
+		set => _supportsDocumentSymbols = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsCodeActions
+	{
+		get => _capabilitySnapshotPublished && _supportsCodeActions;
+		set => _supportsCodeActions = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsReferences
+	{
+		get => _capabilitySnapshotPublished && _supportsReferences;
+		set => _supportsReferences = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsRename
+	{
+		get => _capabilitySnapshotPublished && _supportsRename;
+		set => _supportsRename = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsFormatting
+	{
+		get => _capabilitySnapshotPublished && _supportsFormatting;
+		set => _supportsFormatting = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsHover
+	{
+		get => _capabilitySnapshotPublished && _supportsHover;
+		set => _supportsHover = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsDefinition
+	{
+		get => _capabilitySnapshotPublished && _supportsDefinition;
+		set => _supportsDefinition = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsSignatureHelp
+	{
+		get => _capabilitySnapshotPublished && _supportsSignatureHelp;
+		set => _supportsSignatureHelp = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsSemanticTokensFull
+	{
+		get => _capabilitySnapshotPublished && _supportsSemanticTokensFull;
+		set => _supportsSemanticTokensFull = value;
+	}
+
+	/// <inheritdoc cref="SupportsCompletionResolve"/>
+	public bool SupportsSemanticTokensDelta
+	{
+		get => _capabilitySnapshotPublished && _supportsSemanticTokensDelta;
+		set => _supportsSemanticTokensDelta = value;
+	}
+
 	public bool FailStartWhenCancellationRequested { get; set; }
 	public bool CancelNextHoverRequestWithoutTimeout { get; set; }
 	public Action? BeforeReturningStartResult { get; set; }
@@ -58,14 +182,15 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	public bool ThrowIOExceptionAfterWatchedFilesNotificationGateRelease { get; set; }
 	public List<bool> StartCancellationTokenCanBeCanceled { get; } = [];
 
-	public event Action<PublishDiagnosticsParams>? DiagnosticsPublished;
+	public event EventHandler<DiagnosticsPublishedEventArgs>? DiagnosticsPublished;
 
-	public event Action? SemanticTokensRefreshRequested;
+	public event EventHandler? SemanticTokensRefreshRequested;
 
-	public event Action<long>? TransportUnavailable;
+	public event EventHandler<TransportUnavailableEventArgs>? TransportUnavailable;
 
 	public async Task<bool> StartAsync(CancellationToken cancellationToken)
 	{
+		ThrowIfDisposed();
 		StartCallCount++;
 		StartCancellationTokenCanBeCanceled.Add(cancellationToken.CanBeCanceled);
 
@@ -80,22 +205,26 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		IsReady = StartResult;
 
 		if (StartResult)
+		{
 			TransportGeneration = ++_lastIssuedTransportGeneration;
+			_capabilitySnapshotPublished = true;
+		}
 
 		BeforeReturningStartResult?.Invoke();
 
 		return StartResult;
 	}
 
-	public void MarkTransportUnhealthy()
+	private void MarkTransportUnhealthy()
 	{
 		MarkTransportUnhealthyCallCount++;
 
 		bool wasReady = IsReady;
 		IsReady = false;
+		_capabilitySnapshotPublished = false;
 
 		if (wasReady)
-			TransportUnavailable?.Invoke(TransportGeneration);
+			TransportUnavailable?.Invoke(this, new TransportUnavailableEventArgs(TransportGeneration));
 	}
 
 	public bool TryMarkTransportUnhealthy(long transportGeneration)
@@ -107,8 +236,14 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		return true;
 	}
 
-	public Task SendNotificationAsync(string method, object parameters, CancellationToken cancellationToken)
+	public Task SendNotificationAsync(string method, object? parameters, CancellationToken cancellationToken)
 	{
+		ThrowIfDisposed();
+
+		// Like the real client, a send requires a ready transport session.
+		if (!IsReady)
+			throw new IOException("The language server transport is not ready.");
+
 		if (cancellationToken.IsCancellationRequested)
 			return Task.FromCanceled(cancellationToken);
 
@@ -160,6 +295,12 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 
 	public Task<TResult> SendRequestAsync<TResult>(string method, object parameters, CancellationToken cancellationToken)
 	{
+		ThrowIfDisposed();
+
+		// Like the real client, a send requires a ready transport session.
+		if (!IsReady)
+			throw new IOException("The language server transport is not ready.");
+
 		RecordRequest(method, parameters);
 
 		if (string.Equals(ThrowIOExceptionOnNextRequestMethod, method, StringComparison.Ordinal))
@@ -201,6 +342,12 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 				return WaitForCancellationAsync<TResult>(cancellationToken);
 			}
 
+			if (HoverResponse.ValueKind == JsonValueKind.Null)
+			{
+				BeforeReturningHoverResponse?.Invoke();
+				return Task.FromResult(default(TResult)!);
+			}
+
 			if (HoverResponse.ValueKind != JsonValueKind.Undefined)
 			{
 				BeforeReturningHoverResponse?.Invoke();
@@ -217,6 +364,12 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		if (method == "textDocument/definition" && DefinitionResponse.ValueKind != JsonValueKind.Undefined)
 			return DeserializeResponseAsync<TResult>(DefinitionResponse);
 
+		if (method == "textDocument/documentSymbol" && DocumentSymbolsResponse.ValueKind != JsonValueKind.Undefined)
+			return DeserializeResponseAsync<TResult>(DocumentSymbolsResponse);
+
+		if (method == "textDocument/codeAction" && CodeActionsResponse.ValueKind != JsonValueKind.Undefined)
+			return DeserializeResponseAsync<TResult>(CodeActionsResponse);
+
 		if (method == "textDocument/references" && ReferencesResponse.ValueKind != JsonValueKind.Undefined)
 			return DeserializeResponseAsync<TResult>(ReferencesResponse);
 
@@ -226,21 +379,14 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		if (method == "textDocument/formatting" && FormattingResponse.ValueKind != JsonValueKind.Undefined)
 			return DeserializeResponseAsync<TResult>(FormattingResponse);
 
-		if (method == "textDocument/semanticTokens/full/delta")
-		{
-			if (_semanticTokensDeltaResponses.Count > 0)
-				return DeserializeResponseAsync<TResult>(_semanticTokensDeltaResponses.Dequeue());
-
-			return DeserializeResponseAsync<TResult>(JsonSerializer.SerializeToElement(new
-			{
-				edits = Array.Empty<object>(),
-				resultId = "tokens-delta"
-			}));
-		}
-
 		if (method == "textDocument/semanticTokens/full")
 		{
-			if (_semanticTokensFullRequestGate is not null)
+			bool hasSemanticTokensFullRequestGate;
+
+			lock (_syncRoot)
+				hasSemanticTokensFullRequestGate = _availableSemanticTokensFullRequestGates.Count > 0;
+
+			if (hasSemanticTokensFullRequestGate)
 				return WaitForSemanticTokensFullRequestGateAsync<TResult>();
 
 			if (_semanticTokensFullResponses.Count > 0)
@@ -259,13 +405,24 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		if (typeof(TResult) == typeof(JsonElement))
 			return Task.FromResult((TResult)(object)JsonSerializer.SerializeToElement(new { }));
 
-		return Task.FromResult(CreateDefaultResponse<TResult>());
+		throw new InvalidOperationException(
+			$"The fake language server client received an unconfigured request for '{method}'. Configure a response for it instead of relying on the silent default.");
 	}
 
 	public string[] GetSentMethodNames()
 	{
 		lock (_syncRoot)
 			return [.. _sentMethodNames];
+	}
+
+	public void ClearSentMessages()
+	{
+		lock (_syncRoot)
+		{
+			_sentMethodNames.Clear();
+			_sentNotifications.Clear();
+			_sentRequests.Clear();
+		}
 	}
 
 	public JsonElement GetLastNotificationParameters(string method)
@@ -280,6 +437,22 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		}
 
 		throw new InvalidOperationException($"Notification '{method}' was not observed.");
+	}
+
+	public JsonElement[] GetNotificationParameters(string method)
+	{
+		lock (_syncRoot)
+		{
+			var parameters = new List<JsonElement>();
+
+			for (int i = 0; i < _sentNotifications.Count; i++)
+			{
+				if (string.Equals(_sentNotifications[i].Method, method, StringComparison.Ordinal))
+					parameters.Add(_sentNotifications[i].Parameters);
+			}
+
+			return [.. parameters];
+		}
 	}
 
 	public JsonElement GetLastRequestParameters(string method)
@@ -331,7 +504,21 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		=> _watchedFilesNotificationGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
 	public void BlockNextSemanticTokensFullRequest()
-		=> _semanticTokensFullRequestGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		=> BlockNextSemanticTokensFullRequest(response: null);
+
+	/// <summary>
+	/// Blocks the next semantic-token full request and pins <paramref name="response"/> as its reply, so
+	/// tests can resume gated requests in any order and still know which response each one receives.
+	/// </summary>
+	public void BlockNextSemanticTokensFullRequest(JsonElement? response)
+	{
+		lock (_syncRoot)
+		{
+			_availableSemanticTokensFullRequestGates.Enqueue((
+				new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously),
+				response));
+		}
+	}
 
 	public void ReleaseChangeNotification()
 	{
@@ -349,21 +536,34 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		watchedFilesNotificationGate?.TrySetResult(true);
 	}
 
+	/// <summary>
+	/// Releases the oldest semantic-token full request that is currently parked on a block gate, so
+	/// gated requests resume in the order they arrived.
+	/// </summary>
 	public void ReleaseSemanticTokensFullRequest()
 	{
-		TaskCompletionSource<bool>? semanticTokensFullRequestGate = _semanticTokensFullRequestGate;
-		_semanticTokensFullRequestGate = null;
+		TaskCompletionSource<bool>? semanticTokensFullRequestGate;
+
+		lock (_syncRoot)
+		{
+			semanticTokensFullRequestGate = _pendingSemanticTokensFullRequestGates.Count > 0
+				? _pendingSemanticTokensFullRequestGates.Dequeue()
+				: null;
+		}
 
 		semanticTokensFullRequestGate?.TrySetResult(true);
 	}
 
 	public async Task<bool> WaitForNotificationAsync(string method, TimeSpan timeout)
 	{
+		// Only notifications with an observation signal can be awaited; any other method would return
+		// true immediately even though nothing was observed, making the await vacuous.
 		Task observedNotification = method switch
 		{
 			"textDocument/didChange" => _changeNotificationObserved.Task,
 			"textDocument/didClose" => _closeNotificationObserved.Task,
-			_ => Task.CompletedTask
+			_ => throw new InvalidOperationException(
+				$"The fake language server client has no observation signal for notification '{method}'.")
 		};
 
 		Task completedTask = await Task.WhenAny(observedNotification, Task.Delay(timeout)).ConfigureAwait(false);
@@ -386,31 +586,30 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 	}
 
 	public void PublishDiagnostics(PublishDiagnosticsParams parameters)
-		=> DiagnosticsPublished?.Invoke(parameters);
+		=> DiagnosticsPublished?.Invoke(this, new DiagnosticsPublishedEventArgs(parameters));
 
 	public void PublishSemanticTokensRefreshRequested()
-		=> SemanticTokensRefreshRequested?.Invoke();
+		=> SemanticTokensRefreshRequested?.Invoke(this, EventArgs.Empty);
 
 	public void PublishTransportUnavailable(long? transportGeneration = null)
 	{
 		long generation = transportGeneration ?? TransportGeneration;
-		Action<long>? handlers = TransportUnavailable;
+		EventHandler<TransportUnavailableEventArgs>? handlers = TransportUnavailable;
 
+		// The unhealthy reset keeps the generation number, mirroring the real client contract: a
+		// transport that was marked unhealthy keeps its generation until it is detached.
 		if (generation == TransportGeneration)
 		{
 			IsReady = false;
-			TransportGeneration = 0;
+			_capabilitySnapshotPublished = false;
 		}
 
 		BeforePublishingTransportUnavailable?.Invoke();
-		handlers?.Invoke(generation);
+		handlers?.Invoke(this, new TransportUnavailableEventArgs(generation));
 	}
 
 	public void EnqueueSemanticTokensFullResponse(JsonElement response)
 		=> _semanticTokensFullResponses.Enqueue(response);
-
-	public void EnqueueSemanticTokensDeltaResponse(JsonElement response)
-		=> _semanticTokensDeltaResponses.Enqueue(response);
 
 	private int GetSentMethodCount(string method)
 	{
@@ -448,7 +647,14 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 
 	private static TResult DeserializeResponse<TResult>(JsonElement response)
 	{
-		TResult? result = JsonSerializer.Deserialize<TResult>(response.GetRawText());
+		// A configured JSON null models a server that answered null, which is the provider's documented
+		// fallback path. The unconfigured case never reaches this method (its ValueKind is Undefined and
+		// is rejected by the per-request configuration checks), so null is only observed here when a
+		// test explicitly configured it.
+		if (response.ValueKind == JsonValueKind.Null)
+			return default!;
+
+		TResult? result = JsonSerializer.Deserialize<TResult>(response.GetRawText(), s_responseDeserializationOptions);
 
 		if (result is null)
 			throw new InvalidOperationException("Expected a non-null JSON response.");
@@ -481,10 +687,18 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 
 	private async Task<TResult> WaitForSemanticTokensFullRequestGateAsync<TResult>()
 	{
-		TaskCompletionSource<bool>? semanticTokensFullRequestGate = _semanticTokensFullRequestGate;
+		(TaskCompletionSource<bool> Gate, JsonElement? Response) blockedRequest;
 
-		if (semanticTokensFullRequestGate is not null)
-			await semanticTokensFullRequestGate.Task.ConfigureAwait(false);
+		lock (_syncRoot)
+		{
+			blockedRequest = _availableSemanticTokensFullRequestGates.Dequeue();
+			_pendingSemanticTokensFullRequestGates.Enqueue(blockedRequest.Gate);
+		}
+
+		await blockedRequest.Gate.Task.ConfigureAwait(false);
+
+		if (blockedRequest.Response is { } gatedResponse)
+			return DeserializeResponse<TResult>(gatedResponse);
 
 		if (_semanticTokensFullResponses.Count > 0)
 			return DeserializeResponse<TResult>(_semanticTokensFullResponses.Dequeue());
@@ -503,15 +717,60 @@ internal sealed class FakeLanguageServerClient : ILanguageServerClient
 		if (hoverRequestGate is not null)
 			await hoverRequestGate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
 
+		if (HoverResponse.ValueKind == JsonValueKind.Null)
+			return default!;
+
 		if (HoverResponse.ValueKind != JsonValueKind.Undefined)
 			return DeserializeResponse<TResult>(HoverResponse);
 
 		return CreateDefaultResponse<TResult>();
 	}
 
+	/// <summary>
+	/// Marks the fake as disposed and releases every parked operation, mirroring the real client's
+	/// teardown: use after disposal throws <see cref="ObjectDisposedException"/>, and no blocked test
+	/// operation can leak a permanently parked task.
+	/// </summary>
 	public void Dispose()
-		=> DisposeCallCount++;
+	{
+		DisposeCallCount++;
+		_isDisposed = true;
+		IsReady = false;
+
+		ReleaseOpenNotification();
+		ReleaseStartAsync();
+		ReleaseHoverRequest();
+		ReleaseChangeNotification();
+		ReleaseWatchedFilesNotification();
+
+		TaskCompletionSource<bool>[] blockedSemanticTokensGates;
+
+		lock (_syncRoot)
+		{
+			blockedSemanticTokensGates =
+			[
+				.. _availableSemanticTokensFullRequestGates.Select(blockedRequest => blockedRequest.Gate),
+				.. _pendingSemanticTokensFullRequestGates
+			];
+
+			_availableSemanticTokensFullRequestGates.Clear();
+			_pendingSemanticTokensFullRequestGates.Clear();
+		}
+
+		foreach (TaskCompletionSource<bool> gate in blockedSemanticTokensGates)
+			gate.TrySetResult(true);
+	}
 
 	public ValueTask DisposeAsync()
-		=> ValueTask.CompletedTask;
+	{
+		// Mirror the real client's async disposal so an await-using consumer disposes the fake too.
+		Dispose();
+		return ValueTask.CompletedTask;
+	}
+
+	private void ThrowIfDisposed()
+	{
+		if (_isDisposed)
+			throw new ObjectDisposedException(nameof(FakeLanguageServerClient));
+	}
 }

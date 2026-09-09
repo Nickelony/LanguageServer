@@ -19,7 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Shared\TestHelpers\STATestHelper.cs" Link="Shared\STATestHelper.cs" />
+    <Compile Include="..\..\Shared\TestHelpers\ContractEditTarget.cs" Link="Shared\ContractEditTarget.cs" />
+    <Compile Include="..\..\Shared\TestHelpers\RecordingEditTarget.cs" Link="Shared\RecordingEditTarget.cs" />
+    <Compile Include="..\..\Shared\TestHelpers\TestBitmapRendering.cs" Link="Shared\TestBitmapRendering.cs" />
     <Compile Include="..\..\Shared\TestHelpers\WPFTestHost.cs" Link="Shared\WPFTestHost.cs" />
   </ItemGroup>
 

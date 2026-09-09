@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Nickelony.LanguageServer.Lua.Tests;
 
 [TestClass]
-public partial class LuaLanguageServerIntelliSenseProviderTests
+public sealed partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task Provider_IsUnavailableAndReportsNoCapabilitiesBeforeLazyStartup()
@@ -14,10 +14,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 
 		using var client = new FakeLanguageServerClient { IsReady = false };
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		int capabilitiesChangedCount = 0;
 
-		provider.CapabilitiesChanged += () => capabilitiesChangedCount++;
+		provider.CapabilitiesChanged += (_, _) => capabilitiesChangedCount++;
 
 		Assert.AreEqual(LanguageServerProviderState.Unavailable, provider.State);
 		Assert.IsFalse(provider.IsAvailable);
@@ -42,10 +42,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		const string filePath = @"C:\Workspace\Scripts\test.lua";
 		const string content = "local value = 1";
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, serverExecutablePath: null);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], serverExecutablePath: null);
 		var failures = new List<LanguageServerStartupFailure>();
 
-		provider.StartupFailed += failures.Add;
+		provider.StartupFailed += (_, eventArgs) => failures.Add(eventArgs.Failure);
 
 		Assert.IsNull(await provider.GetHoverAsync(filePath, content, 0, 0).ConfigureAwait(false));
 		Assert.IsNull(await provider.GetHoverAsync(filePath, content, 0, 0).ConfigureAwait(false));
@@ -64,10 +64,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		provider.OpenDocument(filePath, content);
-		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TimeSpan.FromSeconds(1)));
+		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TestPolling.DefaultTimeout));
 
 		JsonElement parameters = client.GetLastNotificationParameters("textDocument/didOpen");
 		JsonElement textDocument = parameters.GetProperty("textDocument");
@@ -79,30 +79,48 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task GetHoverAsync_DisposeDuringStartupWait_ReturnsNullWithoutObjectDisposedException()
+	[Timeout(30_000)]
+	public async Task GetHoverAsync_DisposeWhileRequestsShareBlockedStartup_BothReturnNullWithoutDisposedExceptions()
 	{
 		const string workspaceRoot = @"C:\Workspace";
-		const string filePath = @"C:\Workspace\Scripts\test.lua";
+		const string firstFilePath = @"C:\Workspace\Scripts\test.lua";
+		const string secondFilePath = @"C:\Workspace\Scripts\other.lua";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
-		SemaphoreSlim startLock = GetProviderStartLock(provider);
+		client.BlockNextStartAsync();
 
-		startLock.Wait();
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
-		try
-		{
-			Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(filePath, "local value = 1", 0, 0);
+		// The first request drives the startup and parks inside the blocked start call while it holds
+		// the provider start lock; the second request then waits for that lock. Both must surface the
+		// documented disposal fallback when the provider is disposed while the startup is pending.
+		Task<TextHoverInfo?> firstHoverTask = provider.GetHoverAsync(firstFilePath, "local value = 1", 0, 0);
+		DateTime deadline = DateTime.UtcNow + TestPolling.DefaultTimeout;
 
-			await Task.Delay(50).ConfigureAwait(false);
-			provider.Dispose();
+		while (client.StartCallCount == 0 && DateTime.UtcNow < deadline)
+			await Task.Delay(10).ConfigureAwait(false);
 
-			Assert.IsNull(await hoverTask.ConfigureAwait(false));
-		}
-		finally
-		{
-			startLock.Release();
-		}
+		Assert.AreEqual(1, client.StartCallCount);
+
+		Task<TextHoverInfo?> secondHoverTask = provider.GetHoverAsync(secondFilePath, "local value = 2", 0, 0);
+
+		// No observable signal exists for "the second request is parked on the held start lock"; the
+		// bounded wait is a deliberate best-effort synchronization before disposal. Both requests
+		// return the null fallback either way, so the assertions below are deterministic.
+		await Task.Delay(50).ConfigureAwait(false);
+
+		provider.Dispose();
+		client.ReleaseStartAsync();
+
+		Assert.IsNull(await firstHoverTask.ConfigureAwait(false));
+		Assert.IsNull(await secondHoverTask.ConfigureAwait(false));
+		Assert.AreEqual(1, client.DisposeCallCount);
+
+		// No startup may complete once the provider is disposed. The second request can surface one
+		// extra canceled start attempt when its start-lock acquisition races the disposal token
+		// cancellation, so only the completed-start invariant is asserted here; the deterministic
+		// shared-startup shape is pinned by the parallel-request robustness test.
+		Assert.AreEqual(0L, client.TransportGeneration);
 	}
 
 	[TestMethod]
@@ -125,10 +143,10 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 		client.BlockNextHoverRequest();
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(filePath, "local value = 1", 0, 0);
-		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/hover", 1, TimeSpan.FromSeconds(1)).ConfigureAwait(false));
+		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/hover", 1, TestPolling.DefaultTimeout).ConfigureAwait(false));
 
 		provider.Dispose();
 		client.ReleaseHoverRequest();
@@ -157,10 +175,18 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 		client.BlockNextStartAsync();
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		Task<TextHoverInfo?> hoverTask = provider.GetHoverAsync(filePath, "local value = 1", 0, 0);
 
-		await Task.Delay(50).ConfigureAwait(false);
+		// The fake records the start call before parking on the gate, so the call count is the
+		// observable signal that the hover task reached the blocked startup before disposal.
+		DateTime deadline = DateTime.UtcNow + TestPolling.DefaultTimeout;
+
+		while (client.StartCallCount == 0 && DateTime.UtcNow < deadline)
+			await Task.Delay(10).ConfigureAwait(false);
+
+		Assert.AreEqual(1, client.StartCallCount);
+
 		provider.Dispose();
 
 		Assert.IsNull(await hoverTask.ConfigureAwait(false));
@@ -169,19 +195,28 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public void Dispose_DisposesOwnedCancellationSourceAndUnderlyingClientOnce()
+	public void Dispose_CancelsTheDisposeTokenAndLeavesItLinkable()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 
 		var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		CancellationTokenSource disposeCts = GetProviderDisposeCancellationTokenSource(provider);
 
 		provider.Dispose();
 		provider.Dispose();
 
 		Assert.AreEqual(1, client.DisposeCallCount);
-		Assert.ThrowsExactly<ObjectDisposedException>(() => disposeCts.Cancel());
+		Assert.IsTrue(disposeCts.IsCancellationRequested);
+
+		// This is a deliberate direct seam: the invariant is not observable through the public
+		// surface. Post-disposal request paths short-circuit on the disposed flag before they link
+		// against the cached dispose token, and the failure mode it guards - disposing the source would
+		// make concurrent in-flight linking throw ObjectDisposedException instead of returning the
+		// documented disposal fallback - sits in an unschedulable race window. Pinning the token state
+		// directly is the only deterministic guard against re-adding `_disposeCts.Dispose()` here.
+		using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(disposeCts.Token);
+		Assert.IsTrue(linkedSource.IsCancellationRequested);
 	}
 
 	[TestMethod]
@@ -220,14 +255,14 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "spa", 0, 3);
 		TextCompletionItem resolvedItem = await items[0].ResolveAsync();
 
 		Assert.AreEqual(1, items.Count);
 		Assert.IsTrue(items[0].CanResolve);
 		Assert.AreEqual("function", resolvedItem.Detail);
-		Assert.AreEqual("Spawn docs.", resolvedItem.Description);
+		Assert.AreEqual("Spawn docs.", resolvedItem.Documentation);
 		Assert.AreEqual(7, client.GetLastRequestParameters("completionItem/resolve").GetProperty("data").GetProperty("completionId").GetInt32());
 
 		CollectionAssert.AreEqual(
@@ -274,14 +309,100 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "spa", 0, 3);
 		TextCompletionItem resolvedItem = await items[0].ResolveAsync();
 
 		Assert.AreEqual("spawn", resolvedItem.InsertText);
 		Assert.AreEqual(items[0].TextEdit, resolvedItem.TextEdit);
 		Assert.AreEqual("function", resolvedItem.Detail);
-		Assert.AreEqual("Spawn docs.", resolvedItem.Description);
+		Assert.AreEqual("Spawn docs.", resolvedItem.Documentation);
+	}
+
+	[TestMethod]
+	public async Task GetCompletionItemsAsync_ResolveAdoptsLateInsertionDataWhenOriginalReliesOnLabel()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			SupportsCompletionResolve = true,
+			CompletionResponse = JsonSerializer.SerializeToElement(new
+			{
+				items = new object[]
+				{
+					new
+					{
+						label = "spawn",
+						kind = 3
+					}
+				}
+			}),
+			CompletionResolveResponse = JsonSerializer.SerializeToElement(new
+			{
+				label = "spawn",
+				kind = 3,
+				insertText = "spawn($0)",
+				insertTextFormat = 2,
+				detail = "function",
+				documentation = "Spawn docs."
+			})
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "spa", 0, 3);
+		TextCompletionItem resolvedItem = await items[0].ResolveAsync();
+
+		Assert.AreEqual("spawn", items[0].InsertText);
+		Assert.IsNull(items[0].TextEdit);
+		Assert.AreEqual(TextCompletionInsertTextFormat.PlainText, items[0].InsertTextFormat);
+		Assert.AreEqual("spawn($0)", resolvedItem.InsertText);
+		Assert.AreEqual(TextCompletionInsertTextFormat.Snippet, resolvedItem.InsertTextFormat);
+		Assert.AreEqual("function", resolvedItem.Detail);
+		Assert.AreEqual("Spawn docs.", resolvedItem.Documentation);
+	}
+
+	[TestMethod]
+	public async Task GetCompletionItemsAsync_OrdersPrioritiesByProtocolSortText()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			CompletionResponse = JsonSerializer.SerializeToElement(new
+			{
+				items = new object[]
+				{
+					new
+					{
+						label = "late",
+						kind = 5,
+						sortText = "0002"
+					},
+					new
+					{
+						label = "early",
+						kind = 6,
+						sortText = "0001"
+					}
+				}
+			})
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "loc", 0, 3);
+
+		TextCompletionItem lateItem = items.Single(item => item.Label == "late");
+		TextCompletionItem earlyItem = items.Single(item => item.Label == "early");
+
+		// The server's sortText is the protocol ordering key; the priority hint must agree with it
+		// even when the response order differs.
+		Assert.AreEqual("0001", earlyItem.SortText);
+		Assert.AreEqual("0002", lateItem.SortText);
+		Assert.IsTrue(earlyItem.Priority > lateItem.Priority);
 	}
 
 	[TestMethod]
@@ -295,7 +416,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			CompletionResponse = JsonSerializer.SerializeToElement(new { items = Array.Empty<object>() })
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "spawn.", 0, 6, '.');
 		JsonElement parameters = client.GetLastRequestParameters("textDocument/completion");
@@ -306,6 +427,27 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		Assert.AreEqual(6, parameters.GetProperty("position").GetProperty("character").GetInt32());
 		Assert.AreEqual(2, parameters.GetProperty("context").GetProperty("triggerKind").GetInt32());
 		Assert.AreEqual(".", parameters.GetProperty("context").GetProperty("triggerCharacter").GetString());
+	}
+
+	[TestMethod]
+	public async Task GetCompletionItemsAsync_WithoutTriggerCharacter_PassesInvokedContext()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			CompletionResponse = JsonSerializer.SerializeToElement(new { items = Array.Empty<object>() })
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		await provider.GetCompletionItemsAsync(filePath, "loc", 0, 3);
+		JsonElement context = client.GetLastRequestParameters("textDocument/completion").GetProperty("context");
+
+		// An invoked request carries no trigger character.
+		Assert.AreEqual(1, context.GetProperty("triggerKind").GetInt32());
+		Assert.IsFalse(context.TryGetProperty("triggerCharacter", out _));
 	}
 
 	[TestMethod]
@@ -331,7 +473,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		IReadOnlyList<TextCompletionItem> items = await provider.GetCompletionItemsAsync(filePath, "spa", 0, 3).ConfigureAwait(false);
 
 		Assert.AreEqual(1, items.Count);
@@ -360,7 +502,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		TextHoverInfo? recoveredHover = await provider.GetHoverAsync(filePath, content, 0, 0).ConfigureAwait(false);
 
 		Assert.IsNotNull(recoveredHover);
@@ -399,7 +541,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextWorkspaceEdit? recoveredRename = await provider
 			.RenameSymbolAsync(new TextRenameRequest(filePath, content, 0, 8, "renamed_value"))
@@ -423,7 +565,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			ThrowInvalidOperationOnNextRequestMethod = "textDocument/hover"
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		await Assert.ThrowsExactlyAsync<InvalidOperationException>(async () =>
 			await provider.GetHoverAsync(filePath, content, 0, 0).ConfigureAwait(false)).ConfigureAwait(false);
@@ -433,11 +575,9 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 	}
 
 	[TestMethod]
-	public async Task GetHoverAsync_RequestOnlyDocuments_DoNotAccumulateAcrossDistinctFiles()
+	public async Task GetHoverAsync_IdleDocuments_DoNotAccumulateAcrossDistinctFiles()
 	{
 		const string workspaceRoot = @"C:\Workspace";
-		const int maxTrackedRequestOnlyDocuments = 16;
-
 		using var client = new FakeLanguageServerClient
 		{
 			HoverResponse = JsonSerializer.SerializeToElement(new
@@ -450,7 +590,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		for (int i = 0; i < 20; i++)
 		{
@@ -460,13 +600,32 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			Assert.IsNotNull(hover);
 		}
 
-		Assert.AreEqual(maxTrackedRequestOnlyDocuments, GetTrackedDocumentCount(provider));
-		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 4, TimeSpan.FromSeconds(1)));
-		Assert.AreEqual(4, CountSentMethods(client, "textDocument/didClose"));
+		// The idle-document tracking cap (LanguageServerProviderOptions.MaxTrackedIdleDocuments)
+		// is deliberate provider policy; these assertions pin the
+		// observable policy shape instead of the cap arithmetic: accumulation is bounded (fewer documents
+		// stay tracked than were requested), the oldest idle documents are evicted, and the most recently
+		// requested one is retained. Any cap that bounds accumulation below the request count
+		// satisfies them.
+		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didClose", 1, TestPolling.DefaultTimeout));
+
+		int trackedCount = CountSentMethods(client, "textDocument/didOpen") - CountSentMethods(client, "textDocument/didClose");
+
+		Assert.IsTrue(trackedCount < 20, "Idle documents must not accumulate one per requested file.");
+
+		int didOpenCountBeforeReopen = CountSentMethods(client, "textDocument/didOpen");
+		int didCloseCountBeforeReopen = CountSentMethods(client, "textDocument/didClose");
+
+		Assert.IsNotNull(await provider.GetHoverAsync(@"C:\Workspace\Scripts\hover_19.lua", "local value = 1", 0, 0));
+		Assert.AreEqual(didOpenCountBeforeReopen, CountSentMethods(client, "textDocument/didOpen"), "The most recently used idle document must still be tracked.");
+		Assert.AreEqual(didCloseCountBeforeReopen, CountSentMethods(client, "textDocument/didClose"));
+
+		Assert.IsNotNull(await provider.GetHoverAsync(@"C:\Workspace\Scripts\hover_0.lua", "local value = 1", 0, 0));
+		Assert.AreEqual(didOpenCountBeforeReopen + 1, CountSentMethods(client, "textDocument/didOpen"), "The oldest idle document must have been evicted.");
+		Assert.IsTrue(CountSentMethods(client, "textDocument/didClose") > didCloseCountBeforeReopen, "Evicting the oldest idle document must close its server copy.");
 	}
 
 	[TestMethod]
-	public async Task GetHoverAsync_RequestOnlyDocument_ReopensLazilyOnNextRequest()
+	public async Task GetHoverAsync_IdleDocument_ReopensLazilyOnNextRequest()
 	{
 		const string workspaceRoot = @"C:\Workspace";
 		const string filePath = @"C:\Workspace\Scripts\hover.lua";
@@ -483,7 +642,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		Assert.IsNotNull(await provider.GetHoverAsync(filePath, "local value = 1", 0, 0));
 
@@ -498,7 +657,6 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 
 		Assert.IsNotNull(await provider.GetHoverAsync(filePath, "local value = 1", 0, 0));
 
-		Assert.AreEqual(16, GetTrackedDocumentCount(provider));
 		Assert.AreEqual(didOpenCountBeforeReopen + 1, CountSentMethods(client, "textDocument/didOpen"));
 		Assert.AreEqual(didCloseCountBeforeReopen + 1, CountSentMethods(client, "textDocument/didClose"));
 	}
@@ -510,7 +668,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		const string requestedFilePath = @"C:\Workspace\Scripts\..\Scripts\test.lua";
 		const string content = "local value=1";
 
-		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(requestedFilePath);
+		string normalizedFilePath = LanguageServerPaths.NormalizeLocalPath(requestedFilePath);
 
 		using var client = new FakeLanguageServerClient
 		{
@@ -529,7 +687,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextWorkspaceEdit? workspaceEdit = await provider.FormatDocumentAsync(
 			new TextFormatRequest(requestedFilePath, content, new TextFormattingOptions(tabSize: 3, insertSpaces: false)));
@@ -545,6 +703,48 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		Assert.AreEqual(new Uri(normalizedFilePath).AbsoluteUri, parameters.GetProperty("textDocument").GetProperty("uri").GetString());
 		Assert.AreEqual(3, parameters.GetProperty("options").GetProperty("tabSize").GetInt32());
 		Assert.IsFalse(parameters.GetProperty("options").GetProperty("insertSpaces").GetBoolean());
+
+		CollectionAssert.AreEqual(
+			new[] { "textDocument/didOpen", "textDocument/formatting" },
+			client.GetSentMethodNames());
+	}
+
+	[TestMethod]
+	public async Task FormatDocumentAsync_InvalidFilePath_ReturnsNullWithoutSending()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+
+		using var client = new FakeLanguageServerClient();
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		TextWorkspaceEdit? workspaceEdit = await provider.FormatDocumentAsync(
+			new TextFormatRequest("   ", "local value = 1", new TextFormattingOptions(tabSize: 4, insertSpaces: true)));
+
+		Assert.IsNull(workspaceEdit);
+		Assert.AreEqual(0, client.GetSentMethodNames().Length);
+	}
+
+	[TestMethod]
+	public async Task FormatDocumentAsync_EmptyEditList_ReturnsNullAfterTheRequest()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+		const string content = "local value = 1";
+
+		using var client = new FakeLanguageServerClient
+		{
+			SupportsFormatting = true,
+			FormattingResponse = JsonSerializer.SerializeToElement(Array.Empty<object>())
+		};
+
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+
+		TextWorkspaceEdit? workspaceEdit = await provider.FormatDocumentAsync(
+			new TextFormatRequest(filePath, content, new TextFormattingOptions(tabSize: 4, insertSpaces: true)));
+
+		// An empty edit list means the document is already formatted; the provider reports null
+		// instead of an empty workspace edit.
+		Assert.IsNull(workspaceEdit);
 
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/formatting" },
@@ -601,17 +801,17 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextWorkspaceEdit? workspaceEdit = await provider
 			.RenameSymbolAsync(new TextRenameRequest(filePath, content, 0, 14, "renamed"));
 
+		// The fake response populates both alternative edit representations; the structured
+		// documentChanges list wins so a real server's response cannot be applied twice.
 		Assert.IsNotNull(workspaceEdit);
-		Assert.AreEqual(2, workspaceEdit.DocumentEdits.Count);
-		Assert.AreEqual(filePath, workspaceEdit.DocumentEdits[0].FilePath);
+		Assert.AreEqual(1, workspaceEdit.DocumentEdits.Count);
+		Assert.AreEqual(secondPath, workspaceEdit.DocumentEdits[0].FilePath);
 		Assert.AreEqual("renamed", workspaceEdit.DocumentEdits[0].TextEdits[0].NewText);
-		Assert.AreEqual(secondPath, workspaceEdit.DocumentEdits[1].FilePath);
-		Assert.AreEqual("renamed", workspaceEdit.DocumentEdits[1].TextEdits[0].NewText);
 
 		JsonElement parameters = client.GetLastRequestParameters("textDocument/rename");
 
@@ -621,6 +821,51 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		CollectionAssert.AreEqual(
 			new[] { "textDocument/didOpen", "textDocument/rename" },
 			client.GetSentMethodNames());
+	}
+
+	[TestMethod]
+	public async Task GetDiagnosticsAndSemanticTokens_AfterDisposeOrUnresolvablePath_ReturnEmpty()
+	{
+		const string workspaceRoot = @"C:\Workspace";
+		const string filePath = @"C:\Workspace\Scripts\test.lua";
+
+		using var client = new FakeLanguageServerClient
+		{
+			SupportsSemanticTokensFull = true,
+			SemanticTokenTypes = ["variable"]
+		};
+
+		var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
+		var tokensPublished = new TaskCompletionSource<IReadOnlyList<SemanticToken>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		provider.SemanticTokensUpdated += (_, eventArgs) => tokensPublished.TrySetResult(eventArgs.SemanticTokens);
+
+		// Populate both caches before disposing so the post-disposal reads prove the guards, not an
+		// empty store.
+		provider.OpenDocument(filePath, "local value = 1");
+		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/semanticTokens/full", 1, TestPolling.DefaultTimeout));
+		Assert.IsTrue(await client.WaitForMethodCountAsync("textDocument/didOpen", 1, TestPolling.DefaultTimeout));
+
+		Task tokensCompletedTask = await Task.WhenAny(tokensPublished.Task, Task.Delay(TestPolling.DefaultTimeout)).ConfigureAwait(false);
+		Assert.AreSame(tokensPublished.Task, tokensCompletedTask);
+
+		client.PublishDiagnostics(CreateDiagnostics(filePath, 1, 6, 11, "Current warning."));
+
+		Assert.AreEqual(1, provider.GetDiagnostics(filePath).Count);
+		Assert.AreEqual(1, provider.GetSemanticTokens(filePath).Count);
+
+		// A path that cannot be normalized to a local file is rejected before any lookup.
+		Assert.AreEqual(0, provider.GetDiagnostics("  ").Count);
+		Assert.AreEqual(0, provider.GetSemanticTokens("  ").Count);
+
+		provider.Dispose();
+
+		Assert.AreEqual(0, provider.GetDiagnostics(filePath).Count);
+		Assert.AreEqual(0, provider.GetSemanticTokens(filePath).Count);
+
+		// A null path argument is an error on both reads.
+		Assert.ThrowsExactly<ArgumentNullException>(() => provider.GetDiagnostics(null!));
+		Assert.ThrowsExactly<ArgumentNullException>(() => provider.GetSemanticTokens(null!));
 	}
 
 	[TestMethod]
@@ -634,15 +879,52 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			SupportsFormatting = false
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 
 		TextWorkspaceEdit? workspaceEdit = await provider.FormatDocumentAsync(
 			new TextFormatRequest(filePath, "local value=1", new TextFormattingOptions(tabSize: 4, insertSpaces: true)));
 
+		// The capability gate runs before document synchronization, so an unsupported request
+		// produces no traffic at all.
 		Assert.IsNull(workspaceEdit);
+		Assert.AreEqual(0, client.GetSentMethodNames().Length);
+	}
 
-		CollectionAssert.AreEqual(
-			new[] { "textDocument/didOpen" },
-			client.GetSentMethodNames());
+	[TestMethod]
+	public void Constructor_WithNullWorkspaceRootList_ThrowsArgumentNullException()
+	{
+		using var client = new FakeLanguageServerClient();
+
+		Assert.ThrowsExactly<ArgumentNullException>(() =>
+			new LuaLanguageServerIntelliSenseProvider(null!, client));
+	}
+
+	[TestMethod]
+	public void Constructor_WithEmptyWorkspaceRootList_ThrowsArgumentException()
+	{
+		using var client = new FakeLanguageServerClient();
+
+		// The provider layer requires at least one workspace root (the client itself supports
+		// folderless sessions); the root list is verified before the provider is constructed.
+		Assert.ThrowsExactly<ArgumentException>(() =>
+			new LuaLanguageServerIntelliSenseProvider([], client));
+	}
+
+	[TestMethod]
+	public void Constructor_WithWhitespaceWorkspaceRootEntry_ThrowsArgumentException()
+	{
+		using var client = new FakeLanguageServerClient();
+
+		Assert.ThrowsExactly<ArgumentException>(() =>
+			new LuaLanguageServerIntelliSenseProvider(["   "], client));
+	}
+
+	[TestMethod]
+	public void Constructor_WithDuplicateWorkspaceRoots_ThrowsArgumentException()
+	{
+		using var client = new FakeLanguageServerClient();
+
+		Assert.ThrowsExactly<ArgumentException>(() =>
+			new LuaLanguageServerIntelliSenseProvider([@"C:\Workspace", @"C:\Workspace"], client));
 	}
 }

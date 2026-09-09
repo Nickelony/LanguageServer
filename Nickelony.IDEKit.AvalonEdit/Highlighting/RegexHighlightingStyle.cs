@@ -1,59 +1,60 @@
 using ICSharpCode.AvalonEdit.Highlighting;
+using Nickelony.IDEKit.Infrastructure;
 using System.Windows;
 using System.Windows.Media;
 
 namespace Nickelony.IDEKit.AvalonEdit.Highlighting;
 
 /// <summary>
-/// Defines the color and font styles for text matched by a <see cref="RegexHighlightingRule"/>.
-/// The color is parsed during conversion. <see langword="null"/>, blank, or invalid values use the fallback.
+/// Defines the color and font styles for text matched by a <see cref="RegexHighlightingRule"/>
+/// or highlighted by a <see cref="RegexHighlightingSpan"/>.
 /// </summary>
-/// <param name="HtmlColor">
-/// A color string accepted by WPF's <see cref="ColorConverter"/>.
-/// <see langword="null"/>, whitespace-only, or invalid values use the fallback color.
+/// <remarks>
+/// <para>
+/// The color is parsed during conversion.
+/// A missing or blank color leaves the foreground unset so the editor's theme color is used,
+/// and an invalid value leaves it unset too unless a fallback color is supplied.
+/// </para>
+/// <para>
+/// Bold and italic are applied only when requested, so other styles can still be inherited.
+/// </para>
+/// </remarks>
+/// <param name="ColorText">
+/// A color specification string accepted by WPF's <see cref="ColorConverter"/>, for example
+/// <c>#AARRGGBB</c> or a named color.
+/// <see langword="null"/> or whitespace-only values leave the foreground unset,
+/// while values that cannot be parsed use the conversion's fallback color when one is supplied.
 /// </param>
 /// <param name="IsBold">Whether matched text uses a bold font weight.</param>
 /// <param name="IsItalic">Whether matched text uses an italic font style.</param>
-public sealed record RegexHighlightingStyle(string? HtmlColor = null, bool IsBold = false, bool IsItalic = false)
+public sealed record RegexHighlightingStyle(string? ColorText = null, bool IsBold = false, bool IsItalic = false)
 {
 	/// <summary>
 	/// Converts this style to an AvalonEdit <see cref="HighlightingColor"/>.
-	/// Missing or invalid color values use <paramref name="fallbackColor"/>.
+	/// A missing or blank color leaves the foreground unset so the editor's theme color is used.
+	/// A color value that cannot be parsed uses <paramref name="fallbackColor"/> when one is supplied and
+	/// otherwise leaves the foreground unset as well.
 	/// </summary>
-	/// <param name="fallbackColor">The foreground color used when the configured color cannot be parsed.</param>
+	/// <param name="fallbackColor">
+	/// The foreground color used when the configured color cannot be parsed, or <see langword="null"/> to
+	/// leave the foreground unset so the editor's theme color is used.
+	/// </param>
 	/// <returns>A highlighting color with the resolved foreground color and configured font settings.</returns>
-	public HighlightingColor ToHighlightingColor(Color fallbackColor)
+	public HighlightingColor ToHighlightingColor(Color? fallbackColor)
 	{
-		Color foreground = TryParseColor(HtmlColor, out Color color) ? color : fallbackColor;
+		var highlightingColor = new HighlightingColor();
 
-		return new HighlightingColor
-		{
-			Foreground = new SimpleHighlightingBrush(foreground),
-			FontWeight = IsBold ? FontWeights.Bold : FontWeights.Normal,
-			FontStyle = IsItalic ? FontStyles.Italic : FontStyles.Normal
-		};
-	}
+		if (BrushHelpers.TryParseColor(ColorText, out Color color))
+			highlightingColor.Foreground = new SimpleHighlightingBrush(color);
+		else if (!string.IsNullOrWhiteSpace(ColorText) && fallbackColor is Color fallback)
+			highlightingColor.Foreground = new SimpleHighlightingBrush(fallback);
 
-	private static bool TryParseColor(string? colorValue, out Color color)
-	{
-		color = default;
+		if (IsBold)
+			highlightingColor.FontWeight = FontWeights.Bold;
 
-		if (string.IsNullOrWhiteSpace(colorValue))
-			return false;
+		if (IsItalic)
+			highlightingColor.FontStyle = FontStyles.Italic;
 
-		try
-		{
-			if (ColorConverter.ConvertFromString(colorValue) is Color parsedColor)
-			{
-				color = parsedColor;
-				return true;
-			}
-		}
-		catch (FormatException)
-		{ }
-		catch (NotSupportedException)
-		{ }
-
-		return false;
+		return highlightingColor;
 	}
 }

@@ -1,4 +1,6 @@
 using Nickelony.IDEKit.Core.Text;
+using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nickelony.IDEKit.IntelliSense.DocumentSymbols;
 
@@ -6,50 +8,66 @@ namespace Nickelony.IDEKit.IntelliSense.DocumentSymbols;
 /// Represents a symbol (outline entry) found in a document.
 /// </summary>
 /// <remarks>
-/// Aligned with the LSP <c>DocumentSymbol</c> shape but protocol-independent: ranges use neutral
-/// zero-based UTF-16 offsets (<see cref="TextRange"/>) rather than protocol line and column
-/// coordinates, and the symbol kind is <see cref="TextDocumentSymbolKind"/>. Nested symbols are
-/// carried in <see cref="Children"/>, and an optional host payload is available through <see cref="Data"/>.
+/// <para>
+/// A neutral outline entry: ranges use zero-based UTF-16 offsets (<see cref="TextRange"/>) rather
+/// than line and character coordinates, and the symbol kind is <see cref="TextDocumentSymbolKind"/>.
+/// Nested symbols are carried in <see cref="Children"/>, and an optional host payload is available
+/// through <see cref="Data"/>. Unlike the protocol's document symbol, both ranges are optional and
+/// deprecation annotations are not modeled.
+/// </para>
+/// <para>
+/// <see cref="Children"/> is an owned snapshot and never contains <see langword="null"/> elements.
+/// Providers should keep <see cref="SelectionRange"/> contained in <see cref="Range"/>
+/// when both are known; the library stores ranges as supplied and does not validate containment,
+/// because providers may supply partial range data. Instances use reference equality.
+/// </para>
 /// </remarks>
 public sealed class TextDocumentSymbol
 {
-	private readonly IReadOnlyList<TextDocumentSymbol> _children;
+	private static readonly ReadOnlyCollection<TextDocumentSymbol> s_emptyChildren =
+		Array.AsReadOnly<TextDocumentSymbol>([]);
+
+	private readonly ReadOnlyCollection<TextDocumentSymbol> _children;
+	private string? _detail;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextDocumentSymbol"/> class.
+	/// Initializes a new instance of the <see cref="TextDocumentSymbol"/> class. Optional values are
+	/// assigned with an object initializer.
 	/// </summary>
 	/// <param name="name">The display name of the symbol.</param>
 	/// <param name="kind">The semantic category of the symbol.</param>
-	/// <param name="selectionRange">
-	/// The zero-based range of the symbol name, or <see langword="null"/> when unknown.
-	/// </param>
 	/// <param name="range">
 	/// The zero-based full range of the symbol, or <see langword="null"/> to fall back to
 	/// <paramref name="selectionRange"/>.
 	/// </param>
-	/// <param name="detail">An optional short detail line shown beside the name.</param>
-	/// <param name="children">The nested symbols of this symbol, or <see langword="null"/> when there are none.</param>
-	/// <param name="data">An optional host-specific payload (for example a navigation discriminator).</param>
+	/// <param name="selectionRange">
+	/// The zero-based range of the symbol name, or <see langword="null"/> when unknown.
+	/// </param>
 	/// <exception cref="ArgumentNullException"><paramref name="name"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="kind"/> is not a defined <see cref="TextDocumentSymbolKind"/> value.
+	/// </exception>
 	public TextDocumentSymbol(
 		string name,
 		TextDocumentSymbolKind kind,
-		TextRange? selectionRange = null,
 		TextRange? range = null,
-		string? detail = null,
-		IReadOnlyList<TextDocumentSymbol>? children = null,
-		object? data = null)
+		TextRange? selectionRange = null)
 	{
 		ArgumentNullException.ThrowIfNull(name);
 
+		if (!Enum.IsDefined(kind))
+		{
+			throw new ArgumentOutOfRangeException(
+				nameof(kind),
+				kind,
+				"The kind is not a defined symbol kind; default(TextDocumentSymbolKind) is not a valid kind.");
+		}
+
 		Name = name;
 		Kind = kind;
-		SelectionRange = selectionRange;
 		Range = range ?? selectionRange;
-		Detail = string.IsNullOrWhiteSpace(detail) ? null : detail;
-		Data = data;
-
-		_children = children is { Count: > 0 } ? [.. children] : [];
+		SelectionRange = selectionRange;
+		_children = s_emptyChildren;
 	}
 
 	/// <summary>
@@ -73,22 +91,52 @@ public sealed class TextDocumentSymbol
 	public TextRange? Range { get; }
 
 	/// <summary>
-	/// Gets the optional short detail line shown beside the name.
+	/// Gets the owned snapshot of nested symbols, assigned with an object initializer. A
+	/// <see langword="null"/> or empty assignment means there are no children; the collection must
+	/// not contain <see langword="null"/> elements.
 	/// </summary>
-	public string? Detail { get; }
+	/// <exception cref="ArgumentException">A <see langword="null"/> element was supplied.</exception>
+	[AllowNull]
+	public IReadOnlyList<TextDocumentSymbol> Children
+	{
+		get => _children;
+		init => _children = PrepareChildren(value, nameof(Children));
+	}
+
+	private static ReadOnlyCollection<TextDocumentSymbol> PrepareChildren(
+		IReadOnlyList<TextDocumentSymbol>? children,
+		string paramName)
+	{
+		if (children is not { Count: > 0 })
+			return s_emptyChildren;
+
+		for (int i = 0; i < children.Count; i++)
+		{
+			if (children[i] is null)
+			{
+				throw new ArgumentException(
+					$"The children collection contains a null element at index {i}.",
+					paramName);
+			}
+		}
+
+		return Array.AsReadOnly([.. children]);
+	}
 
 	/// <summary>
-	/// Gets the owned snapshot of nested symbols.
+	/// Gets the optional short detail line shown beside the name, assigned with an object initializer;
+	/// blank values are treated as absent and other values are trimmed.
 	/// </summary>
-	public IReadOnlyList<TextDocumentSymbol> Children => _children;
+	public string? Detail
+	{
+		get => _detail;
+		init => _detail = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+	}
 
 	/// <summary>
-	/// Gets the optional host-specific payload (for example a navigation discriminator).
+	/// Gets the optional host-specific payload (for example a provider-defined navigation target),
+	/// assigned with an object initializer. The payload is intentionally opaque; hosts cast it to
+	/// their own type before use.
 	/// </summary>
-	public object? Data { get; }
-
-	/// <summary>
-	/// Gets a value indicating whether this symbol has nested children.
-	/// </summary>
-	public bool HasChildren => _children.Count > 0;
+	public object? Data { get; init; }
 }

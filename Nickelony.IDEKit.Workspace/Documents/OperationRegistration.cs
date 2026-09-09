@@ -1,7 +1,7 @@
 namespace Nickelony.IDEKit.Workspace.Documents;
 
 /// <summary>
-/// Tracks an active workspace operation and the disk-operation gates it holds.
+/// Tracks an active workspace operation and the per-document disk gates it holds.
 /// </summary>
 /// <remarks>
 /// Completion releases the held gates in reverse acquisition order before completing the waiter

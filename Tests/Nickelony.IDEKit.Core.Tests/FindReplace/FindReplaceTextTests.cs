@@ -1,6 +1,7 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace Nickelony.IDEKit.Core.FindReplace.Tests;
+namespace Nickelony.IDEKit.Core.Tests;
 
 [TestClass]
 public sealed class FindReplaceTextTests
@@ -33,7 +34,9 @@ public sealed class FindReplaceTextTests
 	public void BuildRegexOptions_IgnoresCaseUnlessRequested()
 	{
 		Assert.AreEqual(RegexOptions.None, FindReplaceText.BuildRegexOptions(caseSensitive: true));
-		Assert.AreEqual(RegexOptions.IgnoreCase, FindReplaceText.BuildRegexOptions(caseSensitive: false));
+		Assert.AreEqual(
+			RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+			FindReplaceText.BuildRegexOptions(caseSensitive: false));
 	}
 
 	[TestMethod]
@@ -49,6 +52,80 @@ public sealed class FindReplaceTextTests
 	}
 
 	[TestMethod]
+	public void QueryOverloads_DefaultQuery_Throw()
+	{
+		// default(TextSearchQuery) carries a null pattern, so the query overloads reject it instead
+		// of searching for an empty pattern.
+		TextSearchQuery query = default;
+
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.CountMatches("aaa", query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindAllMatches("aaa", query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindNextMatch("aaa", 0, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindPreviousMatch("aaa", 3, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.ReplaceAll("aaa", query, "x"));
+	}
+
+	[TestMethod]
+	public void QueryOverloads_NullArguments_Throw()
+	{
+		// The query overloads validate through the piecewise overloads, so null text and replacement
+		// arguments still surface as ArgumentNullException.
+		var query = new TextSearchQuery("aaa", RegexOptions.None);
+
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.CountMatches(null!, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindAllMatches(null!, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindNextMatch(null!, 0, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.FindPreviousMatch(null!, 3, query));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.ReplaceAll(null!, query, "x"));
+		Assert.ThrowsExactly<ArgumentNullException>(() => FindReplaceText.ReplaceAll("aaa", query, null!));
+	}
+
+	[TestMethod]
+	public void CountMatches_NegativeMatchTimeout_Throws()
+	{
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+			FindReplaceText.CountMatches("aaa", "a", RegexOptions.None, TimeSpan.FromSeconds(-1)));
+	}
+
+	[TestMethod]
+	public void CountMatches_InfiniteMatchTimeout_IsAccepted()
+	{
+		Assert.AreEqual(3, FindReplaceText.CountMatches("aaa", "a", RegexOptions.None, Regex.InfiniteMatchTimeout));
+	}
+
+	[TestMethod]
+	public void CountMatches_InvalidPattern_ThrowsRegexParseException()
+	{
+		Assert.ThrowsExactly<RegexParseException>(() =>
+			FindReplaceText.CountMatches("aaa", "(", RegexOptions.None));
+	}
+
+	[TestMethod]
+	public void CountMatches_CatastrophicPattern_RespectsMatchTimeout()
+	{
+		// The nested quantifier backtracks catastrophically, so only the finite timeout can finish it.
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() =>
+			FindReplaceText.CountMatches(
+				new string('a', 64) + "!",
+				"(a+)+b",
+				RegexOptions.None,
+				TimeSpan.FromMilliseconds(100)));
+	}
+
+	[TestMethod]
+	public void FindAllMatches_CatastrophicPattern_RespectsMatchTimeout()
+	{
+		// A finite timeout is propagated to the regex, so reading the matches fails instead of
+		// letting the catastrophic backtracking run to completion.
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() =>
+			FindReplaceText.FindAllMatches(
+				new string('a', 64) + "!",
+				"(a+)+b",
+				RegexOptions.None,
+				TimeSpan.FromMilliseconds(100)).Count);
+	}
+
+	[TestMethod]
 	public void FindAllMatches_ReturnsEveryMatch()
 	{
 		MatchCollection matches = FindReplaceText.FindAllMatches("aaa bbb aaa", "aaa", RegexOptions.None);
@@ -57,64 +134,187 @@ public sealed class FindReplaceTextTests
 	}
 
 	[TestMethod]
-	public void GetTextBeforeSelection_ReturnsPrefix()
+	public void FindAllMatches_EmptyPatternReturnsNoMatches()
 	{
-		Assert.AreEqual("aaa ", FindReplaceText.GetTextBeforeSelection("aaa bbb", 4));
+		MatchCollection matches = FindReplaceText.FindAllMatches("aaa", string.Empty, RegexOptions.None);
+
+		Assert.IsEmpty(matches);
 	}
 
 	[TestMethod]
-	public void GetTextAfterSelection_ReturnsSuffix()
+	public void FindNextMatch_ReturnsFirstMatchAtOrAfterStartOffset()
 	{
-		Assert.AreEqual("bbb", FindReplaceText.GetTextAfterSelection("aaa bbb", 4));
-	}
-
-	[TestMethod]
-	public void GetMatchesFromSection_ReturnsMatchesInRequestedSection()
-	{
+		var query = new TextSearchQuery("aaa", RegexOptions.None);
 		const string text = "aaa bbb aaa ccc";
-		var options = RegexOptions.None;
 
-		MatchCollection previous = FindReplaceText.GetMatchesFromSection(
-			FindingOrder.Previous, text, selectionStart: 4, selectionLength: 0, "aaa", options);
-
-		Assert.AreEqual(1, previous.Count);
-		Assert.AreEqual(0, previous[0].Index);
-
-		MatchCollection next = FindReplaceText.GetMatchesFromSection(
-			FindingOrder.Next, text, selectionStart: 4, selectionLength: 0, "aaa", options);
-
-		Assert.AreEqual(1, next.Count);
-		Assert.AreEqual(4, next[0].Index);
+		Assert.AreEqual(0, FindReplaceText.FindNextMatch(text, 0, query)!.Index);
+		Assert.AreEqual(8, FindReplaceText.FindNextMatch(text, 4, query)!.Index);
 	}
 
 	[TestMethod]
-	public void GetMatchesFromSection_UnknownOrderThrows()
+	public void FindNextMatch_NoMatch_ReturnsNull()
+	{
+		Assert.IsNull(FindReplaceText.FindNextMatch("bbb", 0, new TextSearchQuery("aaa", RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindNextMatch_EmptyPattern_ReturnsNull()
+	{
+		Assert.IsNull(FindReplaceText.FindNextMatch("aaa", 0, new TextSearchQuery(string.Empty, RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindNextMatch_AnchorsResolveAgainstTheDocument()
+	{
+		// '^' asserts the start of the document, so it cannot match at a later start offset.
+		Assert.IsNull(FindReplaceText.FindNextMatch("xxx aaa", 4, new TextSearchQuery("^aaa", RegexOptions.None)));
+		Assert.AreEqual(0, FindReplaceText.FindNextMatch("aaa xxx", 0, new TextSearchQuery("^aaa", RegexOptions.None))!.Index);
+	}
+
+	[TestMethod]
+	public void FindNextMatch_WordBoundaryResolvesAgainstTheDocument()
+	{
+		// The 'a' at offset 2 is preceded by a word character, so '\b' does not match there.
+		Assert.IsNull(FindReplaceText.FindNextMatch("xxaaa yyy", 2, new TextSearchQuery(@"\baaa\b", RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindNextMatch_OffsetOutsideDocument_Throws()
 	{
 		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
-			FindReplaceText.GetMatchesFromSection(
-				(FindingOrder)99, "aaa", 0, 0, "aaa", RegexOptions.None));
+			FindReplaceText.FindNextMatch("aaa", 4, new TextSearchQuery("aaa", RegexOptions.None)));
 	}
 
 	[TestMethod]
-	public void GetLastAndFirstMatch_HandleEmptyCollections()
+	public void FindPreviousMatch_ReturnsLastMatchEndingBeforeEndOffset()
 	{
-		MatchCollection empty = FindReplaceText.FindAllMatches("bbb", "aaa", RegexOptions.None);
+		var query = new TextSearchQuery("aaa", RegexOptions.None);
+		const string text = "aaa bbb aaa ccc";
 
-		Assert.IsNull(FindReplaceText.GetLastMatch(empty));
-		Assert.IsNull(FindReplaceText.GetFirstMatch(empty));
-
-		MatchCollection matches = FindReplaceText.FindAllMatches("aaa bbb aaa", "aaa", RegexOptions.None);
-
-		Assert.AreEqual(8, FindReplaceText.GetLastMatch(matches)!.Index);
-		Assert.AreEqual(0, FindReplaceText.GetFirstMatch(matches)!.Index);
+		Assert.AreEqual(0, FindReplaceText.FindPreviousMatch(text, 4, query)!.Index);
+		Assert.AreEqual(8, FindReplaceText.FindPreviousMatch(text, 12, query)!.Index);
 	}
 
 	[TestMethod]
-	public void GetAbsoluteMatchOffset_AddsSectionStartToMatchIndex()
+	public void FindPreviousMatch_MatchReachingBeyondEndOffset_IsExcluded()
 	{
-		Match match = Regex.Match("bbb aaa ccc", "aaa");
+		var query = new TextSearchQuery("bbb", RegexOptions.None);
 
-		Assert.AreEqual(8, FindReplaceText.GetAbsoluteMatchOffset(4, match));
+		Assert.IsNull(FindReplaceText.FindPreviousMatch("aaa bbb", 6, query));
+		Assert.AreEqual(4, FindReplaceText.FindPreviousMatch("aaa bbb", 7, query)!.Index);
+	}
+
+	[TestMethod]
+	public void FindPreviousMatch_NoMatch_ReturnsNull()
+	{
+		Assert.IsNull(FindReplaceText.FindPreviousMatch("bbb", 3, new TextSearchQuery("aaa", RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindPreviousMatch_EndAnchorResolvesAgainstTheDocument()
+	{
+		// '$' asserts the end of the document, so it requires the match to reach the document end.
+		Assert.IsNull(FindReplaceText.FindPreviousMatch("aaa xxx", 3, new TextSearchQuery("aaa$", RegexOptions.None)));
+		Assert.AreEqual(0, FindReplaceText.FindPreviousMatch("aaa", 3, new TextSearchQuery("aaa$", RegexOptions.None))!.Index);
+	}
+
+	[TestMethod]
+	public void FindPreviousMatch_EndOffsetOutsideDocument_Throws()
+	{
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+			FindReplaceText.FindPreviousMatch("aaa", 4, new TextSearchQuery("aaa", RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindHelpers_NegativeOffsets_Throw()
+	{
+		var query = new TextSearchQuery("aaa", RegexOptions.None);
+
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => FindReplaceText.FindNextMatch("aaa", -1, query));
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => FindReplaceText.FindPreviousMatch("aaa", -1, query));
+	}
+
+	[TestMethod]
+	public void FindNextMatch_StartOffsetAtDocumentEnd_ReturnsNull()
+	{
+		// The offset is valid (it equals the text length) but no match can start there.
+		Assert.IsNull(FindReplaceText.FindNextMatch("aaa", 3, new TextSearchQuery("aaa", RegexOptions.None)));
+	}
+
+	[TestMethod]
+	public void FindHelpers_InfiniteMatchTimeout_IsAccepted()
+	{
+		var query = new TextSearchQuery("aaa", RegexOptions.None, Regex.InfiniteMatchTimeout);
+
+		Assert.AreEqual(0, FindReplaceText.FindNextMatch("aaa", 0, query)!.Index);
+		Assert.AreEqual(0, FindReplaceText.FindPreviousMatch("aaa", 3, query)!.Index);
+	}
+
+	[TestMethod]
+	public void FindHelpers_FiniteMatchTimeout_RespectsTimeout()
+	{
+		// A finite query timeout is enforced by the find helpers as well, so a catastrophic pattern
+		// fails instead of running to completion.
+		var query = new TextSearchQuery("(a+)+b", RegexOptions.None, TimeSpan.FromMilliseconds(100));
+		string text = new string('a', 64) + "!";
+
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() => FindReplaceText.FindNextMatch(text, 0, query));
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() => FindReplaceText.FindPreviousMatch(text, text.Length, query));
+	}
+
+	[TestMethod]
+	public void QueryOverloads_AgreeWithPiecewiseOverloads()
+	{
+		var query = new TextSearchQuery("aaa", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500));
+		const string text = "AAA bbb aaa";
+
+		Assert.AreEqual(
+			FindReplaceText.CountMatches(text, query.Pattern, query.Options, query.MatchTimeout),
+			FindReplaceText.CountMatches(text, query));
+
+		Assert.AreEqual(
+			FindReplaceText.FindAllMatches(text, query.Pattern, query.Options, query.MatchTimeout).Count,
+			FindReplaceText.FindAllMatches(text, query).Count);
+
+		Assert.AreEqual(
+			FindReplaceText.ReplaceAll(text, query.Pattern, "x", query.Options, query.MatchTimeout),
+			FindReplaceText.ReplaceAll(text, query, "x"));
+	}
+
+	[TestMethod]
+	public void QueryOverloads_FiniteMatchTimeout_Throw()
+	{
+		var query = new TextSearchQuery("(a+)+b", RegexOptions.None, TimeSpan.FromMilliseconds(100));
+		string text = new string('a', 64) + "!";
+
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() => FindReplaceText.CountMatches(text, query));
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() => FindReplaceText.FindAllMatches(text, query).Count);
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() => FindReplaceText.ReplaceAll(text, query, "x"));
+	}
+
+	[TestMethod]
+	[DoNotParallelize]
+	public void FindHelpers_UnderTurkishCulture_MatchWithInvariantCaseFolding()
+	{
+		RegexOptions options = FindReplaceText.BuildRegexOptions(caseSensitive: false);
+		CultureInfo originalCulture = CultureInfo.CurrentCulture;
+		CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+
+		try
+		{
+			// Turkish casing maps 'I' and 'i' to different letters, so culture-aware case folding
+			// would refuse this match; the invariant options keep the result culture-independent.
+			CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
+			CultureInfo.CurrentUICulture = new CultureInfo("tr-TR");
+
+			Assert.AreEqual(0, FindReplaceText.FindNextMatch("if (x)", 0, new TextSearchQuery("IF", options))!.Index);
+			Assert.AreEqual(0, FindReplaceText.FindPreviousMatch("IF (x)", 6, new TextSearchQuery("if", options))!.Index);
+		}
+		finally
+		{
+			CultureInfo.CurrentCulture = originalCulture;
+			CultureInfo.CurrentUICulture = originalUiCulture;
+		}
 	}
 
 	[TestMethod]
@@ -126,27 +326,43 @@ public sealed class FindReplaceTextTests
 	}
 
 	[TestMethod]
-	public void FindReplaceSource_DefaultsToEmptyName()
+	public void ReplaceAll_CatastrophicPattern_RespectsMatchTimeout()
 	{
-		var source = new FindReplaceSource();
-
-		Assert.AreEqual(string.Empty, source.Name);
-		Assert.AreEqual(0, source.Count);
+		Assert.ThrowsExactly<RegexMatchTimeoutException>(() =>
+			FindReplaceText.ReplaceAll(
+				new string('a', 64) + "!",
+				"(a+)+b",
+				"x",
+				RegexOptions.None,
+				TimeSpan.FromMilliseconds(100)));
 	}
 
 	[TestMethod]
-	public void FindReplaceSource_CarriesNameAndItems()
+	public void ReplaceAll_ReplacementIsSubstitutionPattern()
 	{
-		var source = new FindReplaceSource("script.lua")
-		{
-			new FindReplaceItem(3, "local value = 1", "value", 0)
-		};
+		Assert.AreEqual(
+			"Smith John",
+			FindReplaceText.ReplaceAll("John Smith", @"(\w+) (\w+)", "$2 $1", RegexOptions.None));
 
-		Assert.AreEqual("script.lua", source.Name);
-		Assert.AreEqual(1, source.Count);
-		Assert.AreEqual(3, source[0].LineNumber);
-		Assert.AreEqual("local value = 1", source[0].LineText);
-		Assert.AreEqual("value", source[0].MatchSegmentText);
-		Assert.AreEqual(0, source[0].MatchSegmentIndex);
+		Assert.AreEqual(
+			"$1",
+			FindReplaceText.ReplaceAll("a", "a", "$$1", RegexOptions.None));
 	}
+
+	[TestMethod]
+	public void ReplaceAll_EmptyPatternReturnsOriginalText()
+	{
+		Assert.AreEqual("aaa", FindReplaceText.ReplaceAll("aaa", string.Empty, "x", RegexOptions.None));
+	}
+
+	[TestMethod]
+	public void BuildPattern_WholeWordRegexAlternation_KeepsBothBoundaries()
+	{
+		string pattern = FindReplaceText.BuildPattern("foo|bar", useRegex: true, matchWholeWord: true);
+
+		Assert.AreEqual(@"\b(?:foo|bar)\b", pattern);
+		Assert.IsFalse(Regex.IsMatch("foobar", pattern));
+		Assert.IsTrue(Regex.IsMatch("foo bar", pattern));
+	}
+
 }

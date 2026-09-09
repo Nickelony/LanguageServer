@@ -10,34 +10,44 @@ public sealed partial class DocumentOperationScheduler
 	/// <param name="operation">The operation to enqueue.</param>
 	/// <param name="cancellationToken">Cancels the queued operation.</param>
 	/// <returns>A task that completes with the queued operation result.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/> or <paramref name="operation"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException"><paramref name="filePath"/> is empty or whitespace-only, or the path is invalid on the current platform.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// The caller executes inside a queued scheduler operation and must queue the operation after awaiting it instead.
+	/// </exception>
 	public Task<TResult> EnqueuePerDocumentAsync<TResult>(string filePath, Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
 	{
-		ArgumentNullException.ThrowIfNull(filePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 		ArgumentNullException.ThrowIfNull(operation);
 
-		string normalizedFilePath = LanguageServerPathHelper.NormalizeLocalPath(filePath);
+		string normalizedFilePath = LanguageServerPaths.NormalizeLocalPath(filePath);
+		EnsureNotInsideSchedulerOperation(nameof(EnqueuePerDocumentAsync));
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var enqueueGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		Task scheduledOperation;
-		Task barrierOperation;
-
-		lock (_syncRoot)
+		try
 		{
-			Task previousOperation = _queuedPerDocumentOperations.TryGetValue(normalizedFilePath, out Task? queuedOperation)
-				? queuedOperation
-				: Task.CompletedTask;
+			lock (_syncRoot)
+			{
+				DocumentQueue queue = GetOrCreateDocumentQueueUnderLock(normalizedFilePath);
+				long generation = ++queue._chainGeneration;
 
-			barrierOperation = GetQueuedPerDocumentBarrierUnderLock(normalizedFilePath);
-
-			scheduledOperation = RunQueuedOperationAsync(previousOperation, barrierOperation, operation, completionSource, cancellationToken);
-			_queuedPerDocumentOperations[normalizedFilePath] = scheduledOperation;
+				queue._chainTail = RunCompletionNodeAsync(
+					enqueueGate.Task,
+					[queue._chainTail],
+					new ActiveDocumentContext(normalizedFilePath, secondFilePath: null),
+					operation,
+					completionSource,
+					cancellationToken,
+					onCompleted: () => CompleteChainNode(normalizedFilePath, queue, generation));
+			}
 		}
-
-		scheduledOperation.ContinueWith(
-			_ => ClearQueuedPerDocumentOperation(normalizedFilePath, scheduledOperation),
-			CancellationToken.None,
-			TaskContinuationOptions.ExecuteSynchronously,
-			TaskScheduler.Default);
+		finally
+		{
+			enqueueGate.TrySetResult(true);
+		}
 
 		return completionSource.Task;
 	}
@@ -52,243 +62,126 @@ public sealed partial class DocumentOperationScheduler
 	/// <param name="operation">The exclusive operation to enqueue.</param>
 	/// <param name="cancellationToken">Cancels the queued operation.</param>
 	/// <returns>A task that completes with the queued operation result.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="firstFilePath"/>, <paramref name="secondFilePath"/>, or <paramref name="operation"/> is
+	/// <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException"><paramref name="firstFilePath"/> or <paramref name="secondFilePath"/> is empty or whitespace-only, or a path is invalid on the current platform.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// The caller executes inside a queued scheduler operation and must queue the exclusive operation after awaiting it instead.
+	/// </exception>
 	public Task<TResult> EnqueueExclusivePerDocumentAsync<TResult>(
 		string firstFilePath,
 		string secondFilePath,
 		Func<CancellationToken, Task<TResult>> operation,
 		CancellationToken cancellationToken)
 	{
-		ArgumentNullException.ThrowIfNull(firstFilePath);
-		ArgumentNullException.ThrowIfNull(secondFilePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(firstFilePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(secondFilePath);
 		ArgumentNullException.ThrowIfNull(operation);
 
-		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
-		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
+		string normalizedFirstFilePath = LanguageServerPaths.NormalizeLocalPath(firstFilePath);
+		string normalizedSecondFilePath = LanguageServerPaths.NormalizeLocalPath(secondFilePath);
+		bool samePath = LanguageServerPaths.AreLocalPathsEqual(normalizedFirstFilePath, normalizedSecondFilePath);
+
+		EnsureNotInsideSchedulerOperation(nameof(EnqueueExclusivePerDocumentAsync));
 
 		var completionSource = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-		var barrierSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		var enqueueGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-		Task scheduledOperation;
-
-		lock (_syncRoot)
+		try
 		{
-			Task previousGlobalOperation = _queuedGlobalOperation;
-			Task[] queuedOperations = GetQueuedOperationsSnapshotUnderLock(normalizedFirstFilePath, normalizedSecondFilePath);
+			lock (_syncRoot)
+			{
+				Task previousGlobalOperation = _queuedGlobalOperation;
+				Task[] queuedOperations = CaptureChainTailsUnderLock(normalizedFirstFilePath, normalizedSecondFilePath);
 
-			SetQueuedPerDocumentBarrierUnderLock(normalizedFirstFilePath, barrierSource.Task);
-			SetQueuedPerDocumentBarrierUnderLock(normalizedSecondFilePath, barrierSource.Task);
+				DocumentQueue firstQueue = GetOrCreateDocumentQueueUnderLock(normalizedFirstFilePath);
+				DocumentQueue? secondQueue = samePath ? null : GetOrCreateDocumentQueueUnderLock(normalizedSecondFilePath);
 
-			scheduledOperation = RunExclusivePerDocumentOperationAsync(
-				normalizedFirstFilePath,
-				normalizedSecondFilePath,
-				previousGlobalOperation,
-				queuedOperations,
-				barrierSource,
-				operation,
-				completionSource,
-				cancellationToken);
+				var previousOperations = new Task[queuedOperations.Length + 1];
+				previousOperations[0] = previousGlobalOperation;
+				queuedOperations.CopyTo(previousOperations, 1);
 
-			_queuedGlobalOperation = scheduledOperation;
+				long firstGeneration = ++firstQueue._chainGeneration;
+				long secondGeneration = 0;
+
+				Task exclusiveOperation = RunCompletionNodeAsync(
+					enqueueGate.Task,
+					previousOperations,
+					new ActiveDocumentContext(normalizedFirstFilePath, secondQueue is null ? null : normalizedSecondFilePath),
+					operation,
+					completionSource,
+					cancellationToken,
+					onCompleted: () =>
+					{
+						CompleteChainNode(normalizedFirstFilePath, firstQueue, firstGeneration);
+
+						if (secondQueue is not null)
+							CompleteChainNode(normalizedSecondFilePath, secondQueue, secondGeneration);
+					});
+
+				// The exclusive operation becomes the chain tail of both affected paths, so work queued after it observes it
+				// as its predecessor; it also joins the global chain so later global work cannot overtake it.
+				firstQueue._chainTail = exclusiveOperation;
+
+				if (secondQueue is not null)
+				{
+					secondGeneration = ++secondQueue._chainGeneration;
+					secondQueue._chainTail = exclusiveOperation;
+				}
+
+				_queuedGlobalOperation = exclusiveOperation;
+			}
+		}
+		finally
+		{
+			enqueueGate.TrySetResult(true);
 		}
 
 		return completionSource.Task;
 	}
 
 	/// <summary>
-	/// Waits for the per-document, latest-update, and exclusion-barrier operations queued for one or two document paths when this method is called.
+	/// Waits for the queued operations of one or two document paths that were queued at the time of the call to finish.
 	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Intended for hosts that need a quiescence point for one or two documents (for example before closing or
+	/// renaming them); the client itself does not call this method. Work queued after this call is not awaited.
+	/// </para>
+	/// <para>
+	/// Do not call this method from inside any operation queued with this scheduler; the scheduler rejects that
+	/// pattern with an <see cref="InvalidOperationException"/> because awaiting scheduler work from within a queued
+	/// operation can deadlock a chain.
+	/// </para>
+	/// </remarks>
 	/// <param name="firstFilePath">The first document path to await.</param>
 	/// <param name="secondFilePath">The second document path to await.</param>
 	/// <returns>A task that completes when the queued operations have finished.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="firstFilePath"/> or <paramref name="secondFilePath"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException"><paramref name="firstFilePath"/> or <paramref name="secondFilePath"/> is empty or whitespace-only, or a path is invalid on the current platform.</exception>
+	/// <exception cref="InvalidOperationException">
+	/// The caller executes inside a queued scheduler operation, so waiting for scheduler work would deadlock a chain.
+	/// </exception>
 	public async Task WaitForPerDocumentOperationsAsync(string firstFilePath, string secondFilePath)
 	{
-		ArgumentNullException.ThrowIfNull(firstFilePath);
-		ArgumentNullException.ThrowIfNull(secondFilePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(firstFilePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(secondFilePath);
 
-		string normalizedFirstFilePath = LanguageServerPathHelper.NormalizeLocalPath(firstFilePath);
-		string normalizedSecondFilePath = LanguageServerPathHelper.NormalizeLocalPath(secondFilePath);
+		string normalizedFirstFilePath = LanguageServerPaths.NormalizeLocalPath(firstFilePath);
+		string normalizedSecondFilePath = LanguageServerPaths.NormalizeLocalPath(secondFilePath);
 
-		Task[] queuedOperations = GetQueuedOperationsSnapshot(normalizedFirstFilePath, normalizedSecondFilePath, includeBarriers: true);
+		EnsureNotInsideSchedulerOperation(nameof(WaitForPerDocumentOperationsAsync));
+
+		Task[] queuedOperations;
+
+		lock (_syncRoot)
+			queuedOperations = CaptureChainTailsUnderLock(normalizedFirstFilePath, normalizedSecondFilePath);
 
 		for (int i = 0; i < queuedOperations.Length; i++)
 			await WaitForQueuedOperationAsync(queuedOperations[i]).ConfigureAwait(false);
-	}
-
-	/// <summary>
-	/// Runs an exclusive document operation after previously queued global and per-document work has completed.
-	/// </summary>
-	private async Task RunExclusivePerDocumentOperationAsync<TResult>(
-		string firstFilePath,
-		string secondFilePath,
-		Task previousGlobalOperation,
-		Task[] queuedOperations,
-		TaskCompletionSource<bool> barrierSource,
-		Func<CancellationToken, Task<TResult>> operation,
-		TaskCompletionSource<TResult> completionSource,
-		CancellationToken cancellationToken)
-	{
-		try
-		{
-			await WaitForQueuedOperationAsync(previousGlobalOperation).ConfigureAwait(false);
-
-			for (int i = 0; i < queuedOperations.Length; i++)
-				await WaitForQueuedOperationAsync(queuedOperations[i]).ConfigureAwait(false);
-
-			cancellationToken.ThrowIfCancellationRequested();
-
-			TResult result = await operation(cancellationToken).ConfigureAwait(false);
-			completionSource.TrySetResult(result);
-		}
-		catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
-		{
-			completionSource.TrySetCanceled(cancellationToken);
-		}
-		catch (Exception exception)
-		{
-			completionSource.TrySetException(exception);
-		}
-		finally
-		{
-			barrierSource.TrySetResult(true);
-
-			ClearQueuedPerDocumentBarrier(firstFilePath, barrierSource.Task);
-			ClearQueuedPerDocumentBarrier(secondFilePath, barrierSource.Task);
-		}
-	}
-
-	/// <summary>
-	/// Removes the per-document queue tail when the completed task is still the current tail.
-	/// </summary>
-	/// <param name="filePath">The document path whose queue should be cleared.</param>
-	/// <param name="scheduledOperation">The completed scheduled operation.</param>
-	private void ClearQueuedPerDocumentOperation(string filePath, Task scheduledOperation)
-	{
-		lock (_syncRoot)
-		{
-			if (_queuedPerDocumentOperations.TryGetValue(filePath, out Task? queuedOperation)
-				&& ReferenceEquals(queuedOperation, scheduledOperation))
-			{
-				_queuedPerDocumentOperations.Remove(filePath);
-			}
-		}
-	}
-
-	/// <summary>
-	/// Captures the current queued per-document and latest-update tails for the requested document paths.
-	/// </summary>
-	/// <param name="firstFilePath">The first document path.</param>
-	/// <param name="secondFilePath">The second document path.</param>
-	/// <param name="includeBarriers">Whether to include barrier operations in the snapshot.</param>
-	/// <returns>The distinct queued operation tails that were current at snapshot time.</returns>
-	private Task[] GetQueuedOperationsSnapshot(string firstFilePath, string secondFilePath, bool includeBarriers = false)
-	{
-		lock (_syncRoot)
-			return GetQueuedOperationsSnapshotUnderLock(firstFilePath, secondFilePath, includeBarriers);
-	}
-
-	/// <summary>
-	/// Captures the current queued per-document and latest-update tails for the requested document paths.
-	/// The caller must hold <see cref="_syncRoot"/>.
-	/// </summary>
-	private Task[] GetQueuedOperationsSnapshotUnderLock(string firstFilePath, string secondFilePath, bool includeBarriers = false)
-	{
-		Task firstPerDocumentOperation = GetQueuedPerDocumentOperationUnderLock(firstFilePath);
-		Task firstLatestUpdateOperation = GetQueuedLatestUpdateOperationUnderLock(firstFilePath);
-		bool samePath = LanguageServerPathHelper.AreLocalPathsEqual(firstFilePath, secondFilePath);
-
-		Task firstBarrierOperation = includeBarriers
-			? GetQueuedPerDocumentBarrierUnderLock(firstFilePath)
-			: Task.CompletedTask;
-
-		Task secondPerDocumentOperation = samePath
-			? Task.CompletedTask
-			: GetQueuedPerDocumentOperationUnderLock(secondFilePath);
-
-		Task secondLatestUpdateOperation = samePath
-			? Task.CompletedTask
-			: GetQueuedLatestUpdateOperationUnderLock(secondFilePath);
-
-		Task secondBarrierOperation = includeBarriers || samePath
-			? GetQueuedPerDocumentBarrierUnderLock(secondFilePath)
-			: Task.CompletedTask;
-
-		var queuedOperations = new List<Task>(6);
-		AddDistinctQueuedOperation(queuedOperations, firstPerDocumentOperation);
-		AddDistinctQueuedOperation(queuedOperations, firstLatestUpdateOperation);
-		AddDistinctQueuedOperation(queuedOperations, firstBarrierOperation);
-		AddDistinctQueuedOperation(queuedOperations, secondPerDocumentOperation);
-		AddDistinctQueuedOperation(queuedOperations, secondLatestUpdateOperation);
-		AddDistinctQueuedOperation(queuedOperations, secondBarrierOperation);
-
-		return [.. queuedOperations];
-	}
-
-	/// <summary>
-	/// Adds one queued operation to the snapshot when it is not the completed-task sentinel and has not already been captured.
-	/// </summary>
-	/// <param name="queuedOperations">The captured queued-operation tails.</param>
-	/// <param name="queuedOperation">The queued operation to capture.</param>
-	private static void AddDistinctQueuedOperation(List<Task> queuedOperations, Task queuedOperation)
-	{
-		if (ReferenceEquals(queuedOperation, Task.CompletedTask))
-			return;
-
-		for (int i = 0; i < queuedOperations.Count; i++)
-		{
-			if (ReferenceEquals(queuedOperations[i], queuedOperation))
-				return;
-		}
-
-		queuedOperations.Add(queuedOperation);
-	}
-
-	/// <summary>
-	/// Gets the current queued per-document operation for the supplied path.
-	/// The caller must hold <see cref="_syncRoot"/>.
-	/// </summary>
-	private Task GetQueuedPerDocumentOperationUnderLock(string filePath)
-	{
-		return _queuedPerDocumentOperations.TryGetValue(filePath, out Task? queuedOperation)
-			? queuedOperation
-			: Task.CompletedTask;
-	}
-
-	/// <summary>
-	/// Gets the current exclusion barrier for the supplied path.
-	/// The caller must hold <see cref="_syncRoot"/>.
-	/// </summary>
-	private Task GetQueuedPerDocumentBarrierUnderLock(string filePath)
-	{
-		return _queuedPerDocumentBarriers.TryGetValue(filePath, out Task? barrierOperation)
-			? barrierOperation
-			: Task.CompletedTask;
-	}
-
-	/// <summary>
-	/// Records an exclusion barrier for the supplied document path.
-	/// The caller must hold <see cref="_syncRoot"/>.
-	/// </summary>
-	private void SetQueuedPerDocumentBarrierUnderLock(string filePath, Task barrierOperation)
-	{
-		if (!_queuedPerDocumentBarriers.TryGetValue(filePath, out Task? existingBarrier)
-			|| !ReferenceEquals(existingBarrier, barrierOperation))
-		{
-			_queuedPerDocumentBarriers[filePath] = barrierOperation;
-		}
-	}
-
-	/// <summary>
-	/// Removes a document barrier when it still matches the completed exclusive operation.
-	/// </summary>
-	private void ClearQueuedPerDocumentBarrier(string filePath, Task barrierOperation)
-	{
-		lock (_syncRoot)
-		{
-			if (_queuedPerDocumentBarriers.TryGetValue(filePath, out Task? queuedBarrier)
-				&& ReferenceEquals(queuedBarrier, barrierOperation))
-			{
-				_queuedPerDocumentBarriers.Remove(filePath);
-			}
-		}
 	}
 }

@@ -1,12 +1,12 @@
 namespace Nickelony.IDEKit.IntelliSense.SemanticTokens;
 
 /// <summary>
-/// Well-known semantic token modifiers shared with the language server protocol.
+/// Well-known semantic token modifiers mirroring the LSP names.
 /// </summary>
 /// <remarks>
 /// A modifier is an optional qualifier attached to a <see cref="TextSemanticToken"/>, such as
 /// <see cref="Deprecated"/> or <see cref="Declaration"/>. The names mirror the LSP modifier names;
-/// hosts may use additional custom modifier names.
+/// hosts and language packages may declare additional custom modifier names.
 /// </remarks>
 public static class TextSemanticTokenModifiers
 {
@@ -39,7 +39,4 @@ public static class TextSemanticTokenModifiers
 
 	/// <summary>The token comes from a default library.</summary>
 	public const string DefaultLibrary = "defaultLibrary";
-
-	/// <summary>The token is global.</summary>
-	public const string Global = "global";
 }

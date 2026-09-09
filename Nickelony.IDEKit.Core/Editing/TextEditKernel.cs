@@ -10,9 +10,41 @@ public static class TextEditKernel
 	/// <summary>
 	/// Validates source-offset edits against a text snapshot and returns descending operations.
 	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Insertions that touch a replacement range's boundaries are accepted. When an insertion shares
+	/// a replacement's start offset, the replacement is ordered first and the host applies operations
+	/// in list order, so the inserted text lands before the replacement text; an insertion at a
+	/// replacement's end offset lands after it.
+	/// </para>
+	/// <para>
+	/// Multiple insertions at one source offset are valid: the operations are ordered so that
+	/// applying the list in order inserts their texts in the caller's edit order (the text of the
+	/// lowest edit index appears first), matching protocol conventions such as the LSP edit array.
+	/// </para>
+	/// <para>
+	/// A no-op edit (an empty range with an empty replacement text) contributes no operation, so a
+	/// batch of no-op edits is valid and produces no operations.
+	/// </para>
+	/// <para>
+	/// Ranges are validated first: a no-op whose range lies outside the document is still rejected
+	/// with the range diagnostic instead of being ignored.
+	/// </para>
+	/// </remarks>
 	/// <param name="snapshot">The immutable source text used for range validation.</param>
-	/// <param name="edits">The edits to validate and prepare.</param>
-	/// <returns>A result containing descending-offset operations when all edits are valid.</returns>
+	/// <param name="edits">
+	/// The edits to validate and prepare. A <see langword="null"/> entry or a <see langword="null"/>
+	/// replacement text is reported as a diagnostic instead of throwing.
+	/// </param>
+	/// <returns>
+	/// <list type="bullet">
+	/// <item>A result containing descending-offset operations when all edits are valid;</item>
+	/// <item>A result with no operations and the collected diagnostics when any edit is rejected.</item>
+	/// </list>
+	/// </returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="snapshot"/> or <paramref name="edits"/> is <see langword="null"/>.
+	/// </exception>
 	public static TextEditPreparationResult Prepare(
 		ITextSnapshot snapshot,
 		IEnumerable<TextEditInput?> edits)
@@ -29,37 +61,40 @@ public static class TextEditKernel
 			if (edit is null)
 			{
 				diagnostics.Add(new TextEditPreparationDiagnostic(
-					TextEditPreparationDiagnosticCode.InvalidRange,
 					editIndex,
-					-1,
+					null,
 					"The edit is null."));
+			}
+			else if (edit.NewText is null)
+			{
+				diagnostics.Add(new TextEditPreparationDiagnostic(
+					editIndex,
+					null,
+					"The edit replacement text is null."));
 			}
 			else if (edit.Range.Offset > snapshot.TextLength
 				|| edit.Range.Length > snapshot.TextLength - edit.Range.Offset)
 			{
 				diagnostics.Add(new TextEditPreparationDiagnostic(
-					TextEditPreparationDiagnosticCode.InvalidRange,
 					editIndex,
-					-1,
+					null,
 					"The edit range is outside the document."));
 			}
-			else
+			else if (!edit.IsNoOp)
 			{
+				// An empty range with an empty replacement text changes nothing, so it is ignored
+				// instead of being classified as an insertion and rejected as an intersecting edit.
 				candidates.Add(new Candidate(
 					editIndex,
 					edit.Range.Offset,
 					edit.Range.EndOffset,
-					edit.NewText ?? string.Empty));
+					edit.NewText));
 			}
 
 			editIndex++;
 		}
 
 		candidates.Sort(CandidateComparer.Instance);
-		AddConflictDiagnostics(candidates, diagnostics);
-
-		if (diagnostics.Count > 0)
-			return new TextEditPreparationResult([], diagnostics);
 
 		var operations = new List<TextEditOperation>(candidates.Count);
 
@@ -74,124 +109,48 @@ public static class TextEditKernel
 				candidate.SourceIndex));
 		}
 
-		return new TextEditPreparationResult(operations, []);
+		AddConflictDiagnostics(operations, diagnostics);
+
+		if (diagnostics.Count > 0)
+			return TextEditPreparationResult.Invalid(diagnostics);
+
+		// The shared conflict detector already ran over this batch above, so the carrier is created
+		// through the kernel-validated factory instead of re-detecting the same conflicts in its
+		// validating constructor.
+		return TextEditPreparationResult.Valid(PreparedTextEdits.CreateKernelValidated(operations));
 	}
 
 	/// <summary>
-	/// Maps an offset from the source snapshot to the text after prepared edits are applied.
+	/// Adds a diagnostic for every conflict reported by the shared conflict detector.
 	/// </summary>
-	/// <param name="offset">The zero-based source offset to map.</param>
-	/// <param name="operations">The valid prepared operations.</param>
-	/// <returns>The corresponding zero-based offset in the edited text.</returns>
-	public static int MapOffset(int offset, IReadOnlyList<TextEditOperation> operations)
-	{
-		ArgumentOutOfRangeException.ThrowIfNegative(offset);
-		ArgumentNullException.ThrowIfNull(operations);
-
-		int cumulativeDelta = 0;
-
-		for (int index = operations.Count - 1; index >= 0; index--)
-		{
-			TextEditOperation operation = operations[index];
-
-			if (offset < operation.StartOffset)
-				break;
-
-			if (offset <= operation.EndOffset)
-			{
-				int relativeOffset = offset - operation.StartOffset;
-				int normalizedRelativeOffset = Math.Min(relativeOffset, operation.NewText.Length);
-				return operation.StartOffset + cumulativeDelta + normalizedRelativeOffset;
-			}
-
-			cumulativeDelta += operation.NewText.Length - operation.Length;
-		}
-
-		return offset + cumulativeDelta;
-	}
-
+	/// <remarks>
+	/// Each diagnostic names the edit it was detected for as <c>SourceIndex</c> and the edit it
+	/// conflicts with as <c>RelatedSourceIndex</c>. The conflict order is documented on
+	/// <see cref="TextEditConflictDetector.FindConflicts"/>. The shared detector is the same rule set
+	/// that <see cref="PreparedTextEdits"/> validates with, so a prepared batch never fails
+	/// construction.
+	/// </remarks>
 	private static void AddConflictDiagnostics(
-		IReadOnlyList<Candidate> candidates,
+		IReadOnlyList<TextEditOperation> operations,
 		List<TextEditPreparationDiagnostic> diagnostics)
 	{
-		for (int leftIndex = 0; leftIndex < candidates.Count; leftIndex++)
+		foreach (TextEditConflict conflict in TextEditConflictDetector.FindConflicts(operations))
 		{
-			Candidate left = candidates[leftIndex];
-
-			for (int rightIndex = leftIndex + 1; rightIndex < candidates.Count; rightIndex++)
-			{
-				Candidate right = candidates[rightIndex];
-
-				if (left.StartOffset == left.EndOffset && right.StartOffset == right.EndOffset)
-				{
-					if (left.StartOffset == right.StartOffset)
-					{
-						diagnostics.Add(new TextEditPreparationDiagnostic(
-							TextEditPreparationDiagnosticCode.DuplicateInsertion,
-							left.SourceIndex,
-							right.SourceIndex,
-							"Multiple insertions target the same source offset."));
-					}
-
-					continue;
-				}
-
-				if (left.StartOffset == left.EndOffset || right.StartOffset == right.EndOffset)
-				{
-					Candidate insertion = left.StartOffset == left.EndOffset ? left : right;
-					Candidate replacement = left.StartOffset == left.EndOffset ? right : left;
-
-					if (insertion.StartOffset > replacement.StartOffset && insertion.StartOffset < replacement.EndOffset)
-					{
-						diagnostics.Add(new TextEditPreparationDiagnostic(
-							TextEditPreparationDiagnosticCode.InsertionReplacementIntersection,
-							insertion.SourceIndex,
-							replacement.SourceIndex,
-							"An insertion intersects a replacement range."));
-					}
-
-					continue;
-				}
-
-				if (left.EndOffset > right.StartOffset)
-				{
-					diagnostics.Add(new TextEditPreparationDiagnostic(
-						TextEditPreparationDiagnosticCode.OverlappingRanges,
-						left.SourceIndex,
-						right.SourceIndex,
-						"The edit ranges overlap."));
-				}
-			}
+			diagnostics.Add(new TextEditPreparationDiagnostic(
+				conflict.SourceIndex,
+				conflict.RelatedSourceIndex,
+				TextEditConflictMessages.GetDiagnosticMessage(conflict.Kind)));
 		}
 	}
 
-	private sealed record Candidate(int SourceIndex, int StartOffset, int EndOffset, string NewText);
+	private readonly record struct Candidate(int SourceIndex, int StartOffset, int EndOffset, string NewText);
 
 	private sealed class CandidateComparer : IComparer<Candidate>
 	{
 		public static CandidateComparer Instance { get; } = new();
 
-		public int Compare(Candidate? left, Candidate? right)
-		{
-			if (ReferenceEquals(left, right))
-				return 0;
-
-			if (left is null)
-				return -1;
-
-			if (right is null)
-				return 1;
-
-			int startComparison = left.StartOffset.CompareTo(right.StartOffset);
-
-			if (startComparison != 0)
-				return startComparison;
-
-			int endComparison = left.EndOffset.CompareTo(right.EndOffset);
-
-			return endComparison != 0
-				? endComparison
-				: left.SourceIndex.CompareTo(right.SourceIndex);
-		}
+		public int Compare(Candidate left, Candidate right)
+			=> new TextEditOrderKey(left.StartOffset, left.EndOffset, left.SourceIndex)
+				.CompareTo(new TextEditOrderKey(right.StartOffset, right.EndOffset, right.SourceIndex));
 	}
 }

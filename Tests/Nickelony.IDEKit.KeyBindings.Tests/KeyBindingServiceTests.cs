@@ -99,7 +99,7 @@ public class KeyBindingServiceTests
 	}
 
 	[TestMethod]
-	public void GetBindings_UncataloguedCommand_ReturnsEmpty()
+	public void GetBindings_UncatalogedCommand_ReturnsEmpty()
 	{
 		var service = CreateService();
 
@@ -129,7 +129,7 @@ public class KeyBindingServiceTests
 	}
 
 	[TestMethod]
-	public void GetDisplayText_UncataloguedCommand_ReturnsFallback()
+	public void GetDisplayText_UncatalogedCommand_ReturnsFallback()
 	{
 		var service = CreateService();
 
@@ -219,5 +219,96 @@ public class KeyBindingServiceTests
 		Assert.IsTrue(displayText.Contains("Ctrl+"));
 		Assert.IsTrue(displayText.Contains("Shift+"));
 		Assert.IsTrue(displayText.Contains("S"));
+	}
+
+	[TestMethod]
+	public void KeyCombo_GetDisplayText_UsesFriendlyKeyNames()
+	{
+		Assert.AreEqual("Backspace", new KeyCombo(Key.Back, ModifierKeys.None).GetDisplayText());
+		Assert.AreEqual("Enter", new KeyCombo(Key.Return, ModifierKeys.None).GetDisplayText());
+		Assert.AreEqual("Esc", new KeyCombo(Key.Escape, ModifierKeys.None).GetDisplayText());
+		Assert.AreEqual("Ctrl+Space", new KeyCombo(Key.Space, ModifierKeys.Control).GetDisplayText());
+	}
+
+	[TestMethod]
+	public void Reset_CommandWithDifferingSerializedId_RemovesTheOverride()
+	{
+		var catalog = new CommandCatalog<TestCommand>([
+			new CommandDescriptor<TestCommand>(TestCommand.Save, "editor.save", isRemappable: true, isHostReserved: false,
+				new KeyCombo(Key.S, ModifierKeys.Control))
+		]);
+
+		var overrides = new KeyBindingOverrideCollection();
+		overrides.Overrides.Add(new KeyBindingOverrideEntry
+		{
+			CommandId = "editor.save",
+			Bindings = [new KeyBindingSettings { KeyName = nameof(Key.F5), Modifiers = (int)ModifierKeys.None }]
+		});
+
+		KeyBindingOverrideCollection? saved = null;
+		var service = new KeyBindingService<TestCommand>(catalog, overrides, snapshot => { saved = snapshot; return true; });
+
+		Assert.AreEqual(new KeyCombo(Key.F5, ModifierKeys.None), service.GetBindings(TestCommand.Save)[0]);
+
+		service.Reset(TestCommand.Save);
+
+		Assert.AreEqual(new KeyCombo(Key.S, ModifierKeys.Control), service.GetBindings(TestCommand.Save)[0]);
+		Assert.IsNotNull(saved);
+		Assert.AreEqual(0, saved!.Overrides.Count);
+	}
+
+	[TestMethod]
+	public void ResolveBindings_EmptyOverrideForHostReservedCommand_KeepsCatalogDefaults()
+	{
+		var overrides = new KeyBindingOverrideCollection();
+		overrides.Overrides.Add(new KeyBindingOverrideEntry { CommandId = nameof(TestCommand.Exit), Bindings = [] });
+
+		var service = new KeyBindingService<TestCommand>(CreateCatalog(), overrides, _ => true);
+
+		IReadOnlyList<KeyCombo> bindings = service.GetBindings(TestCommand.Exit);
+		Assert.AreEqual(1, bindings.Count);
+		Assert.AreEqual(new KeyCombo(Key.F4, ModifierKeys.Alt), bindings[0]);
+	}
+
+	[TestMethod]
+	public void ResolveBindings_EmptyOverrideForRemappableCommand_UnbindsTheCommand()
+	{
+		var overrides = new KeyBindingOverrideCollection();
+		overrides.Overrides.Add(new KeyBindingOverrideEntry { CommandId = nameof(TestCommand.Save), Bindings = [] });
+
+		var service = new KeyBindingService<TestCommand>(CreateCatalog(), overrides, _ => true);
+
+		Assert.AreEqual(0, service.GetBindings(TestCommand.Save).Count);
+		Assert.IsFalse(service.TryGetCommand(new KeyCombo(Key.S, ModifierKeys.Control), out _));
+	}
+
+	[TestMethod]
+	public void ResolveBindings_OverrideWithNumericUndefinedKey_FallsBackToDefaults()
+	{
+		var overrides = new KeyBindingOverrideCollection();
+		overrides.Overrides.Add(new KeyBindingOverrideEntry
+		{
+			CommandId = nameof(TestCommand.Save),
+			Bindings = [new KeyBindingSettings { KeyName = "99999", Modifiers = 0 }]
+		});
+
+		var service = new KeyBindingService<TestCommand>(CreateCatalog(), overrides, _ => true);
+
+		Assert.AreEqual(new KeyCombo(Key.S, ModifierKeys.Control), service.GetBindings(TestCommand.Save)[0]);
+	}
+
+	[TestMethod]
+	public void Validate_Outcomes_AreReportedPerPolicy()
+	{
+		var service = CreateService();
+
+		Assert.AreEqual(KeyBindingValidationResult.Valid,
+			service.Validate(TestCommand.Save, [new KeyCombo(Key.F5, ModifierKeys.None)]));
+		Assert.AreEqual(KeyBindingValidationResult.DuplicateInCommand,
+			service.Validate(TestCommand.Save, [new KeyCombo(Key.F5, ModifierKeys.None), new KeyCombo(Key.F5, ModifierKeys.None)]));
+		Assert.AreEqual(KeyBindingValidationResult.Conflict,
+			service.Validate(TestCommand.Save, [new KeyCombo(Key.Z, ModifierKeys.Control)]));
+		Assert.AreEqual(KeyBindingValidationResult.NotRemappable,
+			service.Validate(TestCommand.None, [new KeyCombo(Key.F5, ModifierKeys.None)]));
 	}
 }

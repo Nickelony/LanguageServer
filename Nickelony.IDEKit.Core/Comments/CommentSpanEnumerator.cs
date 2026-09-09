@@ -1,11 +1,16 @@
+using Nickelony.IDEKit.Core.Text;
+
 namespace Nickelony.IDEKit.Core.Comments;
 
 /// <summary>
-/// Enumerates the comments in a span of text in a single forward pass, recognizing
-/// line comments and block comments together and ignoring delimiters inside string
-/// literals and comments. Create one with
-/// <see cref="CommentHelper.EnumerateComments(ReadOnlySpan{char}, CommentSyntax)"/>.
+/// Enumerates the comments in a span of text in a single forward pass, recognizing line comments
+/// and block comments together.
 /// </summary>
+/// <remarks>
+/// Delimiters inside string literals and comments are ignored. Create the enumerator through
+/// <see cref="CommentOperations.EnumerateComments(ReadOnlySpan{char}, CommentSyntax)"/> and consume
+/// it with <c>foreach</c> or with explicit <see cref="MoveNext"/> calls.
+/// </remarks>
 public ref struct CommentSpanEnumerator
 {
 	private readonly ReadOnlySpan<char> _text;
@@ -15,28 +20,37 @@ public ref struct CommentSpanEnumerator
 
 	/// <summary>
 	/// Gets the current comment span. Valid only after <see cref="MoveNext"/> has
-	/// returned <see langword="true"/>.
+	/// returned <see langword="true"/>; before the first move the value is the default instance and
+	/// does not describe a comment.
 	/// </summary>
 	public readonly CommentSpan Current => _current;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="CommentSpanEnumerator"/> struct.
+	/// Initializes a new instance of the <see cref="CommentSpanEnumerator"/> struct. Create instances
+	/// through <see cref="CommentOperations.EnumerateComments(ReadOnlySpan{char}, CommentSyntax)"/>.
 	/// </summary>
 	/// <param name="text">The text to scan. May contain multiple lines.</param>
 	/// <param name="syntax">The comment syntax of the language.</param>
-	public CommentSpanEnumerator(ReadOnlySpan<char> text, CommentSyntax syntax)
+	internal CommentSpanEnumerator(ReadOnlySpan<char> text, CommentSyntax syntax)
 	{
 		_text = text;
-		_scanner = new CommentScanner(text, 0, syntax.StringStyle, syntax.LineCommentDelimiter, syntax.BlockCommentOpen, syntax.BlockCommentClose, syntax.AllowNestedBlockComments);
+		_scanner = new CommentScanner(text, syntax);
 		_floor = 0;
 		_current = default;
 	}
 
 	/// <summary>
+	/// Returns this enumerator so the comment spans can be consumed with <c>foreach</c>.
+	/// </summary>
+	/// <returns>The current enumerator instance.</returns>
+	public readonly CommentSpanEnumerator GetEnumerator()
+		=> this;
+
+	/// <summary>
 	/// Advances to the next comment span in the text.
 	/// </summary>
 	/// <returns>
-	/// <see langword="true"/> if a comment span is available in <see cref="Current"/>;
+	/// <see langword="true"/> when a comment span is available in <see cref="Current"/>;
 	/// otherwise <see langword="false"/>.
 	/// </returns>
 	public bool MoveNext()
@@ -65,21 +79,31 @@ public ref struct CommentSpanEnumerator
 
 		if (lineStart >= 0)
 		{
-			// The span starts at the delimiter and includes preceding whitespace, but
-			// never before the previous comment's end, so a comment-only line consumes
-			// its preceding line ending.
+			// The span includes the whitespace on the comment's own line - so it can start before the
+			// delimiter - plus at most one preceding line terminator, so a comment-only line removes or
+			// masks its own line without consuming blank lines above it. It never starts before the
+			// previous comment's end.
 			int start = lineStart;
 
 			while (start > _floor && char.IsWhiteSpace(_text[start - 1]))
+			{
 				start--;
 
-			// A line comment runs to the line break (exclusive) or the end of the text.
-			int end = lineStart;
+				if (LineTerminators.IsTerminator(_text[start]))
+				{
+					// CRLF is a single line terminator, so the LF pulls its preceding CR in with it.
+					if (_text[start] == '\n' && start > _floor && LineTerminators.IsCrLfPair(_text[start - 1], _text[start]))
+						start--;
 
-			while (end < _text.Length && _text[end] != '\n')
-				end++;
+					break;
+				}
+			}
 
-			_current = new CommentSpan(start, lineStart, end, isLineComment: true);
+			// A line comment runs to the line terminator (exclusive) or the end of the text; the
+			// scanner already resolved that end when it detected the delimiter.
+			int end = _scanner.LineCommentEndIndex;
+
+			_current = new CommentSpan(start, lineStart, end, CommentKind.Line);
 			_floor = end;
 
 			return true;
@@ -101,7 +125,7 @@ public ref struct CommentSpanEnumerator
 		if (blockEnd < 0)
 			blockEnd = _text.Length;
 
-		_current = new CommentSpan(blockStart, blockStart, blockEnd, isLineComment: false);
+		_current = new CommentSpan(blockStart, blockStart, blockEnd, CommentKind.Block);
 		_floor = blockEnd;
 
 		return true;

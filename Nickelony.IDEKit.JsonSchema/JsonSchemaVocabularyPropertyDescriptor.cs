@@ -12,7 +12,8 @@ public sealed class JsonSchemaVocabularyPropertyDescriptor
 	public string Name { get; }
 
 	/// <summary>
-	/// Gets the JSON types supplied for the property, or an empty list when none were supplied.
+	/// Gets the JSON types supplied for the property, or an empty list when none were supplied. The
+	/// list follows the declaration order of <see cref="JsonSchemaPropertyType"/>.
 	/// </summary>
 	public IReadOnlyList<JsonSchemaPropertyType> Types { get; }
 
@@ -22,9 +23,11 @@ public sealed class JsonSchemaVocabularyPropertyDescriptor
 	public string? Description { get; }
 
 	/// <summary>
-	/// Gets whether the only type in <see cref="Types"/> is <see cref="JsonSchemaPropertyType.Array"/>.
+	/// Gets whether <see cref="Types"/> contains exactly one entry, the
+	/// <see cref="JsonSchemaPropertyType.Array"/> type. A union that also allows arrays (for example
+	/// <c>["array", "null"]</c>) reports <see langword="false"/>.
 	/// </summary>
-	public bool IsArray => Types.Count == 1 && Types[0] == JsonSchemaPropertyType.Array;
+	public bool IsArrayOnly => Types.Count == 1 && Types[0] == JsonSchemaPropertyType.Array;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="JsonSchemaVocabularyPropertyDescriptor"/> class.
@@ -33,7 +36,7 @@ public sealed class JsonSchemaVocabularyPropertyDescriptor
 	/// <param name="types">The declared JSON types.</param>
 	/// <param name="description">The property description, which may be <see langword="null"/>.</param>
 	/// <exception cref="ArgumentNullException">
-	/// <paramref name="name"/> or <paramref name="types"/> is null.
+	/// <paramref name="name"/> or <paramref name="types"/> is <see langword="null"/>.
 	/// </exception>
 	public JsonSchemaVocabularyPropertyDescriptor(string name, IReadOnlyList<JsonSchemaPropertyType> types, string? description)
 	{

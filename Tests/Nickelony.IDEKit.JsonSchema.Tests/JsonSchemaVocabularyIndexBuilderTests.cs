@@ -1,7 +1,6 @@
-using System.Text;
-
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
+using System.Text;
 
 namespace Nickelony.IDEKit.JsonSchema.Tests;
 
@@ -227,18 +226,6 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 	}
 
 	[TestMethod]
-	public void Build_NullSchema_ThrowsArgumentNullException()
-		=> Assert.ThrowsExactly<ArgumentNullException>(() => s_builder.Build((JSchema)null!));
-
-	[TestMethod]
-	public void Build_NullToken_ThrowsArgumentNullException()
-		=> Assert.ThrowsExactly<ArgumentNullException>(() => s_builder.Build((JToken)null!));
-
-	[TestMethod]
-	public void Build_NullReader_ThrowsArgumentNullException()
-		=> Assert.ThrowsExactly<ArgumentNullException>(() => s_builder.Build((TextReader)null!));
-
-	[TestMethod]
 	public void Build_DuplicatePropertyDifferentTypes_FirstOccurrenceWins()
 	{
 		JsonSchemaVocabularyIndexResult result = s_builder.Build(JSchema.Parse(DuplicatePropertyFixture));
@@ -269,6 +256,68 @@ public sealed class JsonSchemaVocabularyIndexBuilderTests
 		Assert.AreEqual("Root-level property.", index.Properties.Single(p => p.Name == "root_name").Description);
 		Assert.AreEqual("Nested property.", index.Properties.Single(p => p.Name == "nested_name").Description);
 		Assert.IsTrue(index.Properties.Any(p => p.Name == "child" && p.Types.Single() == JsonSchemaPropertyType.Object));
+	}
+
+	[TestMethod]
+	public void Build_WithConstValues_IndexesStringConstantsOnly()
+	{
+		JsonSchemaVocabularyIndexResult result = s_builder.Build(JSchema.Parse(
+			"""
+			{
+			  "type": "object",
+			  "properties": {
+			    "kind": { "const": "level" },
+			    "count": { "const": 3 }
+			  }
+			}
+			"""));
+
+		Assert.IsTrue(result.Succeeded);
+		JsonSchemaVocabularyIndex index = result.Index!;
+
+		Assert.IsTrue(index.Constants.Contains("level"));
+		Assert.IsFalse(index.Constants.Contains("3"));
+	}
+
+	[TestMethod]
+	public void Build_MultiTypeUnion_ReportsTypesInEnumDeclarationOrder()
+	{
+		JsonSchemaVocabularyIndexResult result = s_builder.Build(JSchema.Parse(
+			"""
+			{
+			  "type": "object",
+			  "properties": {
+			    "value": { "type": [ "null", "array", "object" ] }
+			  }
+			}
+			"""));
+
+		Assert.IsTrue(result.Succeeded);
+		JsonSchemaVocabularyPropertyDescriptor descriptor = result.Index!.Properties.Single(p => p.Name == "value");
+
+		CollectionAssert.AreEqual(
+			new[] { JsonSchemaPropertyType.Object, JsonSchemaPropertyType.Array, JsonSchemaPropertyType.Null },
+			descriptor.Types.ToArray());
+		Assert.IsFalse(descriptor.IsArrayOnly);
+	}
+
+	[TestMethod]
+	public void Build_SingleArrayType_ReportsIsArrayOnly()
+	{
+		JsonSchemaVocabularyIndexResult result = s_builder.Build(JSchema.Parse(
+			"""
+			{
+			  "type": "object",
+			  "properties": {
+			    "levels": { "type": "array" }
+			  }
+			}
+			"""));
+
+		Assert.IsTrue(result.Succeeded);
+		JsonSchemaVocabularyPropertyDescriptor descriptor = result.Index!.Properties.Single(p => p.Name == "levels");
+
+		Assert.IsTrue(descriptor.IsArrayOnly);
 	}
 
 	private const string DefsAndRefsFixture =

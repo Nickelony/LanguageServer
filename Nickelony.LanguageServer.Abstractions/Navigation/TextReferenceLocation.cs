@@ -1,35 +1,29 @@
+using Nickelony.IDEKit.Core.Text;
+
 namespace Nickelony.LanguageServer.Abstractions;
 
 /// <summary>
 /// Identifies a symbol reference in a source file.
 /// </summary>
 /// <remarks>
-/// Coordinates use one-based line and column numbers. Values less than one are changed to one, and an end coordinate
-/// before the start is changed to the start.
+/// <see cref="Range"/> uses zero-based line and character positions in LSP units: lines count line
+/// breaks, characters count UTF-16 code units within the line, and a tab counts as a single code
+/// unit. Range values are stored as supplied.
 /// </remarks>
-public sealed class TextReferenceLocation
+public sealed record TextReferenceLocation
 {
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextReferenceLocation"/> class.
+	/// Initializes a new instance of the <see cref="TextReferenceLocation"/> record.
 	/// </summary>
 	/// <param name="filePath">The file containing the reference.</param>
-	/// <param name="startLineNumber">The one-based start line number.</param>
-	/// <param name="startColumnNumber">The one-based start column number.</param>
-	/// <param name="endLineNumber">The one-based end line number.</param>
-	/// <param name="endColumnNumber">The one-based end column number.</param>
-	public TextReferenceLocation(string filePath, int startLineNumber, int startColumnNumber, int endLineNumber, int endColumnNumber)
+	/// <param name="range">The zero-based range of the reference.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="filePath"/> is <see langword="null"/>.</exception>
+	public TextReferenceLocation(string filePath, TextPositionRange range)
 	{
 		ArgumentNullException.ThrowIfNull(filePath);
 
 		FilePath = filePath;
-
-		(int safeStartLineNumber, int safeStartColumnNumber, int safeEndLineNumber, int safeEndColumnNumber) =
-			TextDocumentRangeNormalizer.Normalize(startLineNumber, startColumnNumber, endLineNumber, endColumnNumber);
-
-		StartLineNumber = safeStartLineNumber;
-		StartColumnNumber = safeStartColumnNumber;
-		EndLineNumber = safeEndLineNumber;
-		EndColumnNumber = safeEndColumnNumber;
+		Range = range;
 	}
 
 	/// <summary>
@@ -38,27 +32,7 @@ public sealed class TextReferenceLocation
 	public string FilePath { get; }
 
 	/// <summary>
-	/// Gets the one-based start line number.
+	/// Gets the zero-based range of the reference.
 	/// </summary>
-	public int StartLineNumber { get; }
-
-	/// <summary>
-	/// Gets the one-based start column number.
-	/// </summary>
-	public int StartColumnNumber { get; }
-
-	/// <summary>
-	/// Gets the one-based end line number.
-	/// </summary>
-	public int EndLineNumber { get; }
-
-	/// <summary>
-	/// Gets the one-based end column number.
-	/// </summary>
-	public int EndColumnNumber { get; }
-
-	/// <summary>
-	/// Gets a value indicating whether the location is contained on a single line.
-	/// </summary>
-	public bool IsSingleLine => StartLineNumber == EndLineNumber;
+	public TextPositionRange Range { get; }
 }

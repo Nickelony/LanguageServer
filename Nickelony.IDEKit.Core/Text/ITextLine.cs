@@ -2,9 +2,11 @@ namespace Nickelony.IDEKit.Core.Text;
 
 /// <summary>
 /// Represents a single line within an <see cref="ITextSnapshot"/>.
-/// Offsets are zero-based. Line numbers are one-based. <see cref="Length"/>
-/// and <see cref="EndOffset"/> exclude line terminators.
 /// </summary>
+/// <remarks>
+/// Offsets are zero-based and line numbers are one-based. <see cref="Length"/> and
+/// <see cref="EndOffset"/> exclude line terminators.
+/// </remarks>
 public interface ITextLine
 {
 	/// <summary>
@@ -23,7 +25,8 @@ public interface ITextLine
 	int EndOffset { get; }
 
 	/// <summary>
-	/// Gets the one-based line number of this line within the source text.
+	/// Gets the one-based line number of this line within the source text; contrast
+	/// <see cref="TextPosition.Line"/>, which is a zero-based line index.
 	/// </summary>
 	int LineNumber { get; }
 }

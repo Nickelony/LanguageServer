@@ -4,19 +4,22 @@ namespace Nickelony.IDEKit.KeyBindings;
 /// A command's catalog entry, including its <typeparamref name="TCommandId"/>, stable
 /// identifier, default bindings, and remapping policy.
 /// </summary>
+/// <typeparam name="TCommandId">The command identity type.</typeparam>
 public sealed class CommandDescriptor<TCommandId>
 	where TCommandId : notnull
 {
 	/// <summary>
-	/// Creates a descriptor with a command identity, stable identifier, remapping policy,
-	/// and default bindings.
+	/// Initializes a new instance of the <see cref="CommandDescriptor{TCommandId}"/> class.
 	/// </summary>
 	/// <param name="command">The command identity. Catalog construction rejects the <see langword="default"/> command value.</param>
 	/// <param name="serializedId">The stable serialized identifier used for persistence.</param>
-	/// <param name="isRemappable">Whether the user is permitted to remap this command.</param>
-	/// <param name="isHostReserved">Whether the host reserves this command and prevents it from being remapped.</param>
+	/// <param name="isRemappable">The value indicating whether the user is permitted to remap this command.</param>
+	/// <param name="isHostReserved">The value indicating whether the host reserves this command and prevents it from being remapped.</param>
 	/// <param name="defaultBindings">The default bindings defined by the application.</param>
-	/// <exception cref="ArgumentNullException"><paramref name="serializedId"/> is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="serializedId"/> or <paramref name="defaultBindings"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException"><paramref name="serializedId"/> is empty.</exception>
 	public CommandDescriptor(
 		TCommandId command,
 		string serializedId,
@@ -24,41 +27,50 @@ public sealed class CommandDescriptor<TCommandId>
 		bool isHostReserved,
 		params KeyCombo[] defaultBindings)
 	{
-		ArgumentNullException.ThrowIfNull(serializedId);
+		ArgumentException.ThrowIfNullOrEmpty(serializedId);
 		ArgumentNullException.ThrowIfNull(defaultBindings);
 
 		Command = command;
 		SerializedId = serializedId;
 		IsRemappable = isRemappable;
 		IsHostReserved = isHostReserved;
-		DefaultBindings = Array.AsReadOnly(defaultBindings);
+
+		// The bindings are copied so later mutation of the caller's array cannot alter the descriptor.
+		DefaultBindings = Array.AsReadOnly<KeyCombo>([.. defaultBindings]);
 	}
 
 	/// <summary>
-	/// The command this descriptor represents. Catalog construction rejects the
-	/// <see langword="default"/> command value, such as <c>None</c> for an enum identity.
+	/// Gets the command this descriptor represents.
 	/// </summary>
+	/// <remarks>
+	/// Catalog construction rejects the <see langword="default"/> command value, such as <c>None</c> for an
+	/// enum identity.
+	/// </remarks>
 	public TCommandId Command { get; }
 
 	/// <summary>
-	/// Stable identifier associated with this command in persisted overrides.
+	/// Gets the stable identifier associated with this command in persisted overrides.
 	/// </summary>
 	public string SerializedId { get; }
 
 	/// <summary>
-	/// The default key combos used when no override applies.
+	/// Gets the default key combos used when no override applies.
 	/// </summary>
 	public IReadOnlyList<KeyCombo> DefaultBindings { get; }
 
 	/// <summary>
-	/// Whether the command may be changed through the service's apply or clear operations.
+	/// Gets a value indicating whether the command may be proposed for remapping.
 	/// </summary>
+	/// <remarks>Validation rejects proposed binding sets for commands that are not remappable.</remarks>
 	public bool IsRemappable { get; }
 
 	/// <summary>
-	/// Whether this command is reserved by the host. Validation rejects apply and clear
-	/// operations for reserved commands, and non-empty loaded overrides are ignored in
-	/// favor of the catalog defaults.
+	/// Gets a value indicating whether this command is reserved by the host.
 	/// </summary>
+	/// <remarks>
+	/// Validation rejects proposed binding sets for reserved commands, and every loaded override is
+	/// ignored in favor of the catalog defaults, including an empty binding list that would unbind a
+	/// remappable command.
+	/// </remarks>
 	public bool IsHostReserved { get; }
 }

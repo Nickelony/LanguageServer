@@ -1,35 +1,63 @@
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
-using System.Diagnostics.CodeAnalysis;
+using Nickelony.IDEKit.AvalonEdit.Documents;
+using Nickelony.IDEKit.Core.AutoClosing;
+using Nickelony.IDEKit.Core.Editing;
+using Nickelony.IDEKit.Core.Text;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace Nickelony.IDEKit.AvalonEdit.Editing;
 
 /// <summary>
-/// Provides bracket, quote, and backtick auto-closing and overtyping for an AvalonEdit <see cref="TextEditor"/>.
+/// Applies auto-closing (including overtype), pair deletion, and selection wrapping to an AvalonEdit
+/// <see cref="TextEditor"/> for the pairs configured through <see cref="TextAutoClosingOptions"/>.
 /// </summary>
-[SuppressMessage(
-	"Performance",
-	"CA1822:MarkMembersAsStatic",
-	Justification = "The service is created per editor as part of the editor service composition.")]
-public sealed class TextAutoClosingService
+/// <remarks>
+/// <para>
+/// Resolution is delegated to the editor-neutral <see cref="TextAutoClosingResolver"/>: this service
+/// snapshots the document, hands the snapshot and its insertion-tracking callback to the resolver, and
+/// applies the resolved action as document edits. The pairs from
+/// <see cref="TextAutoClosingOptions.Pairs"/> are evaluated in order; the first matching pair wins. The
+/// resolution gates are documented on <see cref="ITextAutoClosingService.TryResolveAction"/>.
+/// </para>
+/// <para>
+/// The applying members accept the same optional <see cref="ITextEditTarget"/> as the other editing
+/// helpers: the typed text and the closing text (or the deleted pair) are applied through the supplied
+/// target as one batch, so a single undo still removes or restores the whole pair. A supplied target
+/// must satisfy the contract described by <see cref="TextEditorEditOperations"/>; the caret and
+/// selection are applied to the editor's document as usual.
+/// </para>
+/// <para>
+/// The leading-token skip of a multi-character closing text intentionally extends the convention of
+/// mainstream desktop editors, which apply it to single-character closings only. It lets a pair whose
+/// closing text appends a trailing token (for example <c>},</c>) still be overtyped by typing that
+/// closing text's first character.
+/// </para>
+/// <para>
+/// A quote-like token preceded by the configured escape character belongs to an escape sequence, so it
+/// is neither skipped nor treated as an existing closing text.
+/// </para>
+/// <para>
+/// Whether typing existing closing text skips it and whether Backspace removes the pair follow
+/// <see cref="TextAutoClosingOptions.OvertypeMode"/> and <see cref="TextAutoClosingOptions.DeleteMode"/>.
+/// Both default to <see cref="TextAutoClosingProvenance.Auto"/>, which applies them only to closing text
+/// this service inserted and tracks per document; closing text written through any other path (a loaded
+/// file, a host edit, or an action resolved outside <see cref="HandleTextEntering"/>) is not tracked, so
+/// typing over it inserts normally and Backspace is left to the editor. The tracking state is held by the
+/// service instance and released with the document. Removing the inserted closing text (for example,
+/// undoing the insertion) ends its tracking; a later redo of that insertion does not restore it.
+/// </para>
+/// </remarks>
+public sealed class TextAutoClosingService : ITextAutoClosingService
 {
-	/// <summary>
-	/// Tries to resolve an auto-closing action for <paramref name="inputText"/> at the caret.
-	/// </summary>
-	/// <param name="document">The document containing the caret.</param>
-	/// <param name="caretOffset">The zero-based caret offset.</param>
-	/// <param name="inputText">The text being entered.</param>
-	/// <param name="options">The auto-closing configuration.</param>
-	/// <param name="action">
-	/// The resolved action when the method returns <see langword="true"/>;
-	/// otherwise, the <see langword="default"/> action.
-	/// </param>
-	/// <returns><see langword="true"/> when an action applies; otherwise, <see langword="false"/>.</returns>
-	/// <exception cref="ArgumentNullException">
-	/// <paramref name="document"/>, <paramref name="inputText"/>, or <paramref name="options"/> is <see langword="null"/>.
-	/// </exception>
-	public bool TryGetAction(
+	// The tracking state of the closing texts this service inserted, held per document; anchors keep the
+	// offsets valid across edits, and the state (with the resolver callback bound to it) is released
+	// with its document.
+	private readonly ConditionalWeakTable<TextDocument, DocumentTracking> _tracking = new();
+
+	/// <inheritdoc/>
+	public bool TryResolveAction(
 		TextDocument document,
 		int caretOffset,
 		string inputText,
@@ -40,332 +68,366 @@ public sealed class TextAutoClosingService
 		ArgumentNullException.ThrowIfNull(inputText);
 		ArgumentNullException.ThrowIfNull(options);
 
-		action = default;
-
-		if (inputText.Length == 0)
-			return false;
-
-		if (TryGetBracketAction(
-			inputText,
-			openingToken: "(",
-			closingToken: ")",
-			isEnabled: options.AutoClosingParentheses,
-			closingString: options.ParenthesesClosingString,
-			document,
-			caretOffset,
-			out action))
-		{
-			return true;
-		}
-
-		if (TryGetBracketAction(
-			inputText,
-			openingToken: "{",
-			closingToken: "}",
-			isEnabled: options.AutoClosingBraces,
-			closingString: options.BracesClosingString,
-			document,
-			caretOffset,
-			out action))
-		{
-			return true;
-		}
-
-		if (TryGetBracketAction(
-			inputText,
-			openingToken: "[",
-			closingToken: "]",
-			isEnabled: options.AutoClosingBrackets,
-			closingString: options.BracketsClosingString,
-			document,
-			caretOffset,
-			out action))
-		{
-			return true;
-		}
-
-		if (TryGetQuoteAction(
-			inputText,
-			token: "\"",
-			isEnabled: options.AutoClosingDoubleQuotes,
-			closingString: options.DoubleQuotesClosingString,
-			document,
-			caretOffset,
-			suppressAfterWordCharacter: true,
-			out action))
-		{
-			return true;
-		}
-
-		if (TryGetQuoteAction(
-			inputText,
-			token: "'",
-			isEnabled: options.AutoClosingSingleQuotes,
-			closingString: options.SingleQuotesClosingString,
-			document,
-			caretOffset,
-			suppressAfterWordCharacter: true,
-			out action))
-		{
-			return true;
-		}
-
-		return TryGetQuoteAction(
-			inputText,
-			token: "`",
-			isEnabled: options.AutoClosingBackticks,
-			closingString: options.BackticksClosingString,
-			document,
-			caretOffset,
-			suppressAfterWordCharacter: false,
+		return TextAutoClosingResolver.TryResolveAction(
+			new TextAutoClosingRequest(
+				new TextDocumentSnapshot(document),
+				caretOffset,
+				inputText,
+				options)
+			{
+				IsTrackedClosingText = GetTrackingCallback(document)
+			},
 			out action);
 	}
 
 	/// <summary>
-	/// Applies the auto-closing action (if any) for text entering the editor.
+	/// Gets the resolver tracking callback over this service's recorded insertions for
+	/// <paramref name="document"/>, or <see langword="null"/> when the document has no tracked
+	/// closing texts.
 	/// </summary>
-	/// <remarks>
-	/// An insert action updates the editor without handling the event, allowing normal text input to continue.
-	/// A skip action moves past existing closing text, marks the event handled, and invokes the callback when supplied.
-	/// </remarks>
-	/// <param name="editor">The editor receiving the text.</param>
-	/// <param name="e">The text-composition event being handled.</param>
-	/// <param name="options">The auto-closing configuration.</param>
-	/// <param name="onElementSkipped">An optional callback invoked when a closing element is skipped.</param>
-	/// <exception cref="ArgumentNullException">
-	/// <paramref name="editor"/>, <paramref name="e"/>, or <paramref name="options"/> is <see langword="null"/>.
-	/// </exception>
-	public void HandleTextEntering(
+	private Func<int, bool>? GetTrackingCallback(TextDocument document)
+		=> _tracking.TryGetValue(document, out DocumentTracking? tracking)
+			? tracking.IsTrackedClosingText
+			: null;
+
+	/// <inheritdoc/>
+	public TextAutoClosingResult HandleTextEntering(
 		TextEditor editor,
 		TextCompositionEventArgs e,
 		TextAutoClosingOptions options,
-		Action<string>? onElementSkipped = null)
+		ITextEditTarget? editTarget = null)
 	{
 		ArgumentNullException.ThrowIfNull(editor);
 		ArgumentNullException.ThrowIfNull(e);
 		ArgumentNullException.ThrowIfNull(options);
 
-		if (!TryGetAction(editor.Document, editor.CaretOffset, e.Text, options, out TextAutoClosingAction action))
-			return;
+		// Another TextEntering subscriber (for example a completion list) already handled the input.
+		if (e.Handled)
+			return TextAutoClosingResult.None;
 
-		ApplyAction(editor, e, action, onElementSkipped);
+		// An editor without a document has nothing to resolve against or to insert into, so the input
+		// stays unhandled and normal text input applies.
+		if (editor.Document is not { } document)
+			return TextAutoClosingResult.None;
+
+		bool wrappingSelection = editor.SelectionLength > 0;
+
+		if (!TextAutoClosingResolver.TryResolveAction(
+			new TextAutoClosingRequest(
+				new TextDocumentSnapshot(document),
+				editor.CaretOffset,
+				e.Text,
+				options)
+			{
+				IsWrappingSelection = wrappingSelection,
+				IsTrackedClosingText = GetTrackingCallback(document)
+			},
+			out TextAutoClosingAction action))
+		{
+			return TextAutoClosingResult.None;
+		}
+
+		return wrappingSelection
+			? ApplySelectionAction(editor, e, action, editTarget)
+			: ApplyAction(editor, e, action, editTarget);
 	}
 
-	private static void ApplyAction(
-		TextEditor editor,
-		TextCompositionEventArgs e,
-		TextAutoClosingAction action,
-		Action<string>? onElementSkipped)
+	/// <inheritdoc/>
+	public bool HandleBackspace(TextEditor editor, KeyEventArgs e, TextAutoClosingOptions options, ITextEditTarget? editTarget = null)
 	{
-		switch (action.Kind)
+		ArgumentNullException.ThrowIfNull(editor);
+		ArgumentNullException.ThrowIfNull(e);
+		ArgumentNullException.ThrowIfNull(options);
+
+		if (e.Handled
+			|| e.Key != Key.Back
+			|| (e.KeyboardDevice.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) != 0)
 		{
-			case TextAutoClosingActionKind.InsertClosingElement:
-				editor.SelectedText += action.Element;
-				editor.CaretOffset -= action.Element.Length;
-
-				editor.SelectionStart = editor.CaretOffset;
-				editor.SelectionLength = 0;
-
-				break;
-
-			case TextAutoClosingActionKind.SkipExistingClosingElement:
-				editor.CaretOffset += action.Element.Length;
-
-				e.Handled = true;
-				onElementSkipped?.Invoke(action.Element);
-
-				break;
+			return false;
 		}
+
+		// An active selection is deleted by the editor's own Backspace handling; resolving a pair around
+		// the selection's end would delete text outside the selection.
+		if (editor.SelectionLength > 0)
+			return false;
+
+		// An editor without a document has no pair to delete; the editor's own Backspace applies.
+		if (editor.Document is not { } document)
+			return false;
+
+		int caretOffset = document.ClampOffset(editor.CaretOffset);
+
+		// Delete provenance also governs the pair deletion: with Auto, only a closing text this service
+		// inserted is removed together with its opening token.
+		if (!TextAutoClosingResolver.TryResolvePairDeletion(
+			new TextDocumentSnapshot(document),
+			caretOffset,
+			options,
+			GetTrackingCallback(document),
+			out TextAutoClosingPair? pair))
+		{
+			return false;
+		}
+
+		int deleteStart = caretOffset - pair.Open.Length;
+		int deleteLength = pair.Open.Length + pair.Close.Length;
+
+		if (!IsRangeEditable(editor, deleteStart, deleteLength))
+			return false;
+
+		// The whole pair travels as one edit, so a single undo restores it.
+		TextEditorEditOperations.ApplyOperations(
+			editor,
+			[new TextEditOperation(deleteStart, deleteStart + deleteLength, string.Empty, 0)],
+			editTarget);
+
+		editor.Select(deleteStart, 0);
+
+		e.Handled = true;
+		return true;
 	}
 
 	/// <summary>
-	/// Resolves an action for a bracket pair with distinct opening and closing tokens.
+	/// Dispatches a resolved action to the matching applier, ignoring actions that carry no closing text.
 	/// </summary>
-	/// <remarks>
-	/// Typing either the closing token or the full closing string skips the configured closing string
-	/// when it is already at the caret.
-	/// </remarks>
-	private static bool TryGetBracketAction(
-		string inputText,
-		string openingToken,
-		string closingToken,
-		bool isEnabled,
-		string closingString,
-		TextDocument document,
-		int caretOffset,
-		out TextAutoClosingAction action)
+	/// <param name="editor">The editor receiving the change.</param>
+	/// <param name="e">The text-composition event being handled.</param>
+	/// <param name="action">The action to apply.</param>
+	/// <param name="editTarget">
+	/// The host-owned target to which an applied pair is routed, or <see langword="null"/> to edit the
+	/// editor's document directly.
+	/// </param>
+	/// <returns>The applied result; <see cref="TextAutoClosingResult.None"/> when the action cannot be applied.</returns>
+	private TextAutoClosingResult ApplyAction(
+		TextEditor editor,
+		TextCompositionEventArgs e,
+		TextAutoClosingAction action,
+		ITextEditTarget? editTarget)
 	{
-		action = default;
-
-		if (!isEnabled || string.IsNullOrEmpty(closingString))
-			return false;
-
-		if (inputText == openingToken)
+		// Actions without closing text are ignored: None matches no case, and a malformed action
+		// carries no text to apply.
+		switch (action.Kind)
 		{
-			action = TextAutoClosingAction.CreateInsert(closingString);
-			return true;
+			case TextAutoClosingActionKind.InsertClosingText:
+				if (action.ClosingText is string closingText)
+					return ApplyInsertAction(editor, e, closingText, editTarget);
+
+				break;
+
+			case TextAutoClosingActionKind.SkipExistingClosingText:
+				if (action.ClosingText is string skippedText)
+				{
+					ApplySkipAction(editor, e, skippedText);
+
+					return new TextAutoClosingResult(action, DidWrapSelection: false);
+				}
+
+				break;
 		}
 
-		if ((inputText == closingToken || inputText == closingString)
-			&& IsStringAtCaret(document, caretOffset, closingString))
+		return TextAutoClosingResult.None;
+	}
+
+	/// <summary>
+	/// Inserts the typed text and the closing text as one edit (through the supplied target when one is
+	/// provided), keeping the caret between them, so a single undo removes or restores the whole pair.
+	/// </summary>
+	private TextAutoClosingResult ApplyInsertAction(
+		TextEditor editor,
+		TextCompositionEventArgs e,
+		string closingText,
+		ITextEditTarget? editTarget)
+	{
+		int caretOffset = editor.CaretOffset;
+
+		// The editor refuses edits inside a read-only section; let normal text input apply the same
+		// policy instead of inserting the pair through a direct document edit.
+		if (!editor.TextArea.ReadOnlySectionProvider.CanInsert(caretOffset))
+			return TextAutoClosingResult.None;
+
+		// The typed text and the closing text are applied as one edit, so a single undo removes the pair.
+		TextEditorEditOperations.ApplyOperations(
+			editor,
+			[new TextEditOperation(caretOffset, caretOffset, e.Text + closingText, 0)],
+			editTarget);
+
+		int documentLength = editor.Document.TextLength;
+		int caretAfterPair = Math.Min(caretOffset + e.Text.Length, documentLength);
+
+		editor.Select(caretAfterPair, 0);
+
+		// The inserted closing text is tracked so the default provenance modes can recognize it later.
+		TrackInsertedClosingText(editor.Document, caretAfterPair);
+
+		e.Handled = true;
+
+		return new TextAutoClosingResult(
+			TextAutoClosingAction.CreateInsert(closingText), DidWrapSelection: false);
+	}
+
+	/// <summary>
+	/// Moves the caret past existing closing text and marks the event handled.
+	/// </summary>
+	/// <param name="editor">The editor receiving the skip.</param>
+	/// <param name="e">The text-composition event being handled.</param>
+	/// <param name="skippedText">The existing closing text to move past.</param>
+	private static void ApplySkipAction(
+		TextEditor editor,
+		TextCompositionEventArgs e,
+		string skippedText)
+	{
+		editor.CaretOffset += skippedText.Length;
+		e.Handled = true;
+	}
+
+	/// <summary>
+	/// Applies an insert action to a non-empty selection by wrapping the selection in the typed opening token
+	/// and the closing text, keeping the enclosed text selected.
+	/// </summary>
+	/// <remarks>
+	/// A whitespace-only selection or a selection that only repeats the typed quote is replaced through
+	/// normal text input instead of being wrapped, matching the convention of mainstream desktop editors.
+	/// Typing over
+	/// a selection replaces it, so a skip action is ignored and normal text input applies instead.
+	/// A selection consisting of other quote characters is still wrapped; hosts that follow editors which
+	/// disable wrapping for cross-quote cases must apply that policy in their own selection handling.
+	/// Wrapping replaces the whole selection, so it is applied only when the editor's read-only section
+	/// provider allows replacing the whole range; otherwise normal text input handles the input under the
+	/// same read-only policy as any other typing. The wrap travels as one edit (through the supplied
+	/// target when one is provided), so a single undo removes it.
+	/// </remarks>
+	private TextAutoClosingResult ApplySelectionAction(
+		TextEditor editor,
+		TextCompositionEventArgs e,
+		TextAutoClosingAction action,
+		ITextEditTarget? editTarget)
+	{
+		if (action.Kind != TextAutoClosingActionKind.InsertClosingText || action.ClosingText is not string closingText)
+			return TextAutoClosingResult.None;
+
+		string selectedText = editor.SelectedText;
+
+		if (string.IsNullOrWhiteSpace(selectedText)
+			|| (string.Equals(selectedText, e.Text, StringComparison.Ordinal)
+				&& string.Equals(closingText, e.Text, StringComparison.Ordinal)))
 		{
-			action = TextAutoClosingAction.CreateSkip(closingString);
-			return true;
+			return TextAutoClosingResult.None;
+		}
+
+		int selectionStart = editor.SelectionStart;
+		int selectionLength = editor.SelectionLength;
+
+		if (!IsRangeEditable(editor, selectionStart, selectionLength))
+			return TextAutoClosingResult.None;
+
+		// The enclosed text stays selected, so consecutive wraps nest around it.
+		TextEditorEditOperations.ApplyOperations(
+			editor,
+			[new TextEditOperation(selectionStart, selectionStart + selectionLength, e.Text + selectedText + closingText, 0)],
+			editTarget);
+
+		int documentLength = editor.Document.TextLength;
+		int wrappedStart = Math.Min(selectionStart + e.Text.Length, documentLength);
+		int wrappedLength = Math.Min(selectedText.Length, documentLength - wrappedStart);
+
+		editor.Select(wrappedStart, wrappedLength);
+
+		// The inserted closing text is tracked so the default provenance modes can recognize it later.
+		TrackInsertedClosingText(editor.Document, wrappedStart + wrappedLength);
+
+		e.Handled = true;
+
+		return new TextAutoClosingResult(
+			TextAutoClosingAction.CreateInsert(closingText), DidWrapSelection: true);
+	}
+
+	/// <summary>
+	/// Records the start offset of a closing text this service inserted.
+	/// </summary>
+	private void TrackInsertedClosingText(TextDocument document, int offset)
+	{
+		DocumentTracking tracking = _tracking.GetValue(document, static _ => new DocumentTracking());
+
+		// Deleted anchors track nothing anymore, so the list is pruned as it is extended.
+		tracking.Anchors.RemoveAll(static anchor => anchor.IsDeleted);
+
+		// The anchor marks the start of the inserted closing text and must follow it across edits. The
+		// default movement moves an anchor behind text inserted exactly at its position, which is where
+		// the caret sits while the user types inside the pair; a BeforeInsertion anchor would stay in
+		// front of the typed text and stop marking the closing text.
+		TextAnchor anchor = document.CreateAnchor(offset);
+		anchor.MovementType = AnchorMovementType.Default;
+
+		tracking.Anchors.Add(anchor);
+	}
+
+	/// <summary>
+	/// Determines whether the read-only section provider allows replacing the whole range, so pair
+	/// deletion and selection wrapping never apply to a partially or fully read-only range.
+	/// </summary>
+	private static bool IsRangeEditable(TextEditor editor, int startOffset, int length)
+	{
+		ISegment rangeSegment = new TextSegment
+		{
+			StartOffset = startOffset,
+			EndOffset = startOffset + length
+		};
+
+		foreach (ISegment deletable in editor.TextArea.ReadOnlySectionProvider.GetDeletableSegments(rangeSegment))
+		{
+			if (deletable.Offset == startOffset && deletable.EndOffset == startOffset + length)
+				return true;
 		}
 
 		return false;
 	}
 
 	/// <summary>
-	/// Resolves an action for a quote-like token with the same opening and closing character.
+	/// The per-document tracking state of the closing texts this service inserted: the anchors and the
+	/// resolver callback bound to them.
 	/// </summary>
-	/// <remarks>
-	/// A token already at the caret is skipped. When the preceding character is the same token, the
-	/// typed character is left to normal input so runs such as <c>"""</c> can be built.
-	/// Quote auto-closing is suppressed after a letter, digit, or underscore; backticks bypass that check.
-	/// </remarks>
-	private static bool TryGetQuoteAction(
-		string inputText,
-		string token,
-		bool isEnabled,
-		string closingString,
-		TextDocument document,
-		int caretOffset,
-		bool suppressAfterWordCharacter,
-		out TextAutoClosingAction action)
+	private sealed class DocumentTracking
 	{
-		action = default;
-
-		if (!isEnabled || string.IsNullOrEmpty(closingString))
-			return false;
-
-		if (inputText != token)
-			return false;
-
-		// Skip an existing quote-like token at the caret instead of inserting another one.
-		if (IsCharAtCaret(document, caretOffset, token))
+		/// <summary>
+		/// Initializes the tracking state; the resolver callback is created once here, so passing it on
+		/// the typing path allocates nothing beyond this state.
+		/// </summary>
+		public DocumentTracking()
 		{
-			action = TextAutoClosingAction.CreateSkip(token);
-			return true;
+			Anchors = [];
+			IsTrackedClosingText = IsTrackedAt;
 		}
 
-		// Let normal text input add a token when the same token immediately precedes the caret.
-		if (IsCharBeforeCaret(document, caretOffset, token))
-			return false;
+		/// <summary>
+		/// Gets the anchors of the closing texts this service inserted, in insertion order.
+		/// </summary>
+		public List<TextAnchor> Anchors { get; }
 
-		// Quotes do not auto-close after a letter, digit, or underscore; backticks bypass this check.
-		if (suppressAfterWordCharacter && IsWordCharacterBeforeCaret(document, caretOffset))
-			return false;
+		/// <summary>
+		/// Gets the resolver callback that reports whether a recorded closing text starts at the
+		/// supplied offset and is still present.
+		/// </summary>
+		public Func<int, bool> IsTrackedClosingText { get; }
 
-		action = TextAutoClosingAction.CreateInsert(closingString);
-		return true;
-	}
-
-	private static bool IsCharAtCaret(TextDocument document, int caretOffset, string token)
-	{
-		return caretOffset < document.TextLength
-			&& !string.IsNullOrEmpty(token)
-			&& document.GetCharAt(caretOffset) == token[0];
-	}
-
-	private static bool IsStringAtCaret(TextDocument document, int caretOffset, string token)
-	{
-		if (string.IsNullOrEmpty(token) || caretOffset + token.Length > document.TextLength)
-			return false;
-
-		for (int i = 0; i < token.Length; i++)
+		/// <summary>
+		/// Determines whether a recorded closing text starts at the supplied offset and is still present,
+		/// so the default provenance modes recognize it.
+		/// </summary>
+		/// <remarks>
+		/// The list is walked from the most recent insertion backwards, because a probe almost always
+		/// targets the closing text that was just inserted.
+		/// </remarks>
+		private bool IsTrackedAt(int offset)
 		{
-			if (document.GetCharAt(caretOffset + i) != token[i])
-				return false;
+			for (int index = Anchors.Count - 1; index >= 0; index--)
+			{
+				TextAnchor anchor = Anchors[index];
+
+				if (!anchor.IsDeleted && anchor.Offset == offset)
+					return true;
+			}
+
+			return false;
 		}
-
-		return true;
 	}
-
-	private static bool IsCharBeforeCaret(TextDocument document, int caretOffset, string token)
-	{
-		return caretOffset > 0
-			&& !string.IsNullOrEmpty(token)
-			&& document.GetCharAt(caretOffset - 1) == token[0];
-	}
-
-	private static bool IsWordCharacterBeforeCaret(TextDocument document, int caretOffset)
-		=> caretOffset > 0 && IsWordCharacter(document.GetCharAt(caretOffset - 1));
-
-	private static bool IsWordCharacter(char c)
-		=> char.IsLetterOrDigit(c) || c == '_';
-}
-
-/// <summary>
-/// Configures bracket, quote, and backtick auto-closing and overtyping.
-/// </summary>
-/// <remarks>
-/// An empty closing string disables auto-closing and overtyping for its pair.
-/// Closing strings are not validated against their opening tokens,
-/// so hosts must provide compatible pairs.
-/// </remarks>
-/// <param name="AutoClosingParentheses">Whether to auto-close and overtype parentheses.</param>
-/// <param name="AutoClosingBraces">Whether to auto-close and overtype braces.</param>
-/// <param name="AutoClosingBrackets">Whether to auto-close and overtype brackets.</param>
-/// <param name="AutoClosingDoubleQuotes">Whether to auto-close and overtype double quotes.</param>
-/// <param name="AutoClosingSingleQuotes">Whether to auto-close and overtype single quotes.</param>
-/// <param name="AutoClosingBackticks">Whether to auto-close and overtype backticks.</param>
-/// <param name="ParenthesesClosingString">The closing text to insert or skip for parentheses.</param>
-/// <param name="BracesClosingString">The closing text to insert or skip for braces.</param>
-/// <param name="BracketsClosingString">The closing text to insert or skip for brackets.</param>
-/// <param name="DoubleQuotesClosingString">The closing text inserted for double quotes.</param>
-/// <param name="SingleQuotesClosingString">The closing text inserted for single quotes.</param>
-/// <param name="BackticksClosingString">The closing text inserted for backticks.</param>
-public sealed record TextAutoClosingOptions(
-	bool AutoClosingParentheses,
-	bool AutoClosingBraces,
-	bool AutoClosingBrackets,
-	bool AutoClosingDoubleQuotes,
-	bool AutoClosingSingleQuotes,
-	bool AutoClosingBackticks,
-	string ParenthesesClosingString,
-	string BracesClosingString,
-	string BracketsClosingString,
-	string DoubleQuotesClosingString,
-	string SingleQuotesClosingString,
-	string BackticksClosingString);
-
-/// <summary>
-/// Describes an auto-closing action.
-/// </summary>
-/// <param name="Kind">The kind of auto-closing action.</param>
-/// <param name="Element">The text to insert or skip.</param>
-public readonly record struct TextAutoClosingAction(TextAutoClosingActionKind Kind, string Element)
-{
-	/// <summary>
-	/// Creates an insert action for the specified closing text.
-	/// </summary>
-	/// <param name="element">The text to insert.</param>
-	/// <returns>The insert action.</returns>
-	public static TextAutoClosingAction CreateInsert(string element)
-		=> new(TextAutoClosingActionKind.InsertClosingElement, element);
-
-	/// <summary>
-	/// Creates a skip action for the specified closing text.
-	/// </summary>
-	/// <param name="element">The text to skip.</param>
-	/// <returns>The skip action.</returns>
-	public static TextAutoClosingAction CreateSkip(string element)
-		=> new(TextAutoClosingActionKind.SkipExistingClosingElement, element);
-}
-
-/// <summary>
-/// Identifies the kind of auto-closing action to apply.
-/// </summary>
-public enum TextAutoClosingActionKind
-{
-	/// <summary>
-	/// Inserts the closing element.
-	/// </summary>
-	InsertClosingElement,
-
-	/// <summary>
-	/// Skips an existing closing element.
-	/// </summary>
-	SkipExistingClosingElement
 }

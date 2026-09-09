@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerResponseParserTests
+public sealed partial class LuaLanguageServerResponseParserTests
 {
 	private static CompletionItemPayload CreateCompletionItem(string label, int kind, string? detail, string? documentation, string? insertText = null)
 		=> DeserializeCompletionItemPayload(new Dictionary<string, object?>
@@ -18,16 +18,6 @@ public partial class LuaLanguageServerResponseParserTests
 	private static CompletionItemPayload DeserializeCompletionItemPayload(object payload)
 		=> JsonSerializer.Deserialize<CompletionItemPayload>(JsonSerializer.Serialize(payload))
 			?? throw new InvalidOperationException("Failed to deserialize the Lua completion-item test payload.");
-
-	private static CompletionResponse? DeserializeCompletionResponse(object payload, CompletionResponseJsonConverter? converter = null)
-	{
-		var options = new JsonSerializerOptions();
-
-		if (converter is not null)
-			options.Converters.Add(converter);
-
-		return JsonSerializer.Deserialize<CompletionResponse>(JsonSerializer.Serialize(payload), options);
-	}
 
 	private static HoverResponse DeserializeHoverResponse(object payload)
 		=> JsonSerializer.Deserialize<HoverResponse>(JsonSerializer.Serialize(payload))
@@ -46,6 +36,12 @@ public partial class LuaLanguageServerResponseParserTests
 		=> JsonSerializer.Deserialize<DefinitionResponse>(JsonSerializer.Serialize(payload))
 			?? throw new InvalidOperationException("Failed to deserialize the definition response test payload.");
 
-	private static ReferenceResponse[]? DeserializeReferenceResponse(object payload)
-		=> JsonSerializer.Deserialize<ReferenceResponse[]>(JsonSerializer.Serialize(payload));
+	private static DocumentSymbolsResponse? DeserializeDocumentSymbolsResponse(object payload)
+		=> JsonSerializer.Deserialize<DocumentSymbolsResponse>(JsonSerializer.Serialize(payload));
+
+	private static CodeActionsResponse? DeserializeCodeActionsResponse(object payload)
+		=> JsonSerializer.Deserialize<CodeActionsResponse>(JsonSerializer.Serialize(payload));
+
+	private static ReferenceLocationPayload[]? DeserializeReferenceLocations(object payload)
+		=> JsonSerializer.Deserialize<ReferenceLocationPayload[]>(JsonSerializer.Serialize(payload));
 }

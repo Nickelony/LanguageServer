@@ -25,7 +25,7 @@ public sealed class JsonSchemaVocabularyIndex
 	/// <param name="properties">The schema-wide property vocabulary.</param>
 	/// <param name="constants">The schema-derived constant string values.</param>
 	/// <exception cref="ArgumentNullException">
-	/// <paramref name="properties"/> or <paramref name="constants"/> is null.
+	/// <paramref name="properties"/> or <paramref name="constants"/> is <see langword="null"/>.
 	/// </exception>
 	public JsonSchemaVocabularyIndex(IReadOnlyList<JsonSchemaVocabularyPropertyDescriptor> properties, IReadOnlyList<string> constants)
 	{

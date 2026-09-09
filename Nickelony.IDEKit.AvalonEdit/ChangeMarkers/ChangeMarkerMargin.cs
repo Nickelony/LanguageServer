@@ -1,6 +1,7 @@
-using ICSharpCode.AvalonEdit.Document;
-using ICSharpCode.AvalonEdit.Editing;
 using ICSharpCode.AvalonEdit.Rendering;
+using Nickelony.IDEKit.AvalonEdit.Rendering;
+using Nickelony.IDEKit.Core.LineStatus;
+using Nickelony.IDEKit.Core.Notifications;
 using Nickelony.IDEKit.Infrastructure;
 using System.Windows;
 using System.Windows.Media;
@@ -8,36 +9,67 @@ using System.Windows.Media;
 namespace Nickelony.IDEKit.AvalonEdit.ChangeMarkers;
 
 /// <summary>
-/// Displays a marker beside each visible document line returned by an <see cref="IChangeMarkerSource"/>.
+/// Displays a marker beside each visible document line returned by an <see cref="ILineStatusSource"/>.
 /// </summary>
 /// <remarks>
-/// The source is queried during rendering and is not monitored for changes.
-/// Hosts must invalidate the margin when the source's marked lines change.
+/// <para>
+/// The source is queried during rendering. A source that implements
+/// <see cref="IChangeNotificationSource"/> is followed while the margin is connected to a text view;
+/// a source without notifications requires the host to invalidate the margin when its marked lines change.
+/// </para>
+/// <para>
+/// The marker and the reserved width scale with the margin's font size.
+/// </para>
+/// <para>
+/// The bar drawing is default sample behavior: a derived margin can override
+/// <see cref="LineStatusMarginBase.DrawMarker"/> for a different marker shape, or derive from
+/// <see cref="LineStatusMarginBase"/> directly for a different marker model.
+/// </para>
 /// </remarks>
-public sealed class ChangeMarkerMargin : AbstractMargin
+public class ChangeMarkerMargin : LineStatusMarginBase
 {
-	private static SolidColorBrush s_markerBrush = BrushHelpers.CreateFrozenBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
+	private static readonly SolidColorBrush s_defaultMarkerBrush = BrushHelpers.CreateFrozenBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
 
-	private readonly IChangeMarkerSource _markerSource;
+	static ChangeMarkerMargin()
+	{
+		// A 4-DIP bar matches the width familiar from diff views, instead of the
+		// 16-DIP reserved width that the base class uses for icon margins.
+		MarginWidthProperty.OverrideMetadata(
+			typeof(ChangeMarkerMargin),
+			new FrameworkPropertyMetadata(4.0, FrameworkPropertyMetadataOptions.AffectsMeasure));
+	}
+
+	private readonly ILineStatusSource _markerSource;
 
 	/// <summary>
-	/// Gets or sets the width reserved for change markers.
-	/// The value is read during measurement. Changing it does not invalidate the margin's layout.
+	/// Identifies the <see cref="MarkerBrush"/> dependency property.
 	/// </summary>
-	public static double MarginWidth { get; set; } = 4.0;
+	public static readonly DependencyProperty MarkerBrushProperty = DependencyProperty.Register(
+		nameof(MarkerBrush),
+		typeof(Brush),
+		typeof(ChangeMarkerMargin),
+		new FrameworkPropertyMetadata(s_defaultMarkerBrush, FrameworkPropertyMetadataOptions.AffectsRender),
+		ValidateMarkerBrush);
 
 	/// <summary>
 	/// Gets or sets the brush used to draw change markers.
-	/// The assigned brush is used by subsequent renders.
 	/// </summary>
-	/// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
-	public static SolidColorBrush MarkerBrush
+	/// <remarks>
+	/// The default is a sample value chosen to be visible in common themes; hosts should set it to
+	/// match their own theme.
+	/// </remarks>
+	/// <exception cref="ArgumentNullException">The assigned brush is <see langword="null"/>.</exception>
+	/// <exception cref="ArgumentException">
+	/// The assigned value is not a <see cref="Brush"/>; the property's validation callback rejects it and
+	/// the setter throws.
+	/// </exception>
+	public Brush MarkerBrush
 	{
-		get => s_markerBrush;
+		get => (Brush)GetValue(MarkerBrushProperty);
 		set
 		{
 			ArgumentNullException.ThrowIfNull(value);
-			s_markerBrush = value;
+			SetValue(MarkerBrushProperty, value);
 		}
 	}
 
@@ -46,76 +78,30 @@ public sealed class ChangeMarkerMargin : AbstractMargin
 	/// </summary>
 	/// <param name="markerSource">The source whose marked lines are rendered.</param>
 	/// <exception cref="ArgumentNullException"><paramref name="markerSource"/> is <see langword="null"/>.</exception>
-	public ChangeMarkerMargin(IChangeMarkerSource markerSource)
+	public ChangeMarkerMargin(ILineStatusSource markerSource)
 	{
 		ArgumentNullException.ThrowIfNull(markerSource);
 		_markerSource = markerSource;
+
+		if (markerSource is IChangeNotificationSource notifyingSource)
+			SetNotifyingSource(notifyingSource);
 	}
 
 	/// <inheritdoc/>
-	protected override void OnTextViewChanged(TextView oldTextView, TextView newTextView)
-	{
-		if (oldTextView is not null)
-		{
-			oldTextView.VisualLinesChanged -= TextView_VisualLinesChanged;
-			oldTextView.ScrollOffsetChanged -= TextView_ScrollOffsetChanged;
-		}
-
-		base.OnTextViewChanged(oldTextView, newTextView);
-
-		if (newTextView is not null)
-		{
-			newTextView.VisualLinesChanged += TextView_VisualLinesChanged;
-			newTextView.ScrollOffsetChanged += TextView_ScrollOffsetChanged;
-		}
-
-		InvalidateVisual();
-	}
+	protected override IReadOnlyList<int> GetMarkedLineNumbers()
+		=> _markerSource.GetMarkedLineNumbers();
 
 	/// <inheritdoc/>
-	protected override Size MeasureOverride(Size availableSize)
-		=> new(MarginWidth, 0.0);
-
-	/// <inheritdoc/>
-	protected override void OnRender(DrawingContext drawingContext)
+	protected internal override void DrawMarker(DrawingContext drawingContext, VisualLine visualLine, double visualTop)
 	{
-		TextView? textView = TextView;
+		double markerWidth = GetEffectiveMarginWidth();
 
-		if (textView is null || !textView.VisualLinesValid)
-			return;
-
-		HashSet<int> markedLineNumbers = CollectMarkedLineNumbers();
-
-		if (markedLineNumbers.Count == 0)
-			return;
-
-		double markerWidth = MarginWidth;
-
-		foreach (VisualLine line in textView.VisualLines)
-		{
-			if (!markedLineNumbers.Contains(line.FirstDocumentLine.LineNumber))
-				continue;
-
-			double top = line.GetTextLineVisualYPosition(line.TextLines[0], VisualYPosition.TextTop)
-				- textView.VerticalOffset;
-
-			drawingContext.DrawRectangle(s_markerBrush, null, new Rect(0.0, top, markerWidth, line.Height));
-		}
+		drawingContext.DrawRectangle(MarkerBrush, null, new Rect(0.0, visualTop, markerWidth, visualLine.Height));
 	}
 
-	private HashSet<int> CollectMarkedLineNumbers()
-	{
-		var lineNumbers = new HashSet<int>();
-
-		foreach (DocumentLine line in _markerSource.GetMarkedLines())
-			lineNumbers.Add(line.LineNumber);
-
-		return lineNumbers;
-	}
-
-	private void TextView_VisualLinesChanged(object? sender, EventArgs e)
-		=> InvalidateVisual();
-
-	private void TextView_ScrollOffsetChanged(object? sender, EventArgs e)
-		=> InvalidateVisual();
+	/// <summary>
+	/// Rejects <see langword="null"/> so XAML and <c>SetValue</c> assignments cannot crash the render pass.
+	/// </summary>
+	private static bool ValidateMarkerBrush(object value)
+		=> value is Brush;
 }

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Nickelony.LanguageServer.Provider</RootNamespace>
+    <AssemblyName>Nickelony.LanguageServer.Provider</AssemblyName>
+    <PackageId>Nickelony.LanguageServer.Provider</PackageId>
+    <Description>Language-neutral provider framework for the Nickelony Language Server family: lifecycle, document synchronization, workspace watching, and request machinery for building language-server providers.</Description>
+    <PackageTags>language-server;lsp;editor;intellisense;nickelony</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+    <!-- CA1848 ("use LoggerMessage delegates") is deliberately not enforced for this package: messages go through
+         the ILogger extension methods for readability and low call-site churn, and they are low-frequency lifecycle
+         and diagnostic messages rather than hot-path work. This follows the family logging policy in
+         CODE_STYLE_GUIDELINES.md; hot-path migration to LoggerMessage remains possible when a measurement justifies it. -->
+    <NoWarn>$(NoWarn);CA1848</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nickelony.LanguageServer.Abstractions\Nickelony.LanguageServer.Abstractions.csproj" />
+    <ProjectReference Include="..\Nickelony.LanguageServer.Client\Nickelony.LanguageServer.Client.csproj" />
+    <ProjectReference Include="..\Nickelony.IDEKit.IntelliSense\Nickelony.IDEKit.IntelliSense.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Icon\LanguageServer.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

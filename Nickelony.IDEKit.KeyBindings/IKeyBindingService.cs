@@ -6,70 +6,61 @@ namespace Nickelony.IDEKit.KeyBindings;
 /// Provides runtime key binding lookup, display text, validation, mutation operations,
 /// and a <see cref="BindingsChanged"/> notification.
 /// </summary>
+/// <typeparam name="TCommandId">The command identity type.</typeparam>
 public interface IKeyBindingService<TCommandId> : IDisposable
 	where TCommandId : notnull
 {
 	/// <summary>
-	/// Raised after the runtime maps are rebuilt by an apply, clear, or reset operation.
-	/// Apply and clear raise this event only after the persistence callback reports success;
-	/// reset and reset-all invoke the callback but do not inspect its return value.
-	/// Consumers can use this notification to refresh command presentation.
+	/// Raised after the runtime maps are rebuilt by a reset or reset-all operation.
 	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Both operations invoke the persistence callback but do not inspect its return value.
+	/// </para>
+	/// <para>
+	/// Consumers can use this notification to refresh command presentation.
+	/// </para>
+	/// </remarks>
 	event EventHandler? BindingsChanged;
 
 	/// <summary>
 	/// Looks up the <typeparamref name="TCommandId"/> currently bound to a key combo.
-	/// Returns <see langword="false"/> when no command is bound.
-	/// Each combo in the published runtime maps identifies at most one command.
 	/// </summary>
+	/// <remarks>Each combo in the published runtime maps identifies at most one command.</remarks>
+	/// <param name="shortcut">The key combo to look up.</param>
+	/// <param name="command">The command bound to the combo when the method returns <see langword="true"/>; otherwise, the <see langword="default"/> command value.</param>
+	/// <returns><see langword="true"/> when the combo is bound to a command; otherwise, <see langword="false"/>.</returns>
 	bool TryGetCommand(KeyCombo shortcut, [NotNullWhen(true)] out TCommandId? command);
 
 	/// <summary>
-	/// Returns the current bindings for a command, or an empty list when
-	/// the command has no bindings (explicitly unbound) or is not catalogued.
+	/// Returns the current bindings for a command.
 	/// </summary>
+	/// <param name="command">The command whose current bindings are returned.</param>
+	/// <returns>The current bindings for the command; an empty list when the command has no bindings (explicitly unbound) or is not cataloged.</returns>
 	IReadOnlyList<KeyCombo> GetBindings(TCommandId command);
 
 	/// <summary>
 	/// Returns the display text for a command's current bindings.
-	/// Multiple bindings are joined with <c> / </c>. When the command has no bindings,
-	/// returns <paramref name="fallbackDisplayText"/>.
 	/// </summary>
+	/// <remarks>Multiple bindings are joined with <c> / </c>.</remarks>
+	/// <param name="command">The command whose display text is returned.</param>
+	/// <param name="fallbackDisplayText">The text returned when the command has no bindings.</param>
+	/// <returns>The display text for the command's bindings, or <paramref name="fallbackDisplayText"/> when the command has no bindings.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="fallbackDisplayText"/> is <see langword="null"/>.</exception>
 	string GetDisplayText(TCommandId command, string fallbackDisplayText = "");
 
 	/// <summary>
-	/// Validates a proposed binding set for a command without mutating state. The result
-	/// accounts for command remapping policy, repeated combos within the set, and conflicts
+	/// Validates a proposed binding set for a command without mutating state.
+	/// </summary>
+	/// <remarks>
+	/// The result accounts for command remapping policy, repeated combos within the set, and conflicts
 	/// with the current bindings of other commands.
-	/// </summary>
+	/// </remarks>
+	/// <param name="command">The command the proposed binding set applies to.</param>
+	/// <param name="bindings">The proposed binding set to validate.</param>
+	/// <returns>The validation outcome for the proposed binding set.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="bindings"/> is <see langword="null"/>.</exception>
 	KeyBindingValidationResult Validate(TCommandId command, IReadOnlyList<KeyCombo> bindings);
-
-	/// <summary>
-	/// Tries to replace a command's current binding set. Reserved, non-remappable,
-	/// and duplicate proposals are rejected; conflicts are rejected unless replacement
-	/// is explicitly requested.
-	/// When <paramref name="replaceConflicts"/> is <see langword="true"/>, matching
-	/// bindings are removed from every entry in the persisted override snapshot, including
-	/// the target entry; catalog defaults are not modified. The persistence callback receives
-	/// the snapshot before the runtime maps are rebuilt.
-	/// </summary>
-	/// <remarks>
-	/// The override snapshot is persisted before the in-memory maps are updated; if
-	/// persistence fails, <see cref="KeyBindingValidationResult.Conflict"/> is returned
-	/// and the in-memory bindings remain unchanged.
-	/// </remarks>
-	/// <exception cref="InvalidOperationException">A replacement conflicts with a catalog default that cannot be removed.</exception>
-	KeyBindingValidationResult Apply(TCommandId command, IReadOnlyList<KeyCombo> bindings, bool replaceConflicts);
-
-	/// <summary>
-	/// Clears all bindings for a command, storing an explicit empty override.
-	/// Rejected for host-reserved or non-remappable commands.
-	/// </summary>
-	/// <remarks>
-	/// If the override snapshot cannot be persisted, <see cref="KeyBindingValidationResult.Conflict"/>
-	/// is returned and the in-memory bindings remain unchanged.
-	/// </remarks>
-	KeyBindingValidationResult Clear(TCommandId command);
 
 	/// <summary>
 	/// Removes the override for a single command, falling back to catalog defaults.
@@ -79,6 +70,7 @@ public interface IKeyBindingService<TCommandId> : IDisposable
 	/// in-memory override collection and runtime maps are updated and the change event is
 	/// raised even when the callback reports failure.
 	/// </remarks>
+	/// <param name="command">The command whose override is removed.</param>
 	void Reset(TCommandId command);
 
 	/// <summary>

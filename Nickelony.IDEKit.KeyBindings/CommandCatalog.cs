@@ -5,14 +5,14 @@ namespace Nickelony.IDEKit.KeyBindings;
 /// Each entry supplies a command identity, stable identifier, default bindings,
 /// and remapping policy.
 /// </summary>
+/// <typeparam name="TCommandId">The command identity type.</typeparam>
 public sealed class CommandCatalog<TCommandId>
 	where TCommandId : notnull
 {
 	private readonly Dictionary<TCommandId, CommandDescriptor<TCommandId>> _descriptorsByCommand;
-	private readonly Dictionary<string, CommandDescriptor<TCommandId>> _descriptorsById;
 
 	/// <summary>
-	/// Creates a catalog from the supplied descriptors.
+	/// Initializes a new instance of the <see cref="CommandCatalog{TCommandId}"/> class.
 	/// </summary>
 	/// <param name="descriptors">The descriptors to include in the catalog.</param>
 	/// <exception cref="ArgumentNullException"><paramref name="descriptors"/> is <see langword="null"/>.</exception>
@@ -24,78 +24,37 @@ public sealed class CommandCatalog<TCommandId>
 		ArgumentNullException.ThrowIfNull(descriptors);
 
 		_descriptorsByCommand = new Dictionary<TCommandId, CommandDescriptor<TCommandId>>(descriptors.Count);
-		_descriptorsById = new Dictionary<string, CommandDescriptor<TCommandId>>(descriptors.Count, StringComparer.Ordinal);
+		var serializedIds = new HashSet<string>(StringComparer.Ordinal);
 
 		foreach (CommandDescriptor<TCommandId> descriptor in descriptors)
 		{
 			if (EqualityComparer<TCommandId>.Default.Equals(descriptor.Command, default))
-				throw new ArgumentException("The default command value must not be catalogued.", nameof(descriptors));
+				throw new ArgumentException("The default command value must not be cataloged.", nameof(descriptors));
 
 			if (_descriptorsByCommand.ContainsKey(descriptor.Command))
 				throw new ArgumentException($"Duplicate command in catalog: {descriptor.Command}.", nameof(descriptors));
 
-			if (_descriptorsById.ContainsKey(descriptor.SerializedId))
+			if (!serializedIds.Add(descriptor.SerializedId))
 				throw new ArgumentException($"Duplicate serialized ID in catalog: {descriptor.SerializedId}.", nameof(descriptors));
 
 			_descriptorsByCommand[descriptor.Command] = descriptor;
-			_descriptorsById[descriptor.SerializedId] = descriptor;
 		}
 	}
 
 	/// <summary>
-	/// Gets all descriptors in the catalog. Enumeration order is not specified.
+	/// Gets all descriptors in the catalog.
 	/// </summary>
+	/// <remarks>Enumeration order is not specified.</remarks>
 	public IReadOnlyCollection<CommandDescriptor<TCommandId>> Descriptors => _descriptorsByCommand.Values;
 
 	/// <summary>
-	/// Gets a descriptor by command identity. Returns <see langword="null"/> when
-	/// the command is not catalogued.
+	/// Gets a descriptor by command identity.
 	/// </summary>
+	/// <param name="command">The command identity to resolve.</param>
+	/// <returns>The matching descriptor, or <see langword="null"/> when the command is not cataloged.</returns>
 	public CommandDescriptor<TCommandId>? TryGetDescriptor(TCommandId command)
 	{
 		_descriptorsByCommand.TryGetValue(command, out CommandDescriptor<TCommandId>? descriptor);
 		return descriptor;
-	}
-
-	/// <summary>
-	/// Gets a descriptor by its stable serialized identifier. Returns <see langword="null"/>
-	/// when the identifier is unknown.
-	/// </summary>
-	public CommandDescriptor<TCommandId>? TryGetDescriptorById(string serializedId)
-	{
-		ArgumentNullException.ThrowIfNull(serializedId);
-
-		_descriptorsById.TryGetValue(serializedId, out CommandDescriptor<TCommandId>? descriptor);
-		return descriptor;
-	}
-
-	/// <summary>
-	/// Finds duplicate use of a default key binding, including repeated bindings within
-	/// one descriptor. Returns one description for each duplicate, or an empty list when
-	/// no duplicates exist.
-	/// </summary>
-	public IReadOnlyList<string> ValidateNoDuplicateDefaults()
-	{
-		var violations = new List<string>();
-		var seen = new Dictionary<KeyCombo, TCommandId>();
-
-		foreach (CommandDescriptor<TCommandId> descriptor in _descriptorsByCommand.Values)
-		{
-			foreach (KeyCombo binding in descriptor.DefaultBindings)
-			{
-				if (seen.TryGetValue(binding, out TCommandId? existingCommand))
-				{
-					violations.Add(
-						$"Default key binding {binding.GetDisplayText()} is used by both " +
-						$"{descriptor.Command} and {existingCommand}.");
-				}
-				else
-				{
-					seen[binding] = descriptor.Command;
-				}
-			}
-		}
-
-		return violations;
 	}
 }

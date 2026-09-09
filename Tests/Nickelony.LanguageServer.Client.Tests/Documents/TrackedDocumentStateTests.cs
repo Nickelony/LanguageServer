@@ -1,91 +1,101 @@
 namespace Nickelony.LanguageServer.Client.Tests;
 
 [TestClass]
-public class TrackedDocumentStateTests
+public sealed class TrackedDocumentStateTests
 {
 	[TestMethod]
-	public void TrackedDocumentState_CreateSnapshot_CapturesCurrentDocumentState()
+	public void CreateSnapshot_CapturesCurrentDocumentState()
 	{
-		var state = new TestTrackedDocumentState(
-			@"C:\Workspace\Scripts\start.lua",
-			"file:///C:/Workspace/Scripts/start.lua",
+		var state = new TestTrackedDocumentState(new TrackedDocumentInitialState(
+			@"C:\Workspace\Scripts\start.ext",
+			"file:///C:/Workspace/Scripts/start.ext",
 			"return 1",
-			version: 4,
-			isOpen: true,
-			openReferenceCount: 1,
-			requestReferenceCount: 2,
-			lastAccessStamp: 3);
+			Version: 4,
+			IsOpen: true,
+			OpenReferenceCount: 1,
+			RequestReferenceCount: 2,
+			LastAccessStamp: 3));
 
 		DocumentSnapshot initialSnapshot = state.CreateSnapshot();
 
-		state.Rename(@"C:\Workspace\Scripts\renamed.lua", "file:///C:/Workspace/Scripts/renamed.lua");
+		state.Rename(@"C:\Workspace\Scripts\renamed.ext", "file:///C:/Workspace/Scripts/renamed.ext");
 		string previousContent = state.Update("return 2");
 		state.Close();
 
 		DocumentSnapshot updatedSnapshot = state.CreateSnapshot();
 
-		Assert.AreEqual(@"C:\Workspace\Scripts\start.lua", initialSnapshot.FilePath);
-		Assert.AreEqual("file:///C:/Workspace/Scripts/start.lua", initialSnapshot.Uri);
+		Assert.AreEqual(@"C:\Workspace\Scripts\start.ext", initialSnapshot.FilePath);
+		Assert.AreEqual("file:///C:/Workspace/Scripts/start.ext", initialSnapshot.Uri);
 		Assert.AreEqual("return 1", initialSnapshot.Content);
 		Assert.AreEqual(4, initialSnapshot.Version);
 		Assert.AreEqual("return 1", previousContent);
-		Assert.AreEqual(@"C:\Workspace\Scripts\renamed.lua", updatedSnapshot.FilePath);
-		Assert.AreEqual("file:///C:/Workspace/Scripts/renamed.lua", updatedSnapshot.Uri);
+		Assert.AreEqual(@"C:\Workspace\Scripts\renamed.ext", updatedSnapshot.FilePath);
+		Assert.AreEqual("file:///C:/Workspace/Scripts/renamed.ext", updatedSnapshot.Uri);
 		Assert.AreEqual("return 2", updatedSnapshot.Content);
 		Assert.AreEqual(5, updatedSnapshot.Version);
 		Assert.IsFalse(state.IsOpen);
 	}
 
 	[TestMethod]
-	public async Task TrackedDocumentState_CreateSnapshot_DoesNotMixPathAndUriDuringConcurrentRename()
+	public async Task CreateSnapshot_DoesNotMixPathAndUriDuringConcurrentRename()
 	{
-		var state = new TestTrackedDocumentState(
-			@"C:\Workspace\Scripts\a.lua",
-			"file:///C:/Workspace/Scripts/a.lua",
+		var state = new TestTrackedDocumentState(new TrackedDocumentInitialState(
+			@"C:\Workspace\Scripts\a.ext",
+			"file:///C:/Workspace/Scripts/a.ext",
 			"return 'a'",
-			version: 1,
-			isOpen: true,
-			openReferenceCount: 0,
-			requestReferenceCount: 0,
-			lastAccessStamp: 0);
+			Version: 1,
+			IsOpen: true,
+			OpenReferenceCount: 0,
+			RequestReferenceCount: 0,
+			LastAccessStamp: 0));
 
 		var mismatchMessages = new List<string>();
-		using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+		int writerFinished = 0;
 
+		// Iteration-based stress loop instead of a wall-clock window so slow CI machines do not reduce coverage.
 		Task writerTask = Task.Run(() =>
 		{
-			while (!cancellationTokenSource.IsCancellationRequested)
+			for (int i = 0; i < 10_000; i++)
 			{
-				state.Rename(@"C:\Workspace\Scripts\a.lua", "file:///C:/Workspace/Scripts/a.lua");
+				state.Rename(@"C:\Workspace\Scripts\a.ext", "file:///C:/Workspace/Scripts/a.ext");
 				state.Update("return 'a'");
-				state.Rename(@"C:\Workspace\Scripts\b.lua", "file:///C:/Workspace/Scripts/b.lua");
+				state.Rename(@"C:\Workspace\Scripts\b.ext", "file:///C:/Workspace/Scripts/b.ext");
 				state.Update("return 'b'");
 			}
-		}, cancellationTokenSource.Token);
+
+			Volatile.Write(ref writerFinished, 1);
+		});
 
 		Task readerTask = Task.Run(() =>
 		{
-			while (!cancellationTokenSource.IsCancellationRequested)
+			while (Volatile.Read(ref writerFinished) == 0)
 			{
-				DocumentSnapshot snapshot = state.CreateSnapshot();
-
-				bool isA = string.Equals(snapshot.FilePath, @"C:\Workspace\Scripts\a.lua", StringComparison.Ordinal)
-					&& string.Equals(snapshot.Uri, "file:///C:/Workspace/Scripts/a.lua", StringComparison.Ordinal);
-
-				bool isB = string.Equals(snapshot.FilePath, @"C:\Workspace\Scripts\b.lua", StringComparison.Ordinal)
-					&& string.Equals(snapshot.Uri, "file:///C:/Workspace/Scripts/b.lua", StringComparison.Ordinal);
-
-				if (!isA && !isB)
-				{
-					lock (mismatchMessages)
-						mismatchMessages.Add(snapshot.FilePath + " | " + snapshot.Uri);
-				}
+				CheckSnapshotPairing(state, mismatchMessages);
 			}
-		}, cancellationTokenSource.Token);
+
+			CheckSnapshotPairing(state, mismatchMessages);
+		});
 
 		await Task.WhenAll(writerTask, readerTask).ConfigureAwait(false);
 
 		Assert.AreEqual(0, mismatchMessages.Count,
 			"Snapshots should keep each file path paired with its URI: " + string.Join(", ", mismatchMessages));
+	}
+
+	private static void CheckSnapshotPairing(TestTrackedDocumentState state, List<string> mismatchMessages)
+	{
+		DocumentSnapshot snapshot = state.CreateSnapshot();
+
+		bool isA = string.Equals(snapshot.FilePath, @"C:\Workspace\Scripts\a.ext", StringComparison.Ordinal)
+			&& string.Equals(snapshot.Uri, "file:///C:/Workspace/Scripts/a.ext", StringComparison.Ordinal);
+
+		bool isB = string.Equals(snapshot.FilePath, @"C:\Workspace\Scripts\b.ext", StringComparison.Ordinal)
+			&& string.Equals(snapshot.Uri, "file:///C:/Workspace/Scripts/b.ext", StringComparison.Ordinal);
+
+		if (!isA && !isB)
+		{
+			lock (mismatchMessages)
+				mismatchMessages.Add(snapshot.FilePath + " | " + snapshot.Uri);
+		}
 	}
 }

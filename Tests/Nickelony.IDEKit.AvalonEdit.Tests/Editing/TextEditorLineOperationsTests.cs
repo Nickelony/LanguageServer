@@ -2,116 +2,186 @@ using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using Nickelony.IDEKit.AvalonEdit.Editing;
 using Nickelony.IDEKit.Core.Text;
-using System.Text.RegularExpressions;
 
 namespace Nickelony.IDEKit.AvalonEdit.Tests;
 
-[TestClass]
+[STATestClass]
 public sealed class TextEditorLineOperationsTests
 {
 	[TestMethod]
-	public void TryReplaceFirstMatchingLine_ReplacesFirstMatchingLine()
+	public void SelectLine_SelectsContentExcludingTerminator()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("one\r\ntwo\r\nthree");
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-			bool replaced = editor.TryReplaceFirstMatchingLine(
-				lineText => lineText == "two" ? "2" : null,
-				scrollToLine: false);
+		editor.SelectLine(line);
 
-			Assert.IsTrue(replaced);
-			Assert.AreEqual("one\r\n2\r\nthree", editor.Text);
-		});
+		Assert.AreEqual(5, editor.SelectionStart);
+		Assert.AreEqual(3, editor.SelectionLength);
 	}
 
 	[TestMethod]
-	public void TryReplaceFirstMatchingLine_NoMatch_ReturnsFalseAndLeavesDocument()
+	public void ReplaceLine_ReplacesContentAndPreservesTerminator()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("one\r\ntwo");
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-			bool replaced = TextEditorLineOperations.TryReplaceFirstMatchingLine(
-				editor,
-				_ => null,
-				scrollToLine: false);
+		editor.ReplaceLine(line, "TWO");
 
-			Assert.IsFalse(replaced);
-			Assert.AreEqual("one\r\ntwo", editor.Text);
-		});
+		Assert.AreEqual("one\r\nTWO\r\nthree", editor.Text);
 	}
 
 	[TestMethod]
-	public void TryRenameInFirstMatchingLine_RenamesMatchingName()
+	public void ReplaceLine_SelectReplacementFalse_PlacesCaretAfterTheReplacement()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("Level = old\r\nother");
-			var regex = new Regex(@"^Level\s*=\s*");
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-			bool replaced = editor.TryRenameInFirstMatchingLine(
-				regex,
-				(lineText, pattern) => pattern.Replace(lineText, string.Empty).Trim(),
-				"old",
-				"new",
-				scrollToLine: false);
+		editor.ReplaceLine(line, "TWO");
 
-			Assert.IsTrue(replaced);
-			Assert.AreEqual("Level = new\r\nother", editor.Text);
-		});
+		Assert.AreEqual("one\r\nTWO\r\nthree", editor.Text);
+		Assert.AreEqual(0, editor.SelectionLength);
+		Assert.AreEqual(8, editor.CaretOffset);
 	}
 
 	[TestMethod]
-	public void TryReplaceFirstMatchingLine_WithWorkspaceTarget_DelegatesToTarget()
+	public void ReplaceLine_SelectReplacementTrue_KeepsReplacementSelected()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("one\r\ntwo");
-			var target = new RecordingTarget();
-			int contentChangedCalls = 0;
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-			bool replaced = editor.TryReplaceFirstMatchingLine(
-				lineText => lineText == "one" ? "1" : null,
-				scrollToLine: false,
-				workspaceEditTarget: target,
-				onContentChanged: () => contentChangedCalls++);
+		editor.ReplaceLine(line, "TWO", selectReplacement: true);
 
-			Assert.IsTrue(replaced);
-			Assert.AreEqual(1, target.ApplyCalls);
-			Assert.AreEqual(0, contentChangedCalls);
-		});
+		Assert.AreEqual("one\r\nTWO\r\nthree", editor.Text);
+		Assert.AreEqual(5, editor.SelectionStart);
+		Assert.AreEqual(3, editor.SelectionLength);
+		Assert.AreEqual(8, editor.CaretOffset);
 	}
 
 	[TestMethod]
-	public void TryReplaceFirstMatchingLine_WithoutWorkspaceTarget_NotifiesContentChanged()
+	public void ReplaceLine_MultiLineReplacement_PlacesCaretAfterReplacement()
 	{
-		STATestHelper.RunInSTA(() =>
-		{
-			var editor = CreateEditor("one\r\ntwo");
-			int contentChangedCalls = 0;
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-			bool replaced = editor.TryReplaceFirstMatchingLine(
-				lineText => lineText == "one" ? "1" : null,
-				scrollToLine: false,
-				onContentChanged: () => contentChangedCalls++);
+		editor.ReplaceLine(line, "A\r\nB");
 
-			Assert.IsTrue(replaced);
-			Assert.AreEqual(1, contentChangedCalls);
-			Assert.AreEqual("1\r\ntwo", editor.Text);
-		});
+		Assert.AreEqual("one\r\nA\r\nB\r\nthree", editor.Text);
+		Assert.AreEqual(0, editor.SelectionLength);
+		Assert.AreEqual(9, editor.CaretOffset);
 	}
 
-	private static TextEditor CreateEditor(string text)
-		=> new() { Document = new TextDocument(text) };
-
-	private sealed class RecordingTarget : ITextEditTarget
+	[TestMethod]
+	public void ReplaceLine_MultiLineReplacement_SelectReplacementTrue_KeepsSelection()
 	{
-		public int ApplyCalls { get; private set; }
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
 
-		public string Text => string.Empty;
+		editor.ReplaceLine(line, "A\r\nB", selectReplacement: true);
 
-		public void Apply(IReadOnlyList<TextEditOperation> operations)
-			=> ApplyCalls++;
+		Assert.AreEqual("one\r\nA\r\nB\r\nthree", editor.Text);
+		Assert.AreEqual(5, editor.SelectionStart);
+		Assert.AreEqual(4, editor.SelectionLength);
+	}
+
+	[TestMethod]
+	public void ReplaceContent_ReplacesWholeDocumentAndMovesCaretToEnd()
+	{
+		var editor = WPFTestHost.CreateEditor("one\r\ntwo");
+
+		editor.ReplaceContent("x");
+
+		Assert.AreEqual("x", editor.Text);
+		Assert.AreEqual(0, editor.SelectionLength);
+		Assert.AreEqual(1, editor.CaretOffset);
+	}
+
+	[TestMethod]
+	public void ReplaceLine_IdenticalText_LeavesUndoStackUntouched()
+	{
+		TextEditor editor = WPFTestHost.CreateEditor("one\r\ntwo");
+		editor.Document.UndoStack.ClearAll();
+
+		editor.ReplaceLine(editor.Document.GetLineByNumber(1), "one");
+
+		Assert.AreEqual("one\r\ntwo", editor.Text);
+		Assert.IsFalse(editor.Document.UndoStack.CanUndo);
+		Assert.AreEqual(3, editor.CaretOffset);
+	}
+
+	[TestMethod]
+	public void ReplaceLine_IdenticalTextWithSelection_KeepsReplacementSelected()
+	{
+		TextEditor editor = WPFTestHost.CreateEditor("one\r\ntwo");
+		editor.Document.UndoStack.ClearAll();
+
+		editor.ReplaceLine(editor.Document.GetLineByNumber(1), "one", selectReplacement: true);
+
+		Assert.IsFalse(editor.Document.UndoStack.CanUndo);
+		Assert.AreEqual(0, editor.SelectionStart);
+		Assert.AreEqual(3, editor.SelectionLength);
+	}
+
+	[TestMethod]
+	public void ReplaceContent_IdenticalContent_LeavesUndoStackUntouched()
+	{
+		TextEditor editor = WPFTestHost.CreateEditor("one\r\ntwo");
+
+		editor.Document.UndoStack.ClearAll();
+		editor.Select(0, 2);
+
+		editor.ReplaceContent("one\r\ntwo");
+
+		Assert.AreEqual("one\r\ntwo", editor.Text);
+		Assert.IsFalse(editor.Document.UndoStack.CanUndo);
+		Assert.AreEqual(editor.Document.TextLength, editor.CaretOffset);
+		Assert.AreEqual(0, editor.SelectionLength);
+	}
+
+	[TestMethod]
+	public void ReplaceLine_WithContractEditTarget_AppliesOperationAndPublishesEditorDocument()
+	{
+		TextEditor editor = WPFTestHost.CreateEditor("one\r\ntwo\r\nthree");
+		DocumentLine line = editor.Document.GetLineByNumber(2);
+		var target = new ContractEditTarget(editor);
+
+		editor.ReplaceLine(line, "TWO", editTarget: target);
+
+		Assert.HasCount(1, target.Operations);
+
+		TextEditOperation operation = target.Operations[0];
+
+		Assert.AreEqual(line.Offset, operation.StartOffset);
+		Assert.AreEqual(line.EndOffset, operation.EndOffset);
+		Assert.AreEqual("TWO", operation.NewText);
+
+		// The contract-honoring target publishes the replacement to the editor document before
+		// returning, so the post-edit caret is derived from the updated document.
+		Assert.AreEqual("one\r\nTWO\r\nthree", target.Text);
+		Assert.AreEqual("one\r\nTWO\r\nthree", editor.Text);
+		Assert.AreEqual(line.Offset + "TWO".Length, editor.CaretOffset);
+		Assert.AreEqual(0, editor.SelectionLength);
+	}
+
+	[TestMethod]
+	public void ReplaceContent_WithContractEditTarget_AppliesOperationAndPublishesEditorDocument()
+	{
+		TextEditor editor = WPFTestHost.CreateEditor("one\r\ntwo");
+		int originalLength = editor.Document.TextLength;
+		var target = new ContractEditTarget(editor);
+
+		editor.ReplaceContent("x", target);
+
+		Assert.HasCount(1, target.Operations);
+
+		TextEditOperation operation = target.Operations[0];
+
+		Assert.AreEqual(0, operation.StartOffset);
+		Assert.AreEqual(originalLength, operation.EndOffset);
+		Assert.AreEqual("x", operation.NewText);
+
+		Assert.AreEqual("x", target.Text);
+		Assert.AreEqual("x", editor.Text);
+		Assert.AreEqual(1, editor.CaretOffset);
 	}
 }

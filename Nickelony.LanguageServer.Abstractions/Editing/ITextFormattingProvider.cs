@@ -17,5 +17,6 @@ public interface ITextFormattingProvider
 	/// <param name="request">The document and formatting options.</param>
 	/// <param name="cancellationToken">A token that can cancel the request.</param>
 	/// <returns>The workspace edit to apply, or <see langword="null"/> when formatting is unsupported or no changes are available.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
 	Task<TextWorkspaceEdit?> FormatDocumentAsync(TextFormatRequest request, CancellationToken cancellationToken = default);
 }

@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Nickelony.LanguageServer.Lua.Tests;
 
-public partial class LuaLanguageServerIntelliSenseProviderTests
+public sealed partial class LuaLanguageServerIntelliSenseProviderTests
 {
 	[TestMethod]
 	public async Task CanceledRequestsBeforeStart_PropagateCancellationAcrossAllRequestKinds()
@@ -13,7 +13,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 		const string content = "local value = 1";
 
 		using var client = new FakeLanguageServerClient();
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		using var cancellationTokenSource = new CancellationTokenSource();
 
 		cancellationTokenSource.Cancel();
@@ -23,10 +23,11 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			provider.GetCompletionItemsAsync(filePath, content, 0, 0, cancellationToken: cancellationTokenSource.Token),
 			provider.GetHoverAsync(filePath, content, 0, 0, cancellationTokenSource.Token),
 			provider.GetDefinitionAsync(filePath, content, 0, 0, cancellationTokenSource.Token),
-			provider.GetSignatureHelpAsync(filePath, content, 0, 0, cancellationTokenSource.Token),
+			provider.GetSignatureHelpAsync(filePath, content, 0, 0, cancellationToken: cancellationTokenSource.Token),
 			provider.GetReferencesAsync(new TextReferenceRequest(filePath, content, 0, 0), cancellationTokenSource.Token),
 			provider.RenameSymbolAsync(new TextRenameRequest(filePath, content, 0, 0, "renamed"), cancellationTokenSource.Token),
-			provider.FormatDocumentAsync(new TextFormatRequest(filePath, content, new TextFormattingOptions(4, true)), cancellationTokenSource.Token)
+			provider.FormatDocumentAsync(new TextFormatRequest(filePath, content, new TextFormattingOptions(4, true)), cancellationTokenSource.Token),
+			provider.GetDocumentSymbolsAsync(filePath, content, cancellationTokenSource.Token)
 		];
 
 		for (int i = 0; i < canceledRequests.Length; i++)
@@ -55,7 +56,7 @@ public partial class LuaLanguageServerIntelliSenseProviderTests
 			})
 		};
 
-		using var provider = new LuaLanguageServerIntelliSenseProvider(workspaceRoot, client);
+		using var provider = new LuaLanguageServerIntelliSenseProvider([workspaceRoot], client);
 		using var cancellationTokenSource = new CancellationTokenSource();
 
 		client.BeforeReturningHoverResponse = cancellationTokenSource.Cancel;

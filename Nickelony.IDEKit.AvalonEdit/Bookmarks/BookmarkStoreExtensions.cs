@@ -8,6 +8,12 @@ public static class BookmarkStoreExtensions
 	/// <summary>
 	/// Saves the coordinator's current one-based bookmark line numbers through the supplied store.
 	/// </summary>
+	/// <remarks>
+	/// The save fails while <see cref="BookmarkCoordinator.IsBoundToCurrentDocument"/> is
+	/// <see langword="false"/>; a host that saves from the coordinator's
+	/// <see cref="BookmarkCoordinator.Changed"/> event can query that property to skip or defer the
+	/// save in the unbound window.
+	/// </remarks>
 	/// <param name="coordinator">The coordinator whose bookmarks are persisted.</param>
 	/// <param name="store">The store used to save the bookmarks.</param>
 	/// <param name="filePath">The path of the document the bookmarks belong to.</param>
@@ -15,13 +21,23 @@ public static class BookmarkStoreExtensions
 	/// <exception cref="ArgumentNullException">
 	/// <paramref name="coordinator"/>, <paramref name="store"/>, or <paramref name="filePath"/> is <see langword="null"/>.
 	/// </exception>
+	/// <exception cref="InvalidOperationException">
+	/// The coordinator's document provider returns <see langword="null"/>, or the bookmarks are not
+	/// bound to the document its provider currently returns, for example after a document swap before
+	/// bookmarks are restored for the new document. Saving would delete the persisted bookmarks, so
+	/// the save fails instead.
+	/// </exception>
 	public static bool SaveBookmarks(this BookmarkCoordinator coordinator, IBookmarkStore store, string filePath)
 	{
 		ArgumentNullException.ThrowIfNull(coordinator);
 		ArgumentNullException.ThrowIfNull(store);
 		ArgumentNullException.ThrowIfNull(filePath);
 
-		IReadOnlyList<int> lineNumbers = [.. coordinator.GetBookmarkedLines().Select(line => line.LineNumber)];
+		// The persistence target is resolved fail-fast: an unbound or mismatched coordinator would
+		// otherwise persist an empty set, which deletes the sidecar instead of saving the bookmarks.
+		_ = coordinator.GetDocumentForPersistence();
+
+		IReadOnlyList<int> lineNumbers = coordinator.GetMarkedLineNumbers();
 
 		return store.Save(filePath, lineNumbers);
 	}
@@ -30,21 +46,41 @@ public static class BookmarkStoreExtensions
 	/// Restores the stored one-based bookmark line numbers into the coordinator.
 	/// </summary>
 	/// <remarks>
-	/// Replaces existing bookmarks. Line numbers outside the document are ignored,
-	/// and the coordinator's change callback is not invoked.
+	/// <para>
+	/// Replaces existing bookmarks. Line numbers outside the document are ignored, and the
+	/// coordinator's <see cref="BookmarkCoordinator.Changed"/> event is raised.
+	/// </para>
+	/// <para>
+	/// A load that reports failure (see <see cref="IBookmarkStore.TryLoad"/>) leaves the coordinator
+	/// unchanged: in particular, it stays unbound, so a later
+	/// <see cref="SaveBookmarks(BookmarkCoordinator, IBookmarkStore, string)"/> fails instead of
+	/// persisting an empty set and deleting the stored bookmarks.
+	/// </para>
 	/// </remarks>
 	/// <param name="coordinator">The coordinator whose bookmarks are restored.</param>
 	/// <param name="store">The store used to restore the bookmarks.</param>
 	/// <param name="filePath">The path of the document the bookmarks belong to.</param>
+	/// <returns>
+	/// <see langword="true"/> when the store's load produced a result and the coordinator's bookmarks
+	/// were replaced; <see langword="false"/> when the load failed and nothing was changed.
+	/// </returns>
 	/// <exception cref="ArgumentNullException">
 	/// <paramref name="coordinator"/>, <paramref name="store"/>, or <paramref name="filePath"/> is <see langword="null"/>.
 	/// </exception>
-	public static void RestoreBookmarks(this BookmarkCoordinator coordinator, IBookmarkStore store, string filePath)
+	/// <exception cref="InvalidOperationException">
+	/// The coordinator's document provider returns <see langword="null"/> and the load produced a
+	/// result to restore.
+	/// </exception>
+	public static bool RestoreBookmarks(this BookmarkCoordinator coordinator, IBookmarkStore store, string filePath)
 	{
 		ArgumentNullException.ThrowIfNull(coordinator);
 		ArgumentNullException.ThrowIfNull(store);
 		ArgumentNullException.ThrowIfNull(filePath);
 
-		coordinator.Restore(store.Restore(filePath));
+		if (!store.TryLoad(filePath, out IReadOnlyList<int> bookmarkLineNumbers))
+			return false;
+
+		coordinator.Restore(bookmarkLineNumbers);
+		return true;
 	}
 }

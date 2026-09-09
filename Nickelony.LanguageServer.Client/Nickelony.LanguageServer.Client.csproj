@@ -8,6 +8,11 @@
     <PackageTags>language-server;lsp;editor;intellisense;nickelony</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
+    <!-- CA1848 ("use LoggerMessage delegates") is deliberately not enforced for this package: messages go through
+         the ILogger extension methods for readability and low call-site churn, and they are low-frequency lifecycle
+         and failure-path diagnostics rather than hot-path work. This follows the family logging policy in
+         CODE_STYLE_GUIDELINES.md; hot-path migration to LoggerMessage remains possible when a measurement justifies it. -->
+    <NoWarn>$(NoWarn);CA1848</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,8 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nickelony.LanguageServer.Abstractions\Nickelony.LanguageServer.Abstractions.csproj" />
+    <!-- Core is used by TrackedDocumentStore (incremental text edits), the Interop/ bridges
+         (ProtocolRangeConversion, SemanticTokenConversion), SemanticTokensDecoder, and
+         LanguageServerPaths (the shared local-path comparison policy).
+         IntelliSense supplies the shared offset-based semantic-token payload that SemanticTokenConversion bridges to. -->
     <ProjectReference Include="..\Nickelony.IDEKit.Core\Nickelony.IDEKit.Core.csproj" />
+    <ProjectReference Include="..\Nickelony.IDEKit.IntelliSense\Nickelony.IDEKit.IntelliSense.csproj" />
   </ItemGroup>
 
   <ItemGroup>

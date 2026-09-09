@@ -4,13 +4,14 @@
     <RootNamespace>Nickelony.LanguageServer.Abstractions</RootNamespace>
     <AssemblyName>Nickelony.LanguageServer.Abstractions</AssemblyName>
     <PackageId>Nickelony.LanguageServer.Abstractions</PackageId>
-    <Description>Lightweight, dependency-free editor IntelliSense contracts shared by the Nickelony Language Server family.</Description>
+    <Description>Lightweight editor IntelliSense lifecycle contracts with no external package or protocol dependencies; depends only on Nickelony.IDEKit.IntelliSense/Core.</Description>
     <PackageTags>language-server;lsp;editor;intellisense;nickelony</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>CS1591;RS0016;RS0017</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Nickelony.IDEKit.Core\Nickelony.IDEKit.Core.csproj" />
     <ProjectReference Include="..\Nickelony.IDEKit.IntelliSense\Nickelony.IDEKit.IntelliSense.csproj" />
   </ItemGroup>
 

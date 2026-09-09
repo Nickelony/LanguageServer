@@ -1,138 +1,398 @@
+using Nickelony.IDEKit.IntelliSense.Infrastructure;
+using System.Diagnostics.CodeAnalysis;
+
 namespace Nickelony.IDEKit.IntelliSense.Completion;
 
 /// <summary>
 /// Represents one shared completion entry for an editor completion list.
 /// </summary>
 /// <remarks>
-/// Optional fields let hosts omit the corresponding UI or commit behavior without requiring a
-/// language-specific completion DTO. The built-in completion filter matches <see cref="InsertText"/>;
-/// hosts or custom filters may use <see cref="FilterText"/> instead.
+/// <para>
+/// Only the label is required; every other field is optional and can be set with an object
+/// initializer, for example
+/// <c>new TextCompletionItem("foo") { Detail = "optional detail", Kind = TextCompletionItemKind.Method }</c>.
+/// Hosts can omit the corresponding UI or commit behavior without requiring a language-specific
+/// completion DTO. The built-in completion filter matches <see cref="FilterText"/>.
+/// </para>
+/// <para>
+/// Request metadata (<see cref="RequestDocumentVersion"/>, <see cref="RequestGeneration"/>) and an
+/// optional resolve callback support language-server lifecycles where item details or commit data
+/// arrive only after the list is shown; hosts that complete synchronously can ignore them. This type
+/// stores, normalizes, and copies data; applying request stamps or dropping a resolved edit payload
+/// is done by the host through <see cref="WithRequestContext"/> and <see cref="WithoutTextEdit"/>.
+/// </para>
 /// </remarks>
 public sealed class TextCompletionItem
 {
-	private readonly Func<CancellationToken, Task<TextCompletionItem>>? _resolveAsync;
+	private readonly string _label;
+
+	private string? _insertText;
+	private string? _documentation;
+	private string? _rawDocumentation;
+	private double _priority;
+	private string? _sortText;
+	private bool _isPreselected;
+	private TextCompletionItemKind? _kind;
+	private string? _detail;
+	private string? _filterText;
+	private TextMarkupKind _documentationKind = TextMarkupKind.PlainText;
+	private Func<CancellationToken, Task<TextCompletionItem>>? _resolveAsync;
+	private TextCompletionTextEdit? _textEdit;
+	private int? _requestDocumentVersion;
+	private int? _requestGeneration;
+	private TextCompletionInsertTextFormat? _insertTextFormat;
+	private IReadOnlyList<TextCompletionTag> _tags = [];
+	private IReadOnlyList<string> _commitCharacters = [];
+	private IReadOnlyList<TextCompletionTextEdit> _additionalTextEdits = [];
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TextCompletionItem"/> class.
+	/// Initializes a new instance of the <see cref="TextCompletionItem"/> class that uses the supplied
+	/// label and the default value for every optional field.
 	/// </summary>
 	/// <param name="label">The display label shown in the completion list.</param>
-	/// <param name="insertText">
-	/// The text inserted when the item is committed, or <see langword="null"/> or whitespace to use
-	/// <paramref name="label"/>.
-	/// </param>
-	/// <param name="description">
-	/// Optional descriptive content for tooltip or detail rendering; non-Markdown text is trimmed.
-	/// </param>
-	/// <param name="priority">The sort priority used by the completion UI.</param>
-	/// <param name="kind">The semantic category used for icons and styling.</param>
-	/// <param name="detail">Optional short detail text for host rendering.</param>
-	/// <param name="filterText">Optional alternate text that a host or custom filter can use to match the item.</param>
-	/// <param name="isDescriptionMarkdown">Whether <paramref name="description"/> should be rendered as Markdown.</param>
-	/// <param name="resolveAsync">An optional asynchronous resolver for retrieving additional item details.</param>
-	/// <param name="textEdit">Optional protocol-style insert and replace ranges for custom commit behavior.</param>
-	/// <param name="requestDocumentVersion">
-	/// The originating document version associated with the item for staleness checks.
-	/// </param>
-	/// <param name="requestGeneration">
-	/// The originating request generation associated with the item for staleness checks.
-	/// </param>
-	/// <param name="insertCaretOffset">An optional zero-based caret offset to use after commit.</param>
-	public TextCompletionItem(
-		string label,
-		string? insertText = null,
-		string? description = null,
-		double priority = 0.0,
-		TextCompletionItemKind? kind = null,
-		string? detail = null,
-		string? filterText = null,
-		bool isDescriptionMarkdown = false,
-		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = null,
-		TextCompletionTextEdit? textEdit = null,
-		int? requestDocumentVersion = null,
-		int? requestGeneration = null,
-		int? insertCaretOffset = null)
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="label"/> is <see langword="null"/>.
+	/// </exception>
+	public TextCompletionItem(string label)
 	{
 		ArgumentNullException.ThrowIfNull(label);
 
-		Label = label;
-		InsertText = string.IsNullOrWhiteSpace(insertText) ? label : insertText;
-		Description = string.IsNullOrWhiteSpace(description)
-			? null
-			: isDescriptionMarkdown
-				? description
-				: description.Trim();
-		Priority = priority;
-		Kind = kind ?? TextCompletionItemKind.Generic;
-		Detail = string.IsNullOrWhiteSpace(detail) ? null : detail.Trim();
-		FilterText = string.IsNullOrWhiteSpace(filterText) ? label : filterText;
-		IsDescriptionMarkdown = isDescriptionMarkdown;
-		TextEdit = textEdit;
-		RequestDocumentVersion = requestDocumentVersion;
-		RequestGeneration = requestGeneration;
-		InsertCaretOffset = insertCaretOffset;
+		_label = label;
+	}
 
-		_resolveAsync = resolveAsync;
+	/// <summary>
+	/// Initializes a new instance of the <see cref="TextCompletionItem"/> class that copies the state
+	/// of an existing item.
+	/// </summary>
+	/// <param name="source">The item whose state is copied.</param>
+	private TextCompletionItem(TextCompletionItem source)
+	{
+		_label = source._label;
+		_insertText = source._insertText;
+		_documentation = source._documentation;
+		_rawDocumentation = source._rawDocumentation;
+		_priority = source._priority;
+		_sortText = source._sortText;
+		_isPreselected = source._isPreselected;
+		_kind = source._kind;
+		_detail = source._detail;
+		_filterText = source._filterText;
+		_documentationKind = source._documentationKind;
+		_resolveAsync = source._resolveAsync;
+		_textEdit = source._textEdit;
+		_requestDocumentVersion = source._requestDocumentVersion;
+		_requestGeneration = source._requestGeneration;
+		_insertTextFormat = source._insertTextFormat;
+		_tags = source._tags;
+		_commitCharacters = source._commitCharacters;
+		_additionalTextEdits = source._additionalTextEdits;
 	}
 
 	/// <summary>
 	/// Gets the display label shown in the completion list.
 	/// </summary>
-	public string Label { get; }
+	public string Label => _label;
 
 	/// <summary>
 	/// Gets the text inserted when the item is committed.
 	/// </summary>
-	public string InsertText { get; }
+	/// <remarks>
+	/// The value assigned by the producer, or <see cref="Label"/> when none was supplied; any other
+	/// value is used as supplied, including a whitespace-only value. When <see cref="InsertTextFormat"/> is
+	/// <see cref="TextCompletionInsertTextFormat.Snippet"/>, the text carries raw snippet syntax
+	/// that a host expands with <see cref="TextSnippetExpander"/> before insertion. A commit path
+	/// that sees an edit payload prefers the edit's replacement text; see
+	/// <see cref="TextCompletionTextEdit"/> for the commit-text rule.
+	/// </remarks>
+	[AllowNull]
+	public string InsertText
+	{
+		get
+		{
+			string? insertText = _insertText;
+
+			return insertText ?? Label;
+		}
+		init => _insertText = value;
+	}
 
 	/// <summary>
-	/// Gets optional descriptive content for tooltip or detail rendering.
+	/// Gets optional documentation content shown for the item.
 	/// </summary>
-	public string? Description { get; }
+	/// <remarks>
+	/// Blank values are treated as absent. The value is trimmed unless <see cref="DocumentationKind"/>
+	/// is <see cref="TextMarkupKind.Markdown"/>, in which case it is passed through unchanged for
+	/// Markdown rendering.
+	/// </remarks>
+	public string? Documentation
+	{
+		get => _documentation;
+		init
+		{
+			_rawDocumentation = value;
+			_documentation = NormalizeDocumentation(value, _documentationKind);
+		}
+	}
 
 	/// <summary>
-	/// Gets the sort priority used by the completion UI.
+	/// Gets the producer-derived sort priority hint used to order the completion list.
 	/// </summary>
-	public double Priority { get; }
+	/// <remarks>
+	/// The library applies no meaning to the value; hosts that order completion lists by one number
+	/// conventionally surface higher values first. The default is zero. A producer derives the value
+	/// (for example from protocol kind weights, scope hints, and response order) so that it agrees
+	/// with the <see cref="SortText"/> value the producer assigns. <see cref="SortText"/> is the authoritative protocol
+	/// ordering key; this value is the single-number alternative for hosts whose list cannot rank by
+	/// sort text. The value must be finite.
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The assigned value is not finite.</exception>
+	public double Priority
+	{
+		get => _priority;
+		init
+		{
+			if (!double.IsFinite(value))
+				throw new ArgumentOutOfRangeException(nameof(Priority), value, "The priority must be finite.");
+
+			_priority = value;
+		}
+	}
 
 	/// <summary>
-	/// Gets the semantic category used for icons and styling.
+	/// Gets the protocol sort text used to order this item relative to other items.
 	/// </summary>
-	public TextCompletionItemKind Kind { get; }
+	/// <remarks>
+	/// The value is stored as supplied and read as <see langword="null"/> when it is blank, because
+	/// a blank value is treated as absent. The library stores the field only and never orders by it,
+	/// so ordering stays host behavior: hosts that order by sort text rank by this value (falling
+	/// back to the label when it is unset) and use <see cref="Priority"/> only when their list
+	/// cannot rank by sort text.
+	/// </remarks>
+	public string? SortText
+	{
+		get
+		{
+			string? sortText = _sortText;
+
+			return string.IsNullOrWhiteSpace(sortText) ? null : sortText;
+		}
+		init => _sortText = value;
+	}
+
+	/// <summary>
+	/// Gets a value indicating whether the producer requested this item to be preselected.
+	/// </summary>
+	/// <remarks>
+	/// Mirrors the protocol's <c>preselect</c> flag. The library stores the flag only; selecting and
+	/// positioning the preselected item is host behavior. A producer's derived <see cref="Priority"/>
+	/// may also reflect the flag, so <see cref="Priority"/> ordering alone does not identify it.
+	/// </remarks>
+	public bool IsPreselected
+	{
+		get => _isPreselected;
+		init => _isPreselected = value;
+	}
+
+	/// <summary>
+	/// Gets the semantic category used for icons and styling. Defaults to
+	/// <see cref="TextCompletionItemKind.Generic"/> when no category was assigned; a
+	/// <see langword="null"/> assignment resets the field to unset.
+	/// </summary>
+	[AllowNull]
+	public TextCompletionItemKind Kind
+	{
+		get => _kind ?? TextCompletionItemKind.Generic;
+		init => _kind = value;
+	}
 
 	/// <summary>
 	/// Gets optional short detail text for host rendering.
 	/// </summary>
-	public string? Detail { get; }
+	/// <remarks>
+	/// Blank values are treated as absent and other values are trimmed.
+	/// </remarks>
+	public string? Detail
+	{
+		get => _detail;
+		init => _detail = OptionalText.Normalize(value);
+	}
 
 	/// <summary>
-	/// Gets optional alternate text that a host or custom filter can use to match the item.
+	/// Gets the alternate text used to match the item. Falls back to <see cref="Label"/> when the
+	/// value was never set or was assigned blank; a label that is itself blank is used as the
+	/// fallback unchanged.
 	/// </summary>
-	public string FilterText { get; }
+	/// <remarks>
+	/// The value is stored without trimming because it is matching input a filter compares verbatim;
+	/// only a blank value is treated as absent.
+	/// </remarks>
+	[AllowNull]
+	public string FilterText
+	{
+		get => _filterText ?? Label;
+		init => _filterText = string.IsNullOrWhiteSpace(value) ? null : value;
+	}
 
 	/// <summary>
-	/// Gets a value indicating whether <see cref="Description"/> should be rendered as Markdown.
+	/// Gets how <see cref="Documentation"/> should be interpreted by a host. Defaults to
+	/// <see cref="TextMarkupKind.PlainText"/>.
 	/// </summary>
-	public bool IsDescriptionMarkdown { get; }
+	/// <remarks>
+	/// The value may be initialized before or after <see cref="Documentation"/>; the cached
+	/// documentation is re-derived from the assigned value either way, so normalization does not
+	/// depend on initializer order.
+	/// </remarks>
+	public TextMarkupKind DocumentationKind
+	{
+		get => _documentationKind;
+		init
+		{
+			_documentationKind = value;
+			_documentation = NormalizeDocumentation(_rawDocumentation, value);
+		}
+	}
 
 	/// <summary>
-	/// Gets the optional protocol-style edit payload used when committing the item.
+	/// Gets the optional explicit edit payload used when committing the item.
 	/// </summary>
-	public TextCompletionTextEdit? TextEdit { get; }
+	/// <remarks>
+	/// The edit supersedes the plain insertion text; see <see cref="TextCompletionTextEdit"/> for
+	/// the commit-text rule and the range semantics. When <see cref="InsertTextFormat"/> is
+	/// <see cref="TextCompletionInsertTextFormat.Snippet"/>, the replacement text carries raw
+	/// snippet syntax that a host expands with <see cref="TextSnippetExpander"/> before insertion.
+	/// </remarks>
+	public TextCompletionTextEdit? TextEdit
+	{
+		get => _textEdit;
+		init => _textEdit = value;
+	}
+
+	/// <summary>
+	/// Gets the additional annotations attached to the item, or an empty list when it has none.
+	/// </summary>
+	/// <remarks>
+	/// Mirrors the protocol's <c>tags</c> array; only <see cref="TextCompletionTag.Deprecated"/> is
+	/// defined today, and unknown protocol values never reach the model. Assigning
+	/// <see langword="null"/> yields an empty list, and the stored value is a defensive read-only
+	/// snapshot of the assigned list. <see cref="WithResolvedContent"/> merges tags as a union, so a
+	/// deprecated mark adopted from a resolved item is never dropped.
+	/// </remarks>
+	[AllowNull]
+	public IReadOnlyList<TextCompletionTag> Tags
+	{
+		get => _tags;
+		init => _tags = Snapshot(value);
+	}
+
+	/// <summary>
+	/// Gets the characters that, when typed while the item is selected, accept it; an empty list
+	/// when the item has none.
+	/// </summary>
+	/// <remarks>
+	/// Mirrors the protocol's <c>commitCharacters</c> array. Entries are compared verbatim against
+	/// the typed character by a host; protocol-conforming servers send single-character entries and
+	/// non-conforming entries are preserved as supplied. Assigning <see langword="null"/> yields an
+	/// empty list, and the stored value is a defensive read-only snapshot.
+	/// <see cref="WithResolvedContent"/> adopts resolved characters only when this item has none.
+	/// </remarks>
+	[AllowNull]
+	public IReadOnlyList<string> CommitCharacters
+	{
+		get => _commitCharacters;
+		init => _commitCharacters = Snapshot(value);
+	}
+
+	/// <summary>
+	/// Gets the secondary edits applied together with the item's commit, or an empty list when the
+	/// item has none.
+	/// </summary>
+	/// <remarks>
+	/// Mirrors the protocol's <c>additionalTextEdits</c> array (for example an import insertion
+	/// belonging to an auto-import completion). An entry that omits its replacement text is skipped
+	/// by the commit path instead of failing the commit; protocol producers always supply one.
+	/// A commit path applies the entries atomically with
+	/// the primary insertion in one undo unit. Assigning <see langword="null"/> yields an empty
+	/// list, and the stored value is a defensive read-only snapshot.
+	/// <see cref="WithResolvedContent"/> adopts resolved edits only when this item has none.
+	/// </remarks>
+	[AllowNull]
+	public IReadOnlyList<TextCompletionTextEdit> AdditionalTextEdits
+	{
+		get => _additionalTextEdits;
+		init => _additionalTextEdits = Snapshot(value);
+	}
 
 	/// <summary>
 	/// Gets the originating document version associated with the item for staleness checks.
 	/// </summary>
-	public int? RequestDocumentVersion { get; }
+	/// <remarks>
+	/// Items that outlive the request pipeline (for example an open completion window whose entries
+	/// are resolved asynchronously) are stamped with the document version and request generation they
+	/// were produced for, so a host can reject or rebase them after the document changed. Use
+	/// <see cref="WithRequestContext"/> to stamp or rebase a copy. The in-flight pipeline itself is
+	/// superseded through the request-lifetime session (<see cref="TextCompletionRequestSession"/>),
+	/// which is backed by the core request coordinator. A negative value is rejected.
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The assigned value is negative.</exception>
+	public int? RequestDocumentVersion
+	{
+		get => _requestDocumentVersion;
+		init => _requestDocumentVersion = ValidateStamp(value, nameof(RequestDocumentVersion));
+	}
 
 	/// <summary>
 	/// Gets the originating request generation associated with the item for staleness checks.
 	/// </summary>
-	public int? RequestGeneration { get; }
+	/// <remarks>
+	/// The generation distinguishes repeated requests for the same document version, so a host can
+	/// reject an item produced by a superseded request even though the document did not change.
+	/// Stamps are applied and rebased through <see cref="WithRequestContext"/>; a negative value is
+	/// rejected.
+	/// </remarks>
+	/// <exception cref="ArgumentOutOfRangeException">The assigned value is negative.</exception>
+	public int? RequestGeneration
+	{
+		get => _requestGeneration;
+		init => _requestGeneration = ValidateStamp(value, nameof(RequestGeneration));
+	}
 
 	/// <summary>
-	/// Gets the optional zero-based caret offset to place after commit.
+	/// Gets how the commit text is interpreted. Defaults to
+	/// <see cref="TextCompletionInsertTextFormat.PlainText"/>.
 	/// </summary>
-	public int? InsertCaretOffset { get; }
+	/// <remarks>
+	/// <para>
+	/// When the value is <see cref="TextCompletionInsertTextFormat.Snippet"/>, the text the commit
+	/// path inserts (chosen per <see cref="TextCompletionTextEdit"/>) contains LSP snippet syntax
+	/// with tabstops, placeholders, and escapes. Hosts expand it with
+	/// <see cref="TextSnippetExpander"/> at commit time; the library never rewrites the text
+	/// itself, so the raw payload stays available to every consumer.
+	/// </para>
+	/// <para>
+	/// <see cref="WithResolvedContent"/> adopts the resolved item's format when the resolved item
+	/// explicitly set one; an unset format behaves as absent, so a mere default never overrides,
+	/// while an explicit assignment (including
+	/// <see cref="TextCompletionInsertTextFormat.PlainText"/>) wins over the current value.
+	/// </para>
+	/// </remarks>
+	public TextCompletionInsertTextFormat InsertTextFormat
+	{
+		get => _insertTextFormat ?? TextCompletionInsertTextFormat.PlainText;
+		init => _insertTextFormat = value;
+	}
+
+	/// <summary>
+	/// Gets the optional asynchronous resolver for retrieving additional item details.
+	/// </summary>
+	/// <remarks>
+	/// When no resolver is attached, <see cref="ResolveAsync"/> returns this item unchanged. Attach one
+	/// with an object initializer or <see cref="WithResolveCallback"/>.
+	/// </remarks>
+	public Func<CancellationToken, Task<TextCompletionItem>>? ResolveCallback
+	{
+		get => _resolveAsync;
+		init => _resolveAsync = value;
+	}
 
 	/// <summary>
 	/// Gets a value indicating whether this item can be asynchronously resolved.
@@ -142,13 +402,27 @@ public sealed class TextCompletionItem
 	/// <summary>
 	/// Resolves the item to additional content when a resolve callback is available; otherwise returns this item.
 	/// </summary>
+	/// <remarks>
+	/// This is the raw resolve path: the resolved item is returned exactly as the callback supplied it,
+	/// including any text-edit payload and request stamps it carries. Apply
+	/// <see cref="WithoutTextEdit"/> and <see cref="WithRequestContext"/> to the result when a commit
+	/// path must not use a resolved text-edit payload.
+	/// </remarks>
 	/// <param name="cancellationToken">The cancellation token for the resolve request.</param>
-	/// <returns>The resolved completion item.</returns>
+	/// <returns>
+	/// The resolved completion item supplied by the resolve callback, or this item unchanged when no
+	/// callback is attached.
+	/// </returns>
+	/// <exception cref="InvalidOperationException">
+	/// The resolve callback returned <see langword="null"/> or a <see langword="null"/> task.
+	/// </exception>
 	public Task<TextCompletionItem> ResolveAsync(CancellationToken cancellationToken = default)
 	{
-		return _resolveAsync is null
+		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = _resolveAsync;
+
+		return resolveAsync is null
 			? Task.FromResult(this)
-			: ResolveRequiredAsync(cancellationToken);
+			: ResolveRequiredAsync(resolveAsync, cancellationToken);
 	}
 
 	/// <summary>
@@ -156,105 +430,233 @@ public sealed class TextCompletionItem
 	/// </summary>
 	/// <param name="resolveAsync">The resolve callback to attach.</param>
 	/// <returns>A completion item with resolve support.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="resolveAsync"/> is <see langword="null"/>.
+	/// </exception>
 	public TextCompletionItem WithResolveCallback(Func<CancellationToken, Task<TextCompletionItem>> resolveAsync)
 	{
 		ArgumentNullException.ThrowIfNull(resolveAsync);
 
-		return new(Label, InsertText, Description, Priority, Kind, Detail, FilterText, IsDescriptionMarkdown,
-			resolveAsync, TextEdit, RequestDocumentVersion, RequestGeneration, InsertCaretOffset);
+		TextCompletionItem item = new(this);
+		item._resolveAsync = resolveAsync;
+
+		return item;
 	}
 
 	/// <summary>
 	/// Creates a copy stamped with request metadata used by hosts to reject stale completions.
 	/// </summary>
-	/// <param name="requestDocumentVersion">The originating document version.</param>
-	/// <param name="requestGeneration">The originating request generation.</param>
+	/// <remarks>
+	/// Stamping is a data operation: only <see cref="RequestDocumentVersion"/> and
+	/// <see cref="RequestGeneration"/> are set, and an item that already carries the supplied stamps
+	/// is returned unchanged. Hosts that also keep text-edit data out of the commit path combine this
+	/// with <see cref="WithoutTextEdit"/>, for example when a resolve response is used only to enrich
+	/// presentation.
+	/// </remarks>
+	/// <param name="requestDocumentVersion">The originating document version; must not be negative.</param>
+	/// <param name="requestGeneration">The originating request generation; must not be negative.</param>
 	/// <returns>A completion item stamped with the supplied request context.</returns>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// <paramref name="requestDocumentVersion"/> or <paramref name="requestGeneration"/> is negative.
+	/// </exception>
 	public TextCompletionItem WithRequestContext(int requestDocumentVersion, int requestGeneration)
 	{
-		if (RequestDocumentVersion == requestDocumentVersion && RequestGeneration == requestGeneration)
-			return this;
+		if (requestDocumentVersion < 0)
+		{
+			throw new ArgumentOutOfRangeException(
+				nameof(requestDocumentVersion),
+				requestDocumentVersion,
+				"The request document version must not be negative.");
+		}
 
-		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = _resolveAsync is null
-			? null
-			: async cancellationToken =>
-			{
-				TextCompletionItem resolvedItem = await ResolveRequiredAsync(cancellationToken).ConfigureAwait(false);
-				return resolvedItem.WithRequestContext(requestDocumentVersion, requestGeneration);
-			};
+		if (requestGeneration < 0)
+		{
+			throw new ArgumentOutOfRangeException(
+				nameof(requestGeneration),
+				requestGeneration,
+				"The request generation must not be negative.");
+		}
 
-		return new(Label, InsertText, Description, Priority, Kind, Detail, FilterText,
-			IsDescriptionMarkdown, resolveAsync, TextEdit, requestDocumentVersion, requestGeneration, InsertCaretOffset);
-	}
-
-	/// <summary>
-	/// Creates a copy for commit-time use that removes the protocol-style text-edit payload and
-	/// stamps the item with the supplied request context.
-	/// </summary>
-	/// <param name="requestDocumentVersion">The originating document version.</param>
-	/// <param name="requestGeneration">The originating request generation.</param>
-	/// <returns>
-	/// A completion item without a protocol-style text-edit payload and with the supplied request context.
-	/// </returns>
-	public TextCompletionItem WithFilteredCommitContext(int requestDocumentVersion, int requestGeneration)
-	{
 		if (RequestDocumentVersion == requestDocumentVersion
-			&& RequestGeneration == requestGeneration
-			&& TextEdit is null)
+			&& RequestGeneration == requestGeneration)
 		{
 			return this;
 		}
 
-		Func<CancellationToken, Task<TextCompletionItem>>? resolveAsync = _resolveAsync is null
-			? null
-			: async cancellationToken =>
-			{
-				TextCompletionItem resolvedItem = await ResolveRequiredAsync(cancellationToken).ConfigureAwait(false);
-				return resolvedItem.WithFilteredCommitContext(requestDocumentVersion, requestGeneration);
-			};
+		TextCompletionItem item = new(this);
+		item._requestDocumentVersion = requestDocumentVersion;
+		item._requestGeneration = requestGeneration;
 
-		return new(
-			Label, InsertText, Description, Priority, Kind, Detail, FilterText, IsDescriptionMarkdown, resolveAsync,
-			textEdit: null,
-			requestDocumentVersion: requestDocumentVersion,
-			requestGeneration: requestGeneration,
-			insertCaretOffset: InsertCaretOffset);
+		return item;
+	}
+
+	/// <summary>
+	/// Creates a copy without the explicit edit payload, so the commit uses the plain insertion text.
+	/// </summary>
+	/// <remarks>
+	/// An item that has no text-edit payload is returned unchanged. Use this together with
+	/// <see cref="WithRequestContext"/> when a commit path must use the plain insertion text even
+	/// though an earlier resolve response supplied an edit payload.
+	/// </remarks>
+	/// <returns>A completion item without a text-edit payload.</returns>
+	public TextCompletionItem WithoutTextEdit()
+	{
+		if (TextEdit is null)
+			return this;
+
+		TextCompletionItem item = new(this);
+		item._textEdit = null;
+
+		return item;
 	}
 
 	/// <summary>
 	/// Creates a copy that merges richer resolved content onto the current item.
 	/// </summary>
-	/// <param name="resolvedItem">The resolved item carrying richer detail, description, or kind.</param>
-	/// <returns>A merged completion item that preserves the original commit metadata.</returns>
+	/// <remarks>
+	/// <para>
+	/// The merge applies one rule per field, grouped into content fields, commit fields, and identity
+	/// fields. A resolved item that contributes nothing returns this item.
+	/// </para>
+	/// <para>
+	/// Content fields: <see cref="Detail"/> is taken from <paramref name="resolvedItem"/> when it is
+	/// non-blank. <see cref="Documentation"/> and <see cref="DocumentationKind"/> are taken together
+	/// from <paramref name="resolvedItem"/> when its documentation is non-blank; blank documentation
+	/// keeps both current values. The kind is taken with the text because it describes the adopted
+	/// documentation, including when the resolved item left the kind at its default.
+	/// <see cref="Kind"/> is taken when the resolved item explicitly set
+	/// one; an unset category behaves as absent, so the resolved default never overrides.
+	/// </para>
+	/// <para>
+	/// Commit fields: the edit payload and the sort text are adopted only when this item lacks them.
+	/// The insert-text format is adopted when the resolved item explicitly set one; an unset format
+	/// behaves as absent. Tags are merged as a union, so a resolved deprecated mark is never
+	/// dropped. Commit characters and additional edits are adopted only when this item has none.
+	/// Insertion text is adopted only when this item never set it and supplies no edit payload;
+	/// filter text is adopted only when this item never set it and is independent of the edit
+	/// payload because it only drives matching.
+	/// </para>
+	/// <para>
+	/// Identity fields: label, priority, preselect state, and request stamps always come from this
+	/// item; resolved stamps are ignored so a resolve response cannot retarget the originating
+	/// request. An assigned value is always treated as intentional, so text either item carries
+	/// explicitly is never replaced. The result carries no resolve callback because the resolved
+	/// content has already been applied.
+	/// </para>
+	/// </remarks>
+	/// <param name="resolvedItem">
+	/// The resolved item carrying richer detail, description, kind, or commit data.
+	/// </param>
+	/// <returns>A merged completion item that preserves the original display and commit metadata.</returns>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="resolvedItem"/> is <see langword="null"/>.
+	/// </exception>
 	public TextCompletionItem WithResolvedContent(TextCompletionItem resolvedItem)
 	{
 		ArgumentNullException.ThrowIfNull(resolvedItem);
 
 		string? detail = string.IsNullOrWhiteSpace(resolvedItem.Detail) ? Detail : resolvedItem.Detail;
-		string? description = string.IsNullOrWhiteSpace(resolvedItem.Description) ? Description : resolvedItem.Description;
+		string? documentation = string.IsNullOrWhiteSpace(resolvedItem.Documentation) ? Documentation : resolvedItem.Documentation;
 
-		bool isDescriptionMarkdown = string.IsNullOrWhiteSpace(resolvedItem.Description)
-			? IsDescriptionMarkdown
-			: resolvedItem.IsDescriptionMarkdown;
+		TextMarkupKind documentationKind = string.IsNullOrWhiteSpace(resolvedItem.Documentation)
+			? DocumentationKind
+			: resolvedItem.DocumentationKind;
 
-		TextCompletionItemKind kind = resolvedItem.Kind == TextCompletionItemKind.Generic ? Kind : resolvedItem.Kind;
+		TextCompletionItemKind kind = resolvedItem._kind ?? Kind;
+		TextCompletionTextEdit? textEdit = TextEdit ?? resolvedItem.TextEdit;
+		TextCompletionInsertTextFormat insertTextFormat = resolvedItem._insertTextFormat ?? InsertTextFormat;
+		string? sortText = SortText ?? resolvedItem.SortText;
+		IReadOnlyList<TextCompletionTag> tags = MergeTags(_tags, resolvedItem._tags);
+		IReadOnlyList<string> commitCharacters = _commitCharacters.Count == 0 ? resolvedItem._commitCharacters : _commitCharacters;
+		IReadOnlyList<TextCompletionTextEdit> additionalTextEdits = _additionalTextEdits.Count == 0 ? resolvedItem._additionalTextEdits : _additionalTextEdits;
 
-		return new(
-			Label, InsertText, description, Priority, kind, detail, FilterText, isDescriptionMarkdown,
-			resolveAsync: null,
-			textEdit: TextEdit,
-			requestDocumentVersion: RequestDocumentVersion,
-			requestGeneration: RequestGeneration,
-			insertCaretOffset: InsertCaretOffset);
+		// Unset commit text is tracked as null, so "never set" is distinguishable from an explicit
+		// value: text either side set explicitly stays intentional, while an unset value can be
+		// filled from the resolved item. Insertion text additionally yields to this item's edit
+		// payload, while filter text is independent of it because it only drives matching.
+		string? insertText = TextEdit is null && _insertText is null ? resolvedItem._insertText : _insertText;
+		string? filterText = _filterText ?? resolvedItem._filterText;
+
+		// A resolve response that adds nothing returns this item, matching the sibling With... methods.
+		if (string.Equals(detail, Detail, StringComparison.Ordinal)
+			&& string.Equals(documentation, Documentation, StringComparison.Ordinal)
+			&& documentationKind == DocumentationKind
+			&& kind == Kind
+			&& textEdit == TextEdit
+			&& insertTextFormat == InsertTextFormat
+			&& string.Equals(sortText, SortText, StringComparison.Ordinal)
+			&& ReferenceEquals(tags, _tags)
+			&& ReferenceEquals(commitCharacters, _commitCharacters)
+			&& ReferenceEquals(additionalTextEdits, _additionalTextEdits)
+			&& string.Equals(insertText, _insertText, StringComparison.Ordinal)
+			&& string.Equals(filterText, _filterText, StringComparison.Ordinal))
+		{
+			return this;
+		}
+
+		TextCompletionItem item = new(this);
+		item._insertText = insertText;
+		item._documentation = documentation;
+		item._rawDocumentation = documentation;
+		item._documentationKind = documentationKind;
+		item._kind = kind;
+		item._detail = detail;
+		item._filterText = filterText;
+		item._textEdit = textEdit;
+		item._insertTextFormat = insertTextFormat;
+		item._sortText = sortText;
+		item._tags = tags;
+		item._commitCharacters = commitCharacters;
+		item._additionalTextEdits = additionalTextEdits;
+		item._resolveAsync = null;
+
+		return item;
 	}
 
-	private async Task<TextCompletionItem> ResolveRequiredAsync(CancellationToken cancellationToken)
+	private static IReadOnlyList<T> Snapshot<T>(IReadOnlyList<T>? values)
+		=> values is null || values.Count == 0 ? Array.Empty<T>() : Array.AsReadOnly([.. values]);
+
+	private static IReadOnlyList<TextCompletionTag> MergeTags(IReadOnlyList<TextCompletionTag> current, IReadOnlyList<TextCompletionTag> resolved)
 	{
-		Task<TextCompletionItem> resolveTask = _resolveAsync!(cancellationToken);
-		ArgumentNullException.ThrowIfNull(resolveTask);
+		if (resolved.Count == 0)
+			return current;
+
+		var merged = new List<TextCompletionTag>(current);
+
+		foreach (TextCompletionTag tag in resolved)
+		{
+			if (!merged.Contains(tag))
+				merged.Add(tag);
+		}
+
+		return merged.Count == current.Count ? current : merged.AsReadOnly();
+	}
+
+	private static string? NormalizeDocumentation(string? documentation, TextMarkupKind documentationKind)
+		=> string.IsNullOrWhiteSpace(documentation)
+			? null
+			: documentationKind == TextMarkupKind.Markdown
+				? documentation
+				: documentation.Trim();
+
+	private static int? ValidateStamp(int? value, string parameterName)
+		=> value is < 0
+			? throw new ArgumentOutOfRangeException(parameterName, value, "The request stamp must not be negative.")
+			: value;
+
+	private static async Task<TextCompletionItem> ResolveRequiredAsync(
+		Func<CancellationToken, Task<TextCompletionItem>> resolveAsync,
+		CancellationToken cancellationToken)
+	{
+		Task<TextCompletionItem> resolveTask = resolveAsync(cancellationToken);
+
+		if (resolveTask is null)
+			throw new InvalidOperationException("The completion-item resolve callback returned a null task.");
 
 		TextCompletionItem resolvedItem = await resolveTask.ConfigureAwait(false);
-		ArgumentNullException.ThrowIfNull(resolvedItem);
+
+		if (resolvedItem is null)
+			throw new InvalidOperationException("The completion-item resolve callback returned a null item.");
 
 		return resolvedItem;
 	}

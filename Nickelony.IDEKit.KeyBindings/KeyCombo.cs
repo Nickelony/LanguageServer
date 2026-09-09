@@ -10,10 +10,11 @@ namespace Nickelony.IDEKit.KeyBindings;
 public readonly record struct KeyCombo
 {
 	/// <summary>
-	/// Creates a key combo from a primary <paramref name="key"/> and its <paramref name="modifiers"/>.
+	/// Initializes a new instance of the <see cref="KeyCombo"/> struct.
 	/// </summary>
 	/// <param name="key">The primary key. Must not be <see cref="Key.None"/>.</param>
 	/// <param name="modifiers">The modifier flags, such as Control, Shift, Alt, and Windows.</param>
+	/// <exception cref="ArgumentException"><paramref name="key"/> is <see cref="Key.None"/>.</exception>
 	public KeyCombo(Key key, ModifierKeys modifiers)
 	{
 		if (key == Key.None)
@@ -24,25 +25,32 @@ public readonly record struct KeyCombo
 	}
 
 	/// <summary>
-	/// The primary key. Instances created through the public constructor never contain
-	/// <see cref="Key.None"/>; the <see langword="default"/> value of this record struct does.
+	/// Gets the primary key.
 	/// </summary>
+	/// <remarks>
+	/// Instances created through the public constructor never contain <see cref="Key.None"/>;
+	/// the <see langword="default"/> value of this record struct does.
+	/// </remarks>
 	public Key Key { get; }
 
 	/// <summary>
-	/// The modifier flags associated with the combo.
-	/// Display text renders Ctrl, Shift, Alt, and Windows flags.
+	/// Gets the modifier flags associated with the combo.
 	/// </summary>
+	/// <remarks>Display text renders the Ctrl, Shift, Alt, and Windows flags.</remarks>
 	public ModifierKeys Modifiers { get; }
 
 	/// <summary>
 	/// Creates a <see cref="KeyCombo"/> from a WPF <see cref="KeyEventArgs"/>.
+	/// </summary>
+	/// <remarks>
 	/// Normalizes <see cref="Key.System"/> to <see cref="KeyEventArgs.SystemKey"/> and reads modifiers
 	/// from the event's keyboard device rather than the global <see cref="Keyboard.Modifiers"/>.
-	/// Returns <see langword="null"/> when the resulting key is <see cref="Key.None"/> or
-	/// the combination is a modifier-only keystroke.
-	/// </summary>
+	/// </remarks>
 	/// <param name="e">The WPF key event whose key and currently pressed modifier keys are read.</param>
+	/// <returns>
+	/// The key combo, or <see langword="null"/> when the resulting key is <see cref="Key.None"/> or
+	/// the combination is a modifier-only keystroke.
+	/// </returns>
 	/// <exception cref="ArgumentNullException"><paramref name="e"/> is <see langword="null"/>.</exception>
 	public static KeyCombo? FromKeyEventArgs(KeyEventArgs e)
 	{
@@ -81,10 +89,13 @@ public readonly record struct KeyCombo
 
 	/// <summary>
 	/// Returns display text suitable for menu and toolbar presentation.
+	/// </summary>
+	/// <remarks>
 	/// Control, Shift, Alt, and Windows flags are formatted in that order; other modifier bits
 	/// are omitted. The text is calculated from <see cref="Key"/> and <see cref="Modifiers"/>
 	/// rather than persisted.
-	/// </summary>
+	/// </remarks>
+	/// <returns>The display text for the combo, for example <c>Ctrl+Shift+S</c>.</returns>
 	public string GetDisplayText()
 	{
 		string keyText = Key switch
@@ -108,8 +119,19 @@ public readonly record struct KeyCombo
 			Key.OemOpenBrackets => "[",
 			Key.OemCloseBrackets => "]",
 			Key.OemPipe => "\\",
+			Key.OemBackslash => "\\",
 			Key.OemQuotes => "\"",
 			Key.OemTilde => "`",
+			Key.OemClear => "Clear",
+			Key.Back => "Backspace",
+			Key.Return => "Enter",
+			Key.Escape => "Esc",
+			Key.Space => "Space",
+			Key.Add => "+",
+			Key.Subtract => "-",
+			Key.Multiply => "*",
+			Key.Divide => "/",
+			Key.Decimal => ".",
 			_ => Key.ToString()
 		};
 

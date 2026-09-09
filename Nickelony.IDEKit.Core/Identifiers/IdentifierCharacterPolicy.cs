@@ -5,36 +5,33 @@ namespace Nickelony.IDEKit.Core.Identifiers;
 /// </summary>
 /// <remarks>
 /// The policy distinguishes characters that may begin a token from characters that may appear
-/// within one, and optionally treats quotes or punctuation as token characters. The quote and
-/// punctuation flags add membership on top of the predicates, so a policy can extend
-/// <see cref="Default"/> without writing a custom predicate.
+/// within one. Both rules are caller-supplied predicates; the policy itself only caches them and
+/// exposes the evaluation order the boundary walkers rely on.
 /// </remarks>
 public sealed class IdentifierCharacterPolicy
 {
 	private readonly Func<char, bool> _isPartCharacter;
 	private readonly Func<char, bool> _isStartCharacter;
+	private Func<char, bool>? _partCharacterPredicate;
 
 	/// <summary>
-	/// Gets the policy that accepts letters, digits, and underscores as token characters.
+	/// Gets the policy that accepts letters, digits, and underscores as token characters. This is an
+	/// approximation, not a language identifier policy; see the remarks before relying on it.
 	/// </summary>
+	/// <remarks>
+	/// This is a C-like approximation: <see cref="char.IsLetterOrDigit(char)"/> works on UTF-16 code
+	/// units, so an astral-plane identifier splits at the surrogate pair, and the default
+	/// start-character rule accepts digits. It is also narrower than most language definitions:
+	/// combining marks (for example the acute accent of an NFD identifier) and connector punctuation
+	/// other than <c>_</c> are rejected. Use <see cref="Create"/> with explicit predicates for other
+	/// language rules.
+	/// </remarks>
 	public static IdentifierCharacterPolicy Default { get; } = Create(static character => char.IsLetterOrDigit(character) || character == '_');
 
-	/// <summary>
-	/// Gets a value indicating whether double and single quotes belong to a token.
-	/// </summary>
-	public bool IncludeQuotes { get; }
-
-	/// <summary>
-	/// Gets a value indicating whether punctuation and symbol characters belong to a token.
-	/// </summary>
-	public bool IncludePunctuation { get; }
-
-	private IdentifierCharacterPolicy(Func<char, bool> isPartCharacter, Func<char, bool>? isStartCharacter, bool includeQuotes, bool includePunctuation)
+	private IdentifierCharacterPolicy(Func<char, bool> isPartCharacter, Func<char, bool>? isStartCharacter)
 	{
 		_isPartCharacter = isPartCharacter;
 		_isStartCharacter = isStartCharacter ?? isPartCharacter;
-		IncludeQuotes = includeQuotes;
-		IncludePunctuation = includePunctuation;
 	}
 
 	/// <summary>
@@ -44,57 +41,40 @@ public sealed class IdentifierCharacterPolicy
 	/// <param name="isStartCharacter">
 	/// Determines whether a character may begin a token. Defaults to <paramref name="isPartCharacter"/>.
 	/// </param>
-	/// <param name="includeQuotes">
-	/// When <see langword="true"/>, double and single quotes belong to a token in addition to the
-	/// characters accepted by the predicates.
-	/// </param>
-	/// <param name="includePunctuation">
-	/// When <see langword="true"/>, punctuation and symbol characters belong to a token in addition
-	/// to the characters accepted by the predicates.
-	/// </param>
 	/// <returns>The created policy.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="isPartCharacter"/> is <see langword="null"/>.</exception>
 	public static IdentifierCharacterPolicy Create(
 		Func<char, bool> isPartCharacter,
-		Func<char, bool>? isStartCharacter = null,
-		bool includeQuotes = false,
-		bool includePunctuation = false)
+		Func<char, bool>? isStartCharacter = null)
 	{
 		ArgumentNullException.ThrowIfNull(isPartCharacter);
 
-		return new IdentifierCharacterPolicy(isPartCharacter, isStartCharacter, includeQuotes, includePunctuation);
+		return new IdentifierCharacterPolicy(isPartCharacter, isStartCharacter);
 	}
 
 	/// <summary>
 	/// Determines whether the character may begin a token.
 	/// </summary>
 	/// <param name="character">The character to test.</param>
-	/// <returns><see langword="true"/> if the character may begin a token; otherwise, <see langword="false"/>.</returns>
+	/// <returns><see langword="true"/> when the character may begin a token; otherwise, <see langword="false"/>.</returns>
 	public bool IsStartCharacter(char character)
-		=> _isStartCharacter(character) || IsFlaggedCharacter(character);
+		=> _isStartCharacter(character);
 
 	/// <summary>
 	/// Determines whether the character may appear within a token.
 	/// </summary>
 	/// <param name="character">The character to test.</param>
-	/// <returns><see langword="true"/> if the character may appear within a token; otherwise, <see langword="false"/>.</returns>
+	/// <returns><see langword="true"/> when the character may appear within a token; otherwise, <see langword="false"/>.</returns>
 	public bool IsPartCharacter(char character)
-		=> _isPartCharacter(character) || IsFlaggedCharacter(character);
-
-	private bool IsFlaggedCharacter(char character)
-		=> (IncludeQuotes && character is '"' or '\'')
-			|| (IncludePunctuation && (char.IsPunctuation(character) || char.IsSymbol(character)));
+		=> _isPartCharacter(character);
 
 	/// <summary>
-	/// Returns a copy of this policy that also treats double and single quotes as token characters.
+	/// Gets a cached delegate for <see cref="IsPartCharacter"/> so shared boundary walks do not
+	/// allocate a delegate per call.
 	/// </summary>
-	/// <returns>A policy with the same rules plus quote membership.</returns>
-	public IdentifierCharacterPolicy WithQuotes()
-		=> new(_isPartCharacter, _isStartCharacter, includeQuotes: true, IncludePunctuation);
-
-	/// <summary>
-	/// Returns a copy of this policy that also treats punctuation and symbols as token characters.
-	/// </summary>
-	/// <returns>A policy with the same rules plus punctuation membership.</returns>
-	public IdentifierCharacterPolicy WithPunctuation()
-		=> new(_isPartCharacter, _isStartCharacter, IncludeQuotes, includePunctuation: true);
+	/// <remarks>
+	/// The cache is intentionally unsynchronized: concurrent first calls may each create an
+	/// equivalent delegate, which is harmless, and a lock on this hot path is not warranted.
+	/// </remarks>
+	internal Func<char, bool> PartCharacterPredicate => _partCharacterPredicate ??= IsPartCharacter;
 }

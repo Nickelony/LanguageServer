@@ -1,7 +1,7 @@
 namespace Nickelony.LanguageServer.Client.Tests;
 
 [TestClass]
-public class DocumentReferenceTrackerTests
+public sealed class DocumentReferenceTrackerTests
 {
 	[TestMethod]
 	public void AcquireAndRelease_OpenAndRequestReferences_RemainAccurateUnderConcurrency()

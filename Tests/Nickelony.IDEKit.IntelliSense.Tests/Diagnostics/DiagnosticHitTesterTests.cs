@@ -1,23 +1,21 @@
+using Nickelony.IDEKit.Core.Diagnostics;
 using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.IDEKit.IntelliSense.Tests.Diagnostics;
 
-/// <summary>
-/// Tests diagnostic span selection and hover message formatting with <see cref="DiagnosticHitTester"/>.
-/// </summary>
 [TestClass]
 public sealed class DiagnosticHitTesterTests
 {
-	private static readonly TextEditorDiagnostic s_errorDiagnostic = new(TextEditorDiagnosticSeverity.Error, "boom", 5, 10);
-	private static readonly TextEditorDiagnostic s_warningDiagnostic = new(TextEditorDiagnosticSeverity.Warning, "careful", 20, 30);
-	private static readonly TextEditorDiagnostic s_hintDiagnostic = new(TextEditorDiagnosticSeverity.Hint, "hint", 22, 24);
+	private static readonly TextDiagnostic s_errorDiagnostic = new(TextDiagnosticSeverity.Error, "boom", 5, 10);
+	private static readonly TextDiagnostic s_warningDiagnostic = new(TextDiagnosticSeverity.Warning, "careful", 20, 30);
+	private static readonly TextDiagnostic s_hintDiagnostic = new(TextDiagnosticSeverity.Hint, "hint", 22, 24);
 
-	private static readonly TextEditorDiagnostic[] s_allDiagnostics = [s_errorDiagnostic, s_warningDiagnostic, s_hintDiagnostic];
+	private static readonly TextDiagnostic[] s_allDiagnostics = [s_errorDiagnostic, s_warningDiagnostic, s_hintDiagnostic];
 
 	[TestMethod]
 	public void GetDiagnosticsAtOffset_InsideSpan_ReturnsDiagnostic()
 	{
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 7);
+		IReadOnlyList<TextDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 7);
 
 		Assert.AreEqual(1, result.Count);
 		Assert.AreSame(s_errorDiagnostic, result[0]);
@@ -26,111 +24,104 @@ public sealed class DiagnosticHitTesterTests
 	[TestMethod]
 	public void GetDiagnosticsAtOffset_OutsideAllSpans_ReturnsEmpty()
 	{
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 15);
+		IReadOnlyList<TextDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 15);
 
 		Assert.AreEqual(0, result.Count);
 	}
 
 	[TestMethod]
-	public void GetDiagnosticsForRange_IntersectingSpans_ReturnsOrderedBySeverity()
+	public void EmptySelections_ReuseTheSharedEmptyResult()
 	{
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.GetDiagnosticsForRange(s_allDiagnostics, 21, 25);
+		// The no-match paths return one shared empty result instead of allocating per call.
+		IReadOnlyList<TextDiagnostic> offsetFirst = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 15);
+		IReadOnlyList<TextDiagnostic> offsetSecond = DiagnosticHitTester.GetDiagnosticsAtOffset(s_allDiagnostics, 15);
+		IReadOnlyList<TextDiagnostic> rangeFirst = DiagnosticHitTester.GetDiagnosticsForRange(s_allDiagnostics, 15, 18);
+		IReadOnlyList<TextDiagnostic> rangeSecond = DiagnosticHitTester.GetDiagnosticsForRange(s_allDiagnostics, 15, 18);
 
-		// The warning and hint spans intersect the queried range, and severity ordering places Warning before Hint.
+		Assert.AreEqual(0, offsetFirst.Count);
+		Assert.AreEqual(0, rangeFirst.Count);
+		Assert.AreSame(offsetFirst, offsetSecond);
+		Assert.AreSame(rangeFirst, rangeSecond);
+	}
+
+	[TestMethod]
+	public void GetDiagnosticsForRange_IntersectingSpans_ReturnsInDocumentOrder()
+	{
+		// Both spans intersect the queried range. Document order returns the warning (start 20)
+		// before the error (start 24) even though the error has the higher severity value.
+		var error = new TextDiagnostic(TextDiagnosticSeverity.Error, "error", 24, 28);
+		var warning = new TextDiagnostic(TextDiagnosticSeverity.Warning, "warning", 20, 30);
+
+		IReadOnlyList<TextDiagnostic> result = DiagnosticHitTester.GetDiagnosticsForRange([error, warning], 21, 25);
+
 		Assert.AreEqual(2, result.Count);
-		Assert.AreSame(s_warningDiagnostic, result[0]);
-		Assert.AreSame(s_hintDiagnostic, result[1]);
+		Assert.AreSame(warning, result[0]);
+		Assert.AreSame(error, result[1]);
 	}
 
 	[TestMethod]
-	public void SelectHoverDiagnostics_ExactOffsetHit_WinsOverFallback()
+	public void GetDiagnosticsAtOffset_MixedSeverities_KeepsDocumentOrder()
 	{
-		var overlapping = new[]
-		{
-			new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "exact", 7, 9),
-			s_warningDiagnostic,
-		};
+		// None (severity 0) starts after the error and must not be promoted ahead of it.
+		var none = new TextDiagnostic(TextDiagnosticSeverity.None, "none", 6, 9);
+		var error = new TextDiagnostic(TextDiagnosticSeverity.Error, "error", 5, 10);
 
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.SelectHoverDiagnostics(overlapping, 7, allowLineFallback: true, lineStartOffset: 0, lineEndOffset: 40);
+		IReadOnlyList<TextDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset([error, none], 7);
 
-		Assert.AreEqual(1, result.Count);
-		Assert.AreSame(overlapping[0], result[0]);
+		Assert.AreEqual(2, result.Count);
+		Assert.AreSame(error, result[0]);
+		Assert.AreSame(none, result[1]);
 	}
 
 	[TestMethod]
-	public void SelectHoverDiagnostics_OffsetInsideWarning_IncludesWarning()
+	public void GetDiagnosticsAtOffset_SameStartOffset_OrdersByEndOffset()
 	{
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.SelectHoverDiagnostics(s_allDiagnostics, 25, allowLineFallback: true, lineStartOffset: 18, lineEndOffset: 32);
+		var wider = new TextDiagnostic(TextDiagnosticSeverity.Warning, "wider", 5, 12);
+		var narrower = new TextDiagnostic(TextDiagnosticSeverity.Error, "narrower", 5, 8);
 
-		// The queried offset is within the warning span, so the exact-offset selection includes it.
-		Assert.IsTrue(result.Count >= 1);
-		Assert.IsTrue(result.Contains(s_warningDiagnostic));
+		IReadOnlyList<TextDiagnostic> result = DiagnosticHitTester.GetDiagnosticsAtOffset([wider, narrower], 6);
+
+		Assert.AreEqual(2, result.Count);
+		Assert.AreSame(narrower, result[0]);
+		Assert.AreSame(wider, result[1]);
 	}
 
 	[TestMethod]
-	public void SelectHoverDiagnostics_NoExactHit_NoFallback_ReturnsEmpty()
+	public void GetDiagnosticsAtOffset_EmptyDiagnosticSpan_MatchesExactlyItsOffset()
 	{
-		// No diagnostic covers offset 15, and line fallback is disabled.
-		IReadOnlyList<TextEditorDiagnostic> result = DiagnosticHitTester.SelectHoverDiagnostics(s_allDiagnostics, 15, allowLineFallback: false, lineStartOffset: 18, lineEndOffset: 32);
+		var empty = new TextDiagnostic(TextDiagnosticSeverity.Error, "empty", 7, 7);
 
-		Assert.AreEqual(0, result.Count);
+		Assert.AreEqual(1, DiagnosticHitTester.GetDiagnosticsAtOffset([empty], 7).Count);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsAtOffset([empty], 6).Count);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsAtOffset([empty], 8).Count);
 	}
 
 	[TestMethod]
-	public void FormatMessage_UnprefixedMessage_AddsSeverityLabel()
+	public void GetDiagnosticsForRange_EmptyDiagnosticSpan_IntersectsWhenItsOffsetIsInside()
 	{
-		string result = DiagnosticHitTester.FormatMessage(s_warningDiagnostic, severity => severity.ToString());
+		var empty = new TextDiagnostic(TextDiagnosticSeverity.Error, "empty", 7, 7);
 
-		Assert.AreEqual("Warning:\ncareful", result);
+		Assert.AreEqual(1, DiagnosticHitTester.GetDiagnosticsForRange([empty], 5, 10).Count);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsForRange([empty], 7, 7).Count);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsForRange([empty], 8, 10).Count);
 	}
 
 	[TestMethod]
-	public void FormatMessage_AlreadyPrefixedMessage_IsLeftAlone()
+	public void GetDiagnosticsForRange_EmptyOrReversedRange_SelectsNothing()
 	{
-		var prefixed = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "Warning: pre", 1, 5);
-		string result = DiagnosticHitTester.FormatMessage(prefixed, severity => severity.ToString());
+		var diagnostic = new TextDiagnostic(TextDiagnosticSeverity.Error, "error", 5, 10);
 
-		Assert.AreEqual("Warning: pre", result);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsForRange([diagnostic], 8, 8).Count);
+		Assert.AreEqual(0, DiagnosticHitTester.GetDiagnosticsForRange([diagnostic], 8, 6).Count);
 	}
 
 	[TestMethod]
-	public void FormatMessage_NullLabel_ReturnsRawMessage()
+	public void GetDiagnostics_NegativeArguments_Throw()
 	{
-		string result = DiagnosticHitTester.FormatMessage(s_warningDiagnostic, severityLabel: null);
+		var diagnostic = new TextDiagnostic(TextDiagnosticSeverity.Error, "error", 5, 10);
 
-		Assert.AreEqual("careful", result);
-	}
-
-	[TestMethod]
-	public void BuildCombinedMessage_DeduplicatesIdenticalFormattedMessages()
-	{
-		// Both diagnostics format to the same message, so the combined result contains one copy.
-		var first = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "same", 1, 2);
-		var duplicate = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "same", 4, 5);
-
-		string? result = DiagnosticHitTester.BuildCombinedMessage([first, duplicate], severity => severity.ToString());
-
-		Assert.AreEqual("Error:\nsame", result);
-	}
-
-	[TestMethod]
-	public void BuildCombinedMessage_DifferentMessages_AreCombined()
-	{
-		var first = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, "first", 1, 2);
-		var second = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Hint, "second", 4, 5);
-
-		string? result = DiagnosticHitTester.BuildCombinedMessage([first, second], severity => severity.ToString());
-
-		Assert.AreEqual("Error:\nfirst" + Environment.NewLine + Environment.NewLine + "Hint:\nsecond", result);
-	}
-
-	[TestMethod]
-	public void BuildCombinedMessage_AllEmptyMessages_ReturnsNull()
-	{
-		var empty = new TextEditorDiagnostic(TextEditorDiagnosticSeverity.Error, " ", 1, 2);
-
-		string? result = DiagnosticHitTester.BuildCombinedMessage([empty], severity => severity.ToString());
-
-		Assert.IsNull(result);
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => DiagnosticHitTester.GetDiagnosticsAtOffset([diagnostic], -1));
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => DiagnosticHitTester.GetDiagnosticsForRange([diagnostic], -1, 5));
+		Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => DiagnosticHitTester.GetDiagnosticsForRange([diagnostic], 0, -5));
 	}
 }

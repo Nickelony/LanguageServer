@@ -4,8 +4,9 @@ namespace Nickelony.LanguageServer.Client;
 /// Stores the neutral mirrored state for a tracked language-server document.
 /// </summary>
 /// <remarks>
-/// This type is safe for concurrent reads and mutations of its core tracked document fields.
-/// Derived types should still synchronize any additional mutable state they introduce.
+/// Individual property reads and mutations are atomic, but a multi-field view (for example the path/URI pair
+/// during a rename) is only consistent through <see cref="CreateSnapshot"/>. Derived types should still
+/// synchronize any additional mutable state they introduce.
 /// </remarks>
 public abstract class TrackedDocumentState
 {
@@ -19,38 +20,33 @@ public abstract class TrackedDocumentState
 	private long _lastAccessStamp;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="TrackedDocumentState"/> class.
+	/// Initializes a new instance of the <see cref="TrackedDocumentState"/> class from an initial-state payload.
 	/// </summary>
-	/// <param name="filePath">The normalized tracked file path.</param>
-	/// <param name="uri">The file URI mirrored to the language server.</param>
-	/// <param name="content">The latest synchronized document content.</param>
-	/// <param name="version">The tracked document version.</param>
-	/// <param name="isOpen">Whether the server currently considers the document open.</param>
-	/// <param name="openReferenceCount">The initial number of open-editor references.</param>
-	/// <param name="requestReferenceCount">The initial number of request-owned references.</param>
-	/// <param name="lastAccessStamp">The access stamp used for request-only eviction ordering.</param>
-	public TrackedDocumentState(
-		string filePath,
-		string uri,
-		string content,
-		int version,
-		bool isOpen,
-		int openReferenceCount,
-		int requestReferenceCount,
-		long lastAccessStamp)
+	/// <param name="initialState">The initial tracked-document state.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <see cref="TrackedDocumentInitialState.FilePath"/>, <see cref="TrackedDocumentInitialState.Uri"/>, or
+	/// <see cref="TrackedDocumentInitialState.Content"/> is <see langword="null"/>.
+	/// </exception>
+	/// <exception cref="ArgumentException">
+	/// <see cref="TrackedDocumentInitialState.FilePath"/> or <see cref="TrackedDocumentInitialState.Uri"/> is empty
+	/// or whitespace-only.
+	/// </exception>
+	public TrackedDocumentState(TrackedDocumentInitialState initialState)
 	{
-		ArgumentNullException.ThrowIfNull(filePath);
-		ArgumentNullException.ThrowIfNull(uri);
-		ArgumentNullException.ThrowIfNull(content);
+		ArgumentNullException.ThrowIfNull(initialState.FilePath);
+		ArgumentNullException.ThrowIfNull(initialState.Uri);
+		ArgumentNullException.ThrowIfNull(initialState.Content);
+		ArgumentException.ThrowIfNullOrWhiteSpace(initialState.FilePath);
+		ArgumentException.ThrowIfNullOrWhiteSpace(initialState.Uri);
 
-		_filePath = filePath;
-		_uri = uri;
-		_content = content;
-		_version = version;
-		_isOpen = isOpen;
-		_lastAccessStamp = lastAccessStamp;
+		_filePath = initialState.FilePath;
+		_uri = initialState.Uri;
+		_content = initialState.Content;
+		_version = initialState.Version;
+		_isOpen = initialState.IsOpen;
+		_lastAccessStamp = initialState.LastAccessStamp;
 
-		References = new DocumentReferenceTracker(openReferenceCount, requestReferenceCount);
+		References = new DocumentReferenceTracker(initialState.OpenReferenceCount, initialState.RequestReferenceCount);
 	}
 
 	/// <summary>
@@ -114,7 +110,7 @@ public abstract class TrackedDocumentState
 	}
 
 	/// <summary>
-	/// Gets the access stamp used for request-only eviction ordering.
+	/// Gets the access stamp used for idle-document eviction ordering.
 	/// </summary>
 	public long LastAccessStamp
 	{
@@ -141,7 +137,7 @@ public abstract class TrackedDocumentState
 	}
 
 	/// <summary>
-	/// Updates the request-only eviction ordering stamp.
+	/// Updates the access stamp used for idle-document eviction ordering.
 	/// </summary>
 	/// <param name="lastAccessStamp">The new access stamp.</param>
 	protected void SetLastAccessStamp(long lastAccessStamp)
@@ -154,6 +150,7 @@ public abstract class TrackedDocumentState
 	/// Reopens the tracked server document with fresh content and a new version.
 	/// </summary>
 	/// <param name="content">The reopened content.</param>
+	/// <exception cref="ArgumentNullException"><paramref name="content"/> is <see langword="null"/>.</exception>
 	protected void ReopenDocument(string content)
 	{
 		ArgumentNullException.ThrowIfNull(content);
@@ -171,6 +168,7 @@ public abstract class TrackedDocumentState
 	/// </summary>
 	/// <param name="content">The replacement content.</param>
 	/// <returns>The previous content snapshot.</returns>
+	/// <exception cref="ArgumentNullException"><paramref name="content"/> is <see langword="null"/>.</exception>
 	protected string ReplaceContent(string content)
 	{
 		ArgumentNullException.ThrowIfNull(content);
@@ -190,6 +188,9 @@ public abstract class TrackedDocumentState
 	/// </summary>
 	/// <param name="filePath">The normalized replacement file path.</param>
 	/// <param name="uri">The replacement file URI.</param>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="filePath"/> or <paramref name="uri"/> is <see langword="null"/>.
+	/// </exception>
 	protected void RenameDocument(string filePath, string uri)
 	{
 		ArgumentNullException.ThrowIfNull(filePath);
@@ -203,7 +204,7 @@ public abstract class TrackedDocumentState
 	}
 
 	/// <summary>
-	/// Marks the mirrored server document as closed while keeping the cached state alive.
+	/// Marks the locally mirrored server state as closed without contacting the server.
 	/// </summary>
 	protected void MarkDocumentClosed()
 	{

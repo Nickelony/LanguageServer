@@ -3,45 +3,68 @@ using Nickelony.IDEKit.IntelliSense.Diagnostics;
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Tracks local document state for LuaLS synchronization, including versions, diagnostics, and semantic token caches.
+/// Tracks local document state for LuaLS synchronization, including versions, diagnostics, and semantic-token caches.
 /// </summary>
+/// <remarks>
+/// The store accepts any local path: cached reads normalize the supplied path internally, so callers may pass
+/// an already-normalized path or a raw one.
+/// </remarks>
 internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 {
 	/// <summary>
 	/// Gets the cached diagnostics for the specified file path.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>The cached diagnostics, or an empty list when none are stored.</returns>
-	internal IReadOnlyList<TextEditorDiagnostic> GetDiagnostics(string filePath)
-		=> WithTrackedDocument(filePath, static state => state.DiagnosticsCache.Diagnostics, defaultValue: []);
+	/// <returns>
+	/// The cached diagnostics, ordered by start offset and then by severity, or an empty list when none are stored.
+	/// </returns>
+	internal IReadOnlyList<TextDiagnostic> GetDiagnostics(string filePath)
+		=> WithTrackedDocument(filePath, static state => state.DiagnosticsCache.Items, fallbackValue: []);
+
+	/// <summary>
+	/// Gets the cached diagnostics together with the content snapshot their offsets refer to.
+	/// </summary>
+	/// <param name="filePath">The local file path of the document.</param>
+	/// <returns>
+	/// The cached diagnostics and the content snapshot the payload was parsed against; an empty list and
+	/// <see langword="null"/> when nothing is stored. Consumers that convert the offsets back to positions
+	/// must use the returned snapshot, because it can differ from the caller's current document text.
+	/// </returns>
+	internal (IReadOnlyList<TextDiagnostic> Diagnostics, string? SourceContent) GetDiagnosticsSnapshot(string filePath)
+	{
+		return WithTrackedDocument(filePath,
+			static state => (state.DiagnosticsCache.Items, state.DiagnosticsCache.SourceContent),
+			fallbackValue: ((IReadOnlyList<TextDiagnostic>)[], null));
+	}
 
 	/// <summary>
 	/// Gets the cached semantic tokens for the specified file path.
 	/// </summary>
 	/// <param name="filePath">The local file path of the document.</param>
 	/// <returns>The cached semantic tokens, or an empty list when none are stored.</returns>
-	internal IReadOnlyList<LuaSemanticToken> GetSemanticTokens(string filePath)
-		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.Tokens, defaultValue: []);
-
-	/// <summary>
-	/// Gets the number of documents currently tracked by the store.
-	/// </summary>
-	internal int TrackedDocumentCount
-		=> TrackedDocumentCountCore;
+	internal IReadOnlyList<SemanticToken> GetSemanticTokens(string filePath)
+		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.Items, fallbackValue: []);
 
 	/// <summary>
 	/// Stores a diagnostics payload when it is not stale for the tracked document version.
 	/// </summary>
 	/// <param name="publishedDiagnostics">The diagnostics payload to cache.</param>
 	/// <param name="expectedDocumentVersion">The tracked document version observed when the payload was parsed.</param>
+	/// <param name="sourceContent">The content snapshot the diagnostic offsets were resolved against.</param>
 	/// <returns><see langword="true"/> when the payload was stored; otherwise, <see langword="false"/>.</returns>
-	internal bool TryStoreDiagnostics(LuaPublishedDiagnostics publishedDiagnostics, int expectedDocumentVersion)
+	internal bool TryStoreDiagnostics(LuaPublishedDiagnostics publishedDiagnostics, int expectedDocumentVersion, string sourceContent)
 	{
+		// The parser compared versions against the snapshot it read; this check runs inside the
+		// tracked-document lock to fence the parse-to-store window, so a payload parsed against an
+		// older snapshot cannot overwrite diagnostics stored for a newer version in the meantime.
+		// A payload with an unknown version (0) is accepted without advancing the cached version; a
+		// positive payload is accepted when the tracked version is unknown (0) and becomes the new
+		// cached version.
 		return WithTrackedDocument(
 			publishedDiagnostics.FilePath,
-			state => !HasTrackedDocumentVersionAdvanced(state, expectedDocumentVersion)
-				&& state.DiagnosticsCache.TryStore(publishedDiagnostics),
-			defaultValue: false);
+			state => LuaDocumentVersionPolicy.IsPayloadCurrent(state.Version, expectedDocumentVersion)
+				&& state.DiagnosticsCache.TryStore(publishedDiagnostics.Version, publishedDiagnostics.Diagnostics, sourceContent),
+			fallbackValue: false);
 	}
 
 	/// <summary>
@@ -51,50 +74,13 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 	/// <param name="version">The document version associated with the tokens.</param>
 	/// <param name="semanticTokens">The semantic tokens to cache.</param>
 	/// <returns><see langword="true"/> when the token set was stored; otherwise, <see langword="false"/>.</returns>
-	internal bool TryStoreSemanticTokens(string filePath, int version, IReadOnlyList<LuaSemanticToken> semanticTokens)
+	internal bool TryStoreSemanticTokens(string filePath, int version, IReadOnlyList<SemanticToken> semanticTokens)
 	{
 		return WithTrackedDocument(
 			filePath,
-			state => !HasTrackedDocumentVersionAdvanced(state, version)
+			state => LuaDocumentVersionPolicy.IsPayloadCurrent(state.Version, version)
 				&& state.SemanticTokensCache.TryStore(version, semanticTokens),
-			defaultValue: false);
-	}
-
-	/// <summary>
-	/// Returns the cached semantic-token delta state for <paramref name="filePath"/>, if any.
-	/// The provider uses the state to send <c>semanticTokens/full/delta</c> requests with the previous result ID.
-	/// </summary>
-	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>The cached delta state, or an empty state when the document is not tracked or has no usable delta state.</returns>
-	internal SemanticTokensDeltaState GetSemanticTokensDeltaState(string filePath)
-		=> WithTrackedDocument(filePath, static state => state.SemanticTokensCache.GetDeltaState(), new(null, null));
-
-	/// <summary>
-	/// Stores the raw <c>data</c> payload returned by <c>semanticTokens/full(/delta)</c> along with the
-	/// associated <c>resultId</c>. The values are copied so subsequent requests can ask LuaLS for incremental edits
-	/// without exposing the cached array to mutation.
-	/// </summary>
-	/// <param name="filePath">The local file path of the document.</param>
-	/// <param name="resultId">The server-provided semantic token result id.</param>
-	/// <param name="data">The cached integer token stream.</param>
-	internal void StoreSemanticTokensDeltaState(string filePath, string? resultId, int[]? data)
-		=> WithTrackedDocument(filePath, state => state.SemanticTokensCache.StoreDeltaState(resultId, data));
-
-	/// <summary>
-	/// Clears the cached semantic tokens for the specified file path.
-	/// </summary>
-	/// <param name="filePath">The local file path of the document.</param>
-	/// <returns>The empty semantic-token list after clearing, or an empty list when the document is not tracked.</returns>
-	internal IReadOnlyList<LuaSemanticToken> ClearSemanticTokens(string filePath)
-	{
-		return WithTrackedDocument(
-			filePath,
-			state =>
-			{
-				state.SemanticTokensCache.Clear();
-				return state.SemanticTokensCache.Tokens;
-			},
-			defaultValue: []);
+			fallbackValue: false);
 	}
 
 	/// <summary>
@@ -108,32 +94,19 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 			state =>
 			{
 				MarkTrackedDocumentClosed(state);
-				state.SemanticTokensCache.InvalidateServerSynchronization();
+
+				// The server-side synchronization is unknown after the invalidation, so both payload
+				// caches drop their version stamps and the next payload of either kind is accepted
+				// regardless of the version it reports.
+				state.DiagnosticsCache.ResetVersionStamp();
+				state.SemanticTokensCache.ResetVersionStamp();
 				return true;
 			},
-			defaultValue: false);
+			fallbackValue: false);
 	}
 
-	protected override LuaDocumentState CreateTrackedDocumentState(
-		string filePath,
-		string uri,
-		string content,
-		int version,
-		bool isOpen,
-		int openReferenceCount,
-		int requestReferenceCount,
-		long lastAccessStamp)
-	{
-		return new(
-			filePath,
-			uri,
-			content,
-			version,
-			isOpen,
-			openReferenceCount,
-			requestReferenceCount,
-			lastAccessStamp);
-	}
+	protected override LuaDocumentState CreateTrackedDocumentState(TrackedDocumentInitialState initialState)
+		=> new(initialState);
 
 	protected override long GetLastAccessStamp(LuaDocumentState state)
 		=> state.LastAccessStamp;
@@ -164,7 +137,4 @@ internal sealed class LuaDocumentStore : TrackedDocumentStore<LuaDocumentState>
 		state.DiagnosticsCache.Clear();
 		state.SemanticTokensCache.Clear();
 	}
-
-	private static bool HasTrackedDocumentVersionAdvanced(LuaDocumentState state, int expectedVersion)
-		=> expectedVersion > 0 && state.Version > 0 && state.Version != expectedVersion;
 }

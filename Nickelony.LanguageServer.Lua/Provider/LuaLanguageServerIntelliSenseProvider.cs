@@ -1,608 +1,190 @@
 using System.Collections.Concurrent;
-using Nickelony.IDEKit.IntelliSense.Diagnostics;
 
 namespace Nickelony.LanguageServer.Lua;
 
 /// <summary>
-/// Implements the Lua IntelliSense provider by synchronizing editor documents with LuaLS and caching its responses.
+/// Implements the Lua IntelliSense provider by synchronizing text documents with LuaLS and caching its diagnostics and semantic tokens.
 /// </summary>
 /// <remarks>
-/// The provider owns the language-server client supplied to its constructor and the workspace watcher created by its
-/// workspace coordinator. Dispose the provider when the host/editor no longer needs it; the provider detaches callbacks,
-/// cancels provider work, disposes the watcher, and then disposes the client.
+/// The provider owns the language-server client supplied to its constructor and the workspace watcher created by the
+/// provider framework; dispose the provider when the consumer no longer needs it. The disposal order and callback
+/// rules are defined by the base class.
 /// </remarks>
-public sealed partial class LuaLanguageServerIntelliSenseProvider : ILuaIntelliSenseProvider
+public sealed partial class LuaLanguageServerIntelliSenseProvider : LanguageServerIntelliSenseProviderBase<LuaDocumentState>, ILuaLanguageServerIntelliSenseProvider
 {
-	private readonly ILogger _logger;
+	private readonly LuaLanguageServerOptions _options;
+	private readonly Func<string, Func<FileChangeBatch, CancellationToken, Task>, Action<WorkspaceFileWatcher, Exception?>, WorkspaceFileWatcher>? _workspaceFileWatcherFactoryOverride;
 
-	private static readonly TimeSpan s_defaultRequestTimeout = TimeSpan.FromSeconds(10);
+	private readonly ConcurrentDictionary<string, CancellationTokenSource> _semanticTokenRequests = new(LanguageServerPaths.LocalPathComparer);
 
-	private static readonly Action<ILogger, string, Exception?> s_logMissingExecutable = LoggerMessage.Define<string>(
-		LogLevel.Error,
-		new EventId(1, nameof(LuaLanguageServerIntelliSenseProvider)),
-		"Lua language server executable is unavailable for workspace '{Workspace}'; IntelliSense is disabled until the host supplies a valid executable.");
+	private volatile bool _semanticTokenRequestAdmissionClosed;
+	private LuaDocumentStore? _documentStore;
 
-	private const int DefaultRequestTimeoutRestartThreshold = 2;
-	private const int HardStartupFailureThreshold = 3;
-	private const int MaxTrackedRequestOnlyDocuments = 16;
-
-	/// <summary>
-	/// Gets the workspace paths and file patterns mirrored to the Lua language server for external-change watching.
-	/// </summary>
-	internal static IReadOnlyList<WorkspaceWatchSpecification> WorkspaceWatchSpecifications { get; } = Array.AsReadOnly(
-	[
-		new WorkspaceWatchSpecification(".API", IncludeSubdirectories: false),
-		new WorkspaceWatchSpecification("*.lua", IncludeSubdirectories: true),
-		new WorkspaceWatchSpecification(".luarc.*", IncludeSubdirectories: false)
-	]);
-
-	private readonly string _workspaceRootDirectoryPath;
-	private readonly ILanguageServerClient? _client;
-	private readonly TimeSpan _requestTimeout;
-	private readonly int _requestTimeoutRestartThreshold;
-	private readonly LuaWorkspaceChangeCoordinator _workspaceChanges;
-
-	private readonly DocumentOperationScheduler _documentScheduler = new();
-	private readonly LuaDocumentStore _documents = new();
-	private readonly ConcurrentDictionary<string, CancellationTokenSource> _semanticTokenRequests = new(LanguageServerPathHelper.LocalPathComparer);
-
-	private readonly object _startupStateSyncRoot = new();
-	private readonly object _requestTimeoutSyncRoot = new();
-	private readonly object _callbackAdmissionSyncRoot = new();
-	private readonly SemaphoreSlim _startLock = new(1, 1);
-	private readonly CancellationTokenSource _disposeCts = new();
-
-	private Action<string, IReadOnlyList<TextEditorDiagnostic>>? _diagnosticsUpdated;
-	private Action<string, IReadOnlyList<LuaSemanticToken>>? _semanticTokensUpdated;
-	private Action? _capabilitiesChanged;
-	private Action<LanguageServerStartupFailure>? _startupFailed;
-	private Action<WorkspaceWatcherFailure>? _workspaceWatcherFailed;
-
-	private bool _startupSucceeded;
-	private long _readyTransportGeneration;
-	private long _lastUnavailableTransportGeneration;
-	private int _consecutiveStartupFailures;
-	private int _consecutiveRequestTimeouts;
-	private long _timedOutRequestGeneration = -1;
-	private long _restartRequestedGeneration = -1;
-	private bool _permanentStartupFailureReported;
-	private bool _transientStartupFailureReported;
-
-	private int _disposeStarted;
-	private volatile bool _isDisposed;
-	private bool _callbackAdmissionClosed;
-	private int _providerState = (int)LanguageServerProviderState.Unavailable;
+	private EventHandler<SemanticTokensUpdatedEventArgs>? _semanticTokensUpdated;
 
 	/// <inheritdoc/>
-	public bool IsAvailable
+	public event EventHandler<SemanticTokensUpdatedEventArgs>? SemanticTokensUpdated
 	{
-		get
-		{
-			return State == LanguageServerProviderState.Ready
-				&& !_isDisposed
-				&& _client is not null
-				&& _client.IsReady
-				&& GetStartupSucceeded();
-		}
-	}
-
-	/// <inheritdoc/>
-	public LanguageServerProviderState State
-		=> (LanguageServerProviderState)Volatile.Read(ref _providerState);
-
-	/// <inheritdoc/>
-	public bool SupportsReferences => IsAvailable && _client is not null && _client.SupportsReferences;
-
-	/// <inheritdoc/>
-	public bool SupportsRename => IsAvailable && _client is not null && _client.SupportsRename;
-
-	/// <inheritdoc/>
-	public bool SupportsFormatting => IsAvailable && _client is not null && _client.SupportsFormatting;
-
-	/// <inheritdoc/>
-	public event Action<string, IReadOnlyList<TextEditorDiagnostic>>? DiagnosticsUpdated
-	{
-		add
-		{
-			lock (_callbackAdmissionSyncRoot)
-			{
-				if (!_callbackAdmissionClosed)
-					_diagnosticsUpdated += value;
-			}
-		}
-		remove
-		{
-			lock (_callbackAdmissionSyncRoot)
-				_diagnosticsUpdated -= value;
-		}
-	}
-
-	/// <inheritdoc/>
-	public event Action<string, IReadOnlyList<LuaSemanticToken>>? SemanticTokensUpdated
-	{
-		add
-		{
-			lock (_callbackAdmissionSyncRoot)
-			{
-				if (!_callbackAdmissionClosed)
-					_semanticTokensUpdated += value;
-			}
-		}
-		remove
-		{
-			lock (_callbackAdmissionSyncRoot)
-				_semanticTokensUpdated -= value;
-		}
-	}
-
-	/// <inheritdoc/>
-	public event Action? CapabilitiesChanged
-	{
-		add
-		{
-			lock (_callbackAdmissionSyncRoot)
-			{
-				if (!_callbackAdmissionClosed)
-					_capabilitiesChanged += value;
-			}
-		}
-		remove
-		{
-			lock (_callbackAdmissionSyncRoot)
-				_capabilitiesChanged -= value;
-		}
-	}
-
-	/// <summary>
-	/// Occurs when a Lua language-server startup failure is reported to the host.
-	/// </summary>
-	/// <remarks>
-	/// Notifications may be delivered from background work. Consumers that touch UI controls must marshal to the UI thread.
-	/// Handlers for one event invocation run serially on the raising thread, and a failing handler does not prevent later
-	/// handlers from running. The event is raised once for a transient failure period and once when repeated failures
-	/// become persistent. A successful start clears the failure notification state. Disposal prevents new callbacks, but a
-	/// callback already in progress may finish.
-	/// </remarks>
-	public event Action<LanguageServerStartupFailure>? StartupFailed
-	{
-		add
-		{
-			lock (_callbackAdmissionSyncRoot)
-			{
-				if (!_callbackAdmissionClosed)
-					_startupFailed += value;
-			}
-		}
-		remove
-		{
-			lock (_callbackAdmissionSyncRoot)
-				_startupFailed -= value;
-		}
-	}
-
-	/// <summary>
-	/// Occurs when the external workspace watcher cannot start for an existing workspace or automatic recovery fails.
-	/// </summary>
-	/// <remarks>
-	/// Notifications may be delivered from background work. Consumers that touch UI controls must marshal to the UI thread.
-	/// Automatic recovery is attempted first; a successful recovery does not raise this event. The event is raised once
-	/// until the watcher starts successfully again. External workspace changes may not be forwarded while the watcher is
-	/// unavailable. Disposal prevents new callbacks, but a callback already in progress may finish.
-	/// </remarks>
-	public event Action<WorkspaceWatcherFailure>? WorkspaceWatcherFailed
-	{
-		add
-		{
-			lock (_callbackAdmissionSyncRoot)
-			{
-				if (!_callbackAdmissionClosed)
-					_workspaceWatcherFailed += value;
-			}
-		}
-		remove
-		{
-			lock (_callbackAdmissionSyncRoot)
-				_workspaceWatcherFailed -= value;
-		}
+		add => AddAdmittedCallback(ref _semanticTokensUpdated, value);
+		remove => RemoveCallback(ref _semanticTokensUpdated, value);
 	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class.
 	/// </summary>
-	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua script workspace.</param>
+	/// <param name="workspaceRootDirectoryPaths">
+	/// The root directories of the current Lua script workspace. The first entry is the primary root; every
+	/// entry is watched for external changes. Entries may be nested; duplicates are rejected by local-path
+	/// identity after normalization.
+	/// </param>
 	/// <param name="serverExecutablePath">The LuaLS executable path, or <see langword="null"/> when unavailable.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
-	public LuaLanguageServerIntelliSenseProvider(string workspaceRootDirectoryPath, string? serverExecutablePath, ILogger<LuaLanguageServerIntelliSenseProvider>? logger = null)
-		: this(workspaceRootDirectoryPath,
-			CreateClient(workspaceRootDirectoryPath, serverExecutablePath),
-			s_defaultRequestTimeout,
-			DefaultRequestTimeoutRestartThreshold,
-			logger: logger)
-	{
-		ArgumentNullException.ThrowIfNull(workspaceRootDirectoryPath);
-	}
+	/// <exception cref="ArgumentException">
+	/// <paramref name="workspaceRootDirectoryPaths"/> is empty or contains an empty, whitespace-only, or duplicate entry.
+	/// </exception>
+	/// <exception cref="ArgumentNullException"><paramref name="workspaceRootDirectoryPaths"/> is <see langword="null"/>.</exception>
+	public LuaLanguageServerIntelliSenseProvider(IReadOnlyList<string> workspaceRootDirectoryPaths, string? serverExecutablePath, ILogger<LuaLanguageServerIntelliSenseProvider>? logger = null)
+		: this(workspaceRootDirectoryPaths, serverExecutablePath, LuaLanguageServerOptions.Default, logger)
+	{ }
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class with custom LuaLS settings.
+	/// </summary>
+	/// <param name="workspaceRootDirectoryPaths">
+	/// The root directories of the current Lua script workspace. The first entry is the primary root; every
+	/// entry is watched for external changes. Entries may be nested; duplicates are rejected by local-path
+	/// identity after normalization.
+	/// </param>
+	/// <param name="serverExecutablePath">The LuaLS executable path, or <see langword="null"/> when unavailable.</param>
+	/// <param name="options">The LuaLS settings overrides to apply for this workspace.</param>
+	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
+	/// <exception cref="ArgumentException">
+	/// <paramref name="workspaceRootDirectoryPaths"/> is empty or contains an empty, whitespace-only, or duplicate entry.
+	/// </exception>
+	/// <exception cref="ArgumentNullException">
+	/// <paramref name="workspaceRootDirectoryPaths"/> or <paramref name="options"/> is <see langword="null"/>.
+	/// </exception>
+	public LuaLanguageServerIntelliSenseProvider(IReadOnlyList<string> workspaceRootDirectoryPaths, string? serverExecutablePath, LuaLanguageServerOptions options, ILogger<LuaLanguageServerIntelliSenseProvider>? logger = null)
+		: this(workspaceRootDirectoryPaths,
+			CreateClient(workspaceRootDirectoryPaths, serverExecutablePath, ValidateOptions(options)),
+			logger: logger,
+			luaOptions: options)
+	{ }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="LuaLanguageServerIntelliSenseProvider"/> class for testing and dependency injection.
 	/// </summary>
-	/// <param name="workspaceRootDirectoryPath">The root directory of the current Lua script workspace.</param>
+	/// <param name="workspaceRootDirectoryPaths">
+	/// The root directories of the current Lua script workspace, in caller order. Entries may be nested;
+	/// duplicates are rejected by local-path identity after normalization.
+	/// </param>
 	/// <param name="client">The language server client, or <see langword="null"/> when unavailable.</param>
-	/// <param name="requestTimeout">The per-request timeout, or <see langword="null"/> for the default.</param>
-	/// <param name="requestTimeoutRestartThreshold">The number of consecutive request timeouts before the current transport is marked unhealthy and the next request triggers a restart.</param>
-	/// <param name="workspaceFileWatcherFactory">A factory for creating workspace file watchers, used for testing.</param>
+	/// <param name="providerOptions">The provider tunables, or <see langword="null"/> for the framework defaults.</param>
+	/// <param name="workspaceFileWatcherFactory">Overrides workspace watcher creation, or <see langword="null"/> for the framework default.</param>
 	/// <param name="logger">The logger instance, or <see langword="null"/> for a no-op logger.</param>
+	/// <param name="luaOptions">The LuaLS settings overrides, or <see langword="null"/> for the defaults.</param>
 	/// <remarks>
 	/// Ownership of <paramref name="client"/> transfers to the provider. The client is disposed when this provider is
-	/// disposed, including when construction completed only partially and startup never succeeded.
+	/// disposed; when construction fails after the transfer, the base class disposes the client as construction
+	/// unwinds.
 	/// </remarks>
-	internal LuaLanguageServerIntelliSenseProvider(string workspaceRootDirectoryPath, ILanguageServerClient? client,
-		TimeSpan? requestTimeout = null,
-		int requestTimeoutRestartThreshold = DefaultRequestTimeoutRestartThreshold,
+	internal LuaLanguageServerIntelliSenseProvider(IReadOnlyList<string> workspaceRootDirectoryPaths, ILanguageServerClient? client,
+		LanguageServerProviderOptions? providerOptions = null,
 		Func<string, Func<FileChangeBatch, CancellationToken, Task>, Action<WorkspaceFileWatcher, Exception?>, WorkspaceFileWatcher>? workspaceFileWatcherFactory = null,
-		ILogger<LuaLanguageServerIntelliSenseProvider>? logger = null)
+		ILogger<LuaLanguageServerIntelliSenseProvider>? logger = null,
+		LuaLanguageServerOptions? luaOptions = null)
+		: base(workspaceRootDirectoryPaths,
+			client,
+			providerOptions,
+			logger)
 	{
-		_logger = logger ?? NullLogger<LuaLanguageServerIntelliSenseProvider>.Instance;
+		_options = luaOptions ?? LuaLanguageServerOptions.Default;
+		_workspaceFileWatcherFactoryOverride = workspaceFileWatcherFactory;
 
-		_workspaceRootDirectoryPath = LanguageServerPathHelper.NormalizeLocalPath(workspaceRootDirectoryPath);
-		_client = client;
-		_requestTimeout = requestTimeout ?? s_defaultRequestTimeout;
-		_requestTimeoutRestartThreshold = Math.Max(1, requestTimeoutRestartThreshold);
-		_workspaceChanges = new LuaWorkspaceChangeCoordinator(
-			_workspaceRootDirectoryPath,
-			WorkspaceWatchSpecifications,
-			workspaceFileWatcherFactory ?? CreateWorkspaceFileWatcher,
-			() => _client,
-			() => _isDisposed,
-			EnsureStartedAsync,
-			MarkWorkspaceTransportUnavailable,
-			RaiseWorkspaceWatcherFailed,
-			_logger);
-
-		if (_client is not null)
-		{
-			_client.DiagnosticsPublished += HandleDiagnosticsPublished;
-			_client.SemanticTokensRefreshRequested += HandleSemanticTokensRefreshRequested;
-			_client.TransportUnavailable += HandleTransportUnavailable;
-		}
+		if (Client is not null)
+			Client.SemanticTokensRefreshRequested += HandleSemanticTokensRefreshRequested;
 	}
 
-	private static ILanguageServerClient? CreateClient(string workspaceRootDirectoryPath, string? serverExecutablePath)
+	/// <inheritdoc/>
+	protected override WorkspaceFileWatcher CreateWorkspaceFileWatcher(
+		string workspaceRootDirectoryPath,
+		Func<FileChangeBatch, CancellationToken, Task> dispatchAsync,
+		Action<WorkspaceFileWatcher, Exception?> onWatcherFailed)
 	{
+		return _workspaceFileWatcherFactoryOverride?.Invoke(workspaceRootDirectoryPath, dispatchAsync, onWatcherFailed)
+			?? base.CreateWorkspaceFileWatcher(workspaceRootDirectoryPath, dispatchAsync, onWatcherFailed);
+	}
+
+	/// <inheritdoc/>
+	public IReadOnlyList<SemanticToken> GetSemanticTokens(string filePath)
+	{
+		ArgumentNullException.ThrowIfNull(filePath);
+
+		if (IsDisposed)
+			return [];
+
+		if (!LanguageServerPaths.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
+		{
+			Logger.LogDebug("Lua semantic-token read for '{FilePath}' was dropped because the path is not a usable local path.", filePath);
+			return [];
+		}
+
+		return DocumentStore.GetSemanticTokens(normalizedFilePath);
+	}
+
+	/// <summary>
+	/// Gets the tracked-document store as the typed Lua store.
+	/// </summary>
+	/// <remarks>
+	/// The instance is created by <see cref="CreateTrackedDocumentStore"/> and stashed during the base
+	/// constructor, so no downcast of the base property is needed.
+	/// </remarks>
+	private LuaDocumentStore DocumentStore => _documentStore!;
+
+	private static LanguageServerClient? CreateClient(IReadOnlyList<string> workspaceRootDirectoryPaths, string? serverExecutablePath, LuaLanguageServerOptions options)
+	{
+		// The base constructor validates the roots only after this factory has run, so validate them
+		// here first: an invalid root list must fail before a client exists. The empty list is
+		// rejected explicitly because the shared path helper accepts it for folderless client
+		// sessions, while this provider layer requires at least one root.
+		string[] normalizedRoots = LanguageServerPaths.NormalizeWorkspaceRoots(workspaceRootDirectoryPaths);
+
+		if (normalizedRoots.Length == 0)
+			throw new ArgumentException("At least one workspace root directory path is required.", nameof(workspaceRootDirectoryPaths));
+
 		if (string.IsNullOrWhiteSpace(serverExecutablePath))
 			return null;
 
-		string normalizedRoot = LanguageServerPathHelper.NormalizeLocalPath(workspaceRootDirectoryPath);
-
-		return new LanguageServerClient(normalizedRoot, serverExecutablePath, new LanguageServerClientOptions(
-			() => LuaLanguageServerSettingsFactory.Create(normalizedRoot))
+		return new LanguageServerClient(workspaceRootDirectoryPaths, serverExecutablePath, new LanguageServerClientOptions(
+			() => LuaLanguageServerSettingsFactory.Create(options))
 		{
 			ClientCapabilitiesProvider = _ => LuaLanguageServerClientCapabilitiesFactory.Create(),
 			InitializationOptionsProvider = _ => LuaLanguageServerInitializationOptionsFactory.Create()
 		});
 	}
 
-	private static WorkspaceFileWatcher CreateWorkspaceFileWatcher(
-		string workspaceRootDirectoryPath,
-		Func<FileChangeBatch, CancellationToken, Task> dispatchAsync,
-		Action<WorkspaceFileWatcher, Exception?> onWatcherFailed)
+	private static LuaLanguageServerOptions ValidateOptions(LuaLanguageServerOptions options)
 	{
-		return new(workspaceRootDirectoryPath, dispatchAsync, WorkspaceWatchSpecifications, onWatcherFailed);
+		ArgumentNullException.ThrowIfNull(options);
+		return options;
 	}
 
-	/// <inheritdoc/>
-	public IReadOnlyList<TextEditorDiagnostic> GetDiagnostics(string filePath)
-	{
-		ArgumentNullException.ThrowIfNull(filePath);
+	/// <summary>
+	/// Resolves the normalized document path a parse closure needs for same-document filtering or edit
+	/// targeting.
+	/// </summary>
+	/// <remarks>
+	/// The request pipeline performs the same normalization before invoking a parse closure, so the raw
+	/// input path is only the fallback for a request that never reaches its closure.
+	/// </remarks>
+	/// <param name="filePath">The caller-supplied document path.</param>
+	/// <returns>The normalized path, or the raw path when normalization fails.</returns>
+	private static string ResolveDocumentFilePath(string filePath)
+		=> LanguageServerPaths.TryNormalizeLocalPath(filePath, out string normalizedFilePath) ? normalizedFilePath : filePath;
 
-		if (_isDisposed)
-			return [];
-
-		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
-			return [];
-
-		return _documents.GetDiagnostics(normalizedFilePath);
-	}
-
-	/// <inheritdoc/>
-	public IReadOnlyList<LuaSemanticToken> GetSemanticTokens(string filePath)
-	{
-		ArgumentNullException.ThrowIfNull(filePath);
-
-		if (_isDisposed)
-			return [];
-
-		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
-			return [];
-
-		return _documents.GetSemanticTokens(normalizedFilePath);
-	}
-
-	/// <inheritdoc/>
-	public void OpenDocument(string filePath, string content)
-	{
-		ArgumentNullException.ThrowIfNull(filePath);
-		ArgumentNullException.ThrowIfNull(content);
-
-		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
-			return;
-
-		CancelQueuedDocumentUpdate(normalizedFilePath);
-
-		ObserveBackgroundTask(SynchronizeDocumentAsync(normalizedFilePath, content,
-			acquireOpenReference: true,
-			acquireRequestReference: false,
-			refreshSemanticTokens: true,
-			CancellationToken.None), $"Document open '{normalizedFilePath}'");
-	}
-
-	/// <inheritdoc/>
-	public void UpdateDocument(string filePath, string content)
-	{
-		ArgumentNullException.ThrowIfNull(filePath);
-		ArgumentNullException.ThrowIfNull(content);
-
-		if (!LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
-			return;
-
-		ObserveBackgroundTask(QueueLatestDocumentUpdateAsync(normalizedFilePath, content), $"Document change '{normalizedFilePath}'");
-	}
-
-	/// <inheritdoc/>
-	public void CloseDocument(string filePath)
-	{
-		ArgumentNullException.ThrowIfNull(filePath);
-
-		if (_isDisposed || _client is null || !LanguageServerPathHelper.TryNormalizeLocalPath(filePath, out string normalizedFilePath))
-			return;
-
-		CancelQueuedDocumentUpdate(normalizedFilePath);
-
-		ObserveBackgroundTask(CloseDocumentAsync(normalizedFilePath, CancellationToken.None), $"Document close '{normalizedFilePath}'");
-	}
-
-	private void MarkWorkspaceTransportUnavailable(long transportGeneration)
-	{
-		ILanguageServerClient? client = _client;
-
-		if (client is null)
-			return;
-
-		try
-		{
-			if (client.TryMarkTransportUnhealthy(transportGeneration))
-				MarkStartupTransportUnavailable();
-		}
-		catch (Exception exception)
-		{
-			_logger.LogDebug(exception, "Failed to mark the Lua language server transport unhealthy after a workspace-watcher send failure.");
-		}
-	}
-
-	private void RaiseDiagnosticsUpdated(string filePath, IReadOnlyList<TextEditorDiagnostic> diagnostics)
-	{
-		if (!TrySnapshotCallbackHandlers(() => _diagnosticsUpdated, out Delegate? handlers))
-			return;
-
-		InvokeSubscribersSafely(
-			handlers,
-			handler => ((Action<string, IReadOnlyList<TextEditorDiagnostic>>)handler)(filePath, diagnostics),
-			"Lua diagnostics subscriber");
-	}
-
-	private void HandleTransportUnavailable(long transportGeneration)
-	{
-		// The client clears its current capability snapshot before raising this event. Match the
-		// event against the generation that most recently reached Ready, not the reset snapshot.
-		lock (_startupStateSyncRoot)
-		{
-			if (_isDisposed)
-				return;
-
-			if (transportGeneration > _lastUnavailableTransportGeneration)
-				_lastUnavailableTransportGeneration = transportGeneration;
-
-			if (!_startupSucceeded
-				|| _readyTransportGeneration != transportGeneration)
-			{
-				return;
-			}
-
-			_startupSucceeded = false;
-		}
-
-		SetProviderState(LanguageServerProviderState.Unavailable, notifyCapabilitiesChanged: true);
-	}
-
-	private void RaiseSemanticTokensUpdated(string filePath, IReadOnlyList<LuaSemanticToken> semanticTokens)
-	{
-		if (!TrySnapshotCallbackHandlers(() => _semanticTokensUpdated, out Delegate? handlers))
-			return;
-
-		InvokeSubscribersSafely(
-			handlers,
-			handler => ((Action<string, IReadOnlyList<LuaSemanticToken>>)handler)(filePath, semanticTokens),
-			"Lua semantic token subscriber");
-	}
-
-	private void RaiseCapabilitiesChanged()
-	{
-		if (!TrySnapshotCallbackHandlers(() => _capabilitiesChanged, out Delegate? handlers))
-			return;
-
-		InvokeSubscribersSafely(
-			handlers,
-			handler => ((Action)handler)(),
-			"Lua capability-change subscriber");
-	}
-
-	private void RaiseStartupFailed(LanguageServerStartupFailure failure)
-	{
-		if (!TrySnapshotCallbackHandlers(() => _startupFailed, out Delegate? handlers))
-			return;
-
-		InvokeSubscribersSafely(
-			handlers,
-			handler => ((Action<LanguageServerStartupFailure>)handler)(failure),
-			"Lua IntelliSense startup-failure subscriber");
-	}
-
-	private void RaiseWorkspaceWatcherFailed(WorkspaceWatcherFailure failure)
-	{
-		if (!TrySnapshotCallbackHandlers(() => _workspaceWatcherFailed, out Delegate? handlers))
-			return;
-
-		InvokeSubscribersSafely(
-			handlers,
-			handler => ((Action<WorkspaceWatcherFailure>)handler)(failure),
-			"Lua workspace-watcher subscriber");
-	}
-
-	private bool TrySnapshotCallbackHandlers(Func<Delegate?> callbackAccessor, out Delegate? handlers)
-	{
-		lock (_callbackAdmissionSyncRoot)
-		{
-			if (_callbackAdmissionClosed || _isDisposed)
-			{
-				handlers = null;
-				return false;
-			}
-
-			handlers = callbackAccessor();
-			return handlers is not null;
-		}
-	}
-
-	private bool TryAdmitCallback()
-	{
-		lock (_callbackAdmissionSyncRoot)
-			return !_callbackAdmissionClosed && !_isDisposed;
-	}
-
-	private void InvokeSubscribersSafely(Delegate? handlers, Action<Delegate> invoke, string subscriberDescription)
-	{
-		if (handlers is null)
-			return;
-
-		foreach (Delegate handler in handlers.GetInvocationList())
-		{
-			if (!TryAdmitCallback())
-				return;
-
-			try
-			{
-				invoke(handler);
-			}
-			catch (Exception exception)
-			{
-				_logger.LogWarning(exception, "{SubscriberDescription} threw; later subscribers will still be notified.", subscriberDescription);
-			}
-		}
-	}
-
-	private void SetProviderState(LanguageServerProviderState state, bool notifyCapabilitiesChanged = false)
-	{
-		LanguageServerProviderState previousState;
-
-		lock (_startupStateSyncRoot)
-		{
-			if (_isDisposed && state != LanguageServerProviderState.Disposed)
-				return;
-
-			previousState = (LanguageServerProviderState)_providerState;
-
-			if (previousState == LanguageServerProviderState.Disposed && state != LanguageServerProviderState.Disposed)
-				return;
-
-			Volatile.Write(ref _providerState, (int)state);
-		}
-
-		if (notifyCapabilitiesChanged && previousState != state)
-			RaiseCapabilitiesChanged();
-	}
-
-	private int GetConsecutiveStartupFailures()
-	{
-		lock (_startupStateSyncRoot)
-			return _consecutiveStartupFailures;
-	}
-
-	private bool GetStartupSucceeded()
-	{
-		lock (_startupStateSyncRoot)
-			return _startupSucceeded;
-	}
-
-	private bool TryMarkStartupFailureReported(bool isPermanentFailure)
-	{
-		lock (_startupStateSyncRoot)
-		{
-			if (isPermanentFailure)
-			{
-				if (_permanentStartupFailureReported)
-					return false;
-
-				_permanentStartupFailureReported = true;
-				return true;
-			}
-
-			if (_transientStartupFailureReported)
-				return false;
-
-			_transientStartupFailureReported = true;
-			return true;
-		}
-	}
-
-	private void MarkStartupTransportUnavailable()
-	{
-		lock (_startupStateSyncRoot)
-			_startupSucceeded = false;
-
-		SetProviderState(LanguageServerProviderState.Unavailable, notifyCapabilitiesChanged: true);
-	}
-
-	private bool TryCompleteSuccessfulStart(long transportGeneration)
-	{
-		LanguageServerProviderState previousState;
-
-		lock (_startupStateSyncRoot)
-		{
-			if (_isDisposed
-				|| transportGeneration == 0
-				|| _lastUnavailableTransportGeneration == transportGeneration
-				|| _client is null
-				|| !_client.IsReady
-				|| _client.TransportGeneration != transportGeneration)
-			{
-				_startupSucceeded = false;
-				return false;
-			}
-
-			_startupSucceeded = true;
-			_readyTransportGeneration = transportGeneration;
-			_consecutiveStartupFailures = 0;
-			_transientStartupFailureReported = false;
-			_permanentStartupFailureReported = false;
-
-			previousState = (LanguageServerProviderState)_providerState;
-			Volatile.Write(ref _providerState, (int)LanguageServerProviderState.Ready);
-		}
-
-		if (previousState != LanguageServerProviderState.Ready
-			&& State == LanguageServerProviderState.Ready)
-		{
-			RaiseCapabilitiesChanged();
-		}
-
-		return true;
-	}
-
-	private int RegisterStartupFailure()
-	{
-		lock (_startupStateSyncRoot)
-		{
-			_startupSucceeded = false;
-			return ++_consecutiveStartupFailures;
-		}
-	}
+	private void RaiseSemanticTokensUpdated(string filePath, IReadOnlyList<SemanticToken> semanticTokens)
+		=> RaiseSubscribers(
+			() => _semanticTokensUpdated,
+			handler => ((EventHandler<SemanticTokensUpdatedEventArgs>)handler)(this, new SemanticTokensUpdatedEventArgs(filePath, semanticTokens)),
+			"Lua semantic-token subscriber");
 }

@@ -19,12 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Shared\TestHelpers\STATestHelper.cs" Link="Shared\STATestHelper.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
-    <Using Include="Nickelony.IDEKit.Testing" />
   </ItemGroup>
 
 </Project>
